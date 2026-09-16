@@ -120,7 +120,7 @@ public class ProjectQueryService {
         if (size == null) {
             return DEFAULT_SIZE;
         }
-        return Math.min(size, MAX_SIZE);
+        return Math.max(1, Math.min(size, MAX_SIZE));
     }
 
     /** Defaults to page 0 if not provided or negative. */
