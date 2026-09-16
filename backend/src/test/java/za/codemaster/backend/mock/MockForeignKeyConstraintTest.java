@@ -23,7 +23,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
-public class MockkForeignKeyConstraintTest {
+public class MockForeignKeyConstraintTest {
 
     @Mock
     private JdbcTemplate jdbcTemplate;
@@ -168,5 +168,48 @@ public class MockkForeignKeyConstraintTest {
     private boolean rootRootCauseMatches(String rootCause) {
         return rootCause.contains("projects_connection_check") || 
                rootCause.contains("violates check constraint");
+    }
+
+    // V3 migration tests
+    @Test
+    @DisplayName("V3 Acceptance Criteria 1: Reject duplicate (project_id, user_id) in project_maintainers")
+    void shouldRejectDuplicateProjectMaintainerPair() {
+        when(jdbcTemplate.update(
+            contains("INSERT INTO project_maintainers"),
+            eq(1L), eq(1L), eq("maintainer")
+        )).thenThrow(new DataIntegrityViolationException(
+            "ERROR: duplicate key value violates unique constraint \"uq_project_maintainers_project_user\""
+        ));
+
+        DataIntegrityViolationException exception = assertThrows(
+            DataIntegrityViolationException.class,
+            () -> jdbcTemplate.update(
+                "INSERT INTO project_maintainers (project_id, user_id, role) VALUES (?, ?, ?)",
+                1L, 1L, "maintainer"
+            )
+        );
+
+        assertTrue(exception.getMessage().contains("uq_project_maintainers_project_user"));
+    }
+
+    @Test
+    @DisplayName("V3 Acceptance Criteria 2: Reject duplicate (project_id, github_issue_number) in issues")
+    void shouldRejectDuplicateProjectIssueNumberPair() {
+        when(jdbcTemplate.update(
+            contains("INSERT INTO issues"),
+            eq(1L), eq(42), anyString(), anyString(), eq("open")
+        )).thenThrow(new DataIntegrityViolationException(
+            "ERROR: duplicate key value violates unique constraint \"uq_issues_project_issue_number\""
+        ));
+
+        DataIntegrityViolationException exception = assertThrows(
+            DataIntegrityViolationException.class,
+            () -> jdbcTemplate.update(
+                "INSERT INTO issues (project_id, github_issue_number, github_url, title, status) VALUES (?, ?, ?, ?, ?)",
+                1L, 42, "https://github.com/codemaster/issues-repo/issues/42", "Duplicate issue", "open"
+            )
+        );
+
+        assertTrue(exception.getMessage().contains("uq_issues_project_issue_number"));
     }
 }
