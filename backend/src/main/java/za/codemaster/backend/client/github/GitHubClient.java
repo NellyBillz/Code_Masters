@@ -3,16 +3,25 @@ package za.codemaster.backend.client.github;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import za.codemaster.backend.dto.GitHubProjectMetadata;
+import za.codemaster.backend.dto.GitHubRepositoryResponse;
+
+import java.time.OffsetDateTime;
+import java.util.Map;
 
 /**
  * Thin wrapper around the GitHub REST API.
  * <p>
- * GH-1.2 spike scope only: prove that {@code GITHUB_API_TOKEN} authenticates
- * a real call. There is deliberately no response mapping / DTO parsing here
- * yet - that lands in the follow-up ticket once the plumbing is confirmed.
+ * {@link #verifyAuthenticatedCall} is the original GH-1.2 spike: it proves
+ * {@code GITHUB_API_TOKEN} authenticates a real call and deliberately does
+ * no response mapping. {@link #fetchProjectMetadata} is GH-1: it reuses that
+ * same proven auth plumbing but actually parses the response into the
+ * plain, decoupled {@link GitHubProjectMetadata}.
  * <p>
  * Auth header format confirmed against GitHub's current REST API auth docs
  * (docs.github.com/en/rest/authentication/authenticating-to-the-rest-api,
@@ -50,16 +59,11 @@ public class GitHubClient {
      * @param repo  repo name, e.g. "Hello-World"
      */
     public void verifyAuthenticatedCall(String owner, String repo) {
-        if (token == null || token.isBlank()) {
-            throw new IllegalStateException(
-                    "github.api.token is not set - export GITHUB_API_TOKEN (see backend/.env.example)");
-        }
+        requireToken();
 
         ResponseEntity<String> response = restClient.get()
                 .uri("/repos/{owner}/{repo}", owner, repo)
-                .header("Authorization", "Bearer " + token)
-                .header("Accept", "application/vnd.github+json")
-                .header("X-GitHub-Api-Version", GITHUB_API_VERSION)
+                .headers(this::attachAuthHeaders)
                 .retrieve()
                 .toEntity(String.class);
 
@@ -72,6 +76,78 @@ public class GitHubClient {
         if (!"5000".equals(rateLimit)) {
             log.warn("X-RateLimit-Limit was '{}', not 5000 - token is likely NOT authenticating "
                     + "(60 means unauthenticated fallback). Check GITHUB_API_TOKEN.", rateLimit);
+        }
+    }
+
+    /**
+     * Fetches and normalizes metadata for {@code owner/repo} into a plain,
+     * unit-testable {@link GitHubProjectMetadata} - the real GH-1 deliverable
+     * that turns the {@link #verifyAuthenticatedCall} spike into something
+     * callers can actually use.
+     * <p>
+     * Makes two calls: {@code GET /repos/{owner}/{repo}} for the core fields
+     * (mapped into {@link GitHubRepositoryResponse}, GitHub's raw shape) and
+     * {@code GET /repos/{owner}/{repo}/languages} for the per-language byte
+     * breakdown (GitHub returns that as a flat {@code language -> bytes}
+     * object, so a {@code Map<String, Long>} maps it directly - no extra DTO
+     * needed). The two are merged into one {@link GitHubProjectMetadata}.
+     * <p>
+     * Numeric/license/language fields fall back to {@code 0} / {@code null}
+     * / an empty map when GitHub omits them, rather than throwing - GitHub
+     * legitimately returns nulls here (e.g. no LICENSE file, no detected
+     * language, empty repo has no languages).
+     *
+     * @param owner repo owner/org, e.g. "octocat"
+     * @param repo  repo name, e.g. "Hello-World"
+     * @return normalized, plain project metadata (see its javadoc for the
+     *         GH-1.7 field/type contract)
+     * @throws IllegalStateException if {@code github.api.token} is unset, or
+     *                                GitHub returns an empty repo body
+     */
+    public GitHubProjectMetadata fetchProjectMetadata(String owner, String repo) {
+        requireToken();
+
+        GitHubRepositoryResponse repository = restClient.get()
+                .uri("/repos/{owner}/{repo}", owner, repo)
+                .headers(this::attachAuthHeaders)
+                .retrieve()
+                .body(GitHubRepositoryResponse.class);
+
+        if (repository == null) {
+            throw new IllegalStateException(
+                    "GitHub returned an empty repository body for " + owner + "/" + repo);
+        }
+
+        Map<String, Long> languageBreakdown = restClient.get()
+                .uri("/repos/{owner}/{repo}/languages", owner, repo)
+                .headers(this::attachAuthHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<Map<String, Long>>() {
+                });
+
+        return new GitHubProjectMetadata(
+                repository.name(),
+                repository.description(),
+                repository.language(),
+                languageBreakdown == null ? Map.of() : languageBreakdown,
+                repository.stargazersCount() == null ? 0 : repository.stargazersCount(),
+                repository.forksCount() == null ? 0 : repository.forksCount(),
+                repository.openIssuesCount() == null ? 0 : repository.openIssuesCount(),
+                repository.license() == null ? null : repository.license().spdxId(),
+                repository.pushedAt() == null ? null : OffsetDateTime.parse(repository.pushedAt())
+        );
+    }
+
+    private void attachAuthHeaders(HttpHeaders headers) {
+        headers.set("Authorization", "Bearer " + token);
+        headers.set("Accept", "application/vnd.github+json");
+        headers.set("X-GitHub-Api-Version", GITHUB_API_VERSION);
+    }
+
+    private void requireToken() {
+        if (token == null || token.isBlank()) {
+            throw new IllegalStateException(
+                    "github.api.token is not set - export GITHUB_API_TOKEN (see backend/.env.example)");
         }
     }
 }
