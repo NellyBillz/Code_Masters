@@ -16,6 +16,10 @@ import za.codemaster.backend.dto.GitHubRepositoryResponse;
 
 import java.net.URI;
 import java.time.OffsetDateTime;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -53,6 +57,8 @@ public class GitHubClient {
 
     /** GitHub's "nothing changed since your ETag" status - see the class javadoc. */
     private static final int NOT_MODIFIED = 304;
+    private static final int FORBIDDEN = 403;
+    private static final int TOO_MANY_REQUESTS = 429;
 
     /**
      * Matches one entry of an RFC 8288 {@code Link} header, e.g.
@@ -157,6 +163,10 @@ public class GitHubClient {
                     if (status == NOT_MODIFIED) {
                         return GitHubFetchResult.<GitHubRepositoryResponse>notModified();
                     }
+                    if (isRateLimited(status)) {
+                        return GitHubFetchResult.<GitHubRepositoryResponse>rateLimited(
+                                parseRetryAfter(response.getHeaders()));
+                    }
                     if (status != 200) {
                         throw new IllegalStateException(
                                 "GitHub GET /repos/" + owner + "/" + repo
@@ -173,18 +183,33 @@ public class GitHubClient {
                             repository, response.getHeaders().getFirst(HttpHeaders.ETAG));
                 });
 
+        if (repositoryResult.isRateLimited()) {
+            return GitHubFetchResult.rateLimited(repositoryResult.retryAfter());
+        }
         if (!repositoryResult.isModified()) {
             return GitHubFetchResult.notModified();
         }
 
         GitHubRepositoryResponse repository = repositoryResult.data();
 
-        Map<String, Long> languageBreakdown = restClient.get()
+        GitHubFetchResult<Map<String, Long>> languageResult = restClient.get()
                 .uri("/repos/{owner}/{repo}/languages", owner, repo)
                 .headers(this::attachAuthHeaders)
-                .retrieve()
-                .body(new ParameterizedTypeReference<Map<String, Long>>() {
+                .exchange((request, response) -> {
+                    int status = response.getStatusCode().value();
+                    if (isRateLimited(status)) {
+                        return GitHubFetchResult.<Map<String, Long>>rateLimited(parseRetryAfter(response.getHeaders()));
+                    }
+                    if (status != 200) {
+                        throw new IllegalStateException("GitHub languages request returned unexpected status " + status);
+                    }
+                    Map<String, Long> body = response.bodyTo(new ParameterizedTypeReference<Map<String, Long>>() {});
+                    return GitHubFetchResult.modified(body == null ? Map.of() : body, null);
                 });
+        if (languageResult.isRateLimited()) {
+            return GitHubFetchResult.rateLimited(languageResult.retryAfter());
+        }
+        Map<String, Long> languageBreakdown = languageResult.data();
 
         GitHubProjectMetadata metadata = new GitHubProjectMetadata(
                 repository.name(),
@@ -248,6 +273,9 @@ public class GitHubClient {
                     if (status == NOT_MODIFIED) {
                         return GitHubFetchResult.<FirstIssuesPage>notModified();
                     }
+                    if (isRateLimited(status)) {
+                        return GitHubFetchResult.<FirstIssuesPage>rateLimited(parseRetryAfter(response.getHeaders()));
+                    }
                     if (status != 200) {
                         throw new IllegalStateException(
                                 "GitHub GET /repos/" + owner + "/" + repo
@@ -264,6 +292,9 @@ public class GitHubClient {
                             response.getHeaders().getFirst(HttpHeaders.ETAG));
                 });
 
+        if (firstPageResult.isRateLimited()) {
+            return GitHubFetchResult.rateLimited(firstPageResult.retryAfter());
+        }
         if (!firstPageResult.isModified()) {
             return GitHubFetchResult.notModified();
         }
@@ -273,19 +304,29 @@ public class GitHubClient {
         String nextLink = firstPage.nextLink();
 
         while (nextLink != null) {
-            ResponseEntity<List<GitHubIssueResponse>> response = restClient.get()
+            GitHubFetchResult<FirstIssuesPage> pageResult = restClient.get()
                     .uri(URI.create(nextLink))
                     .headers(this::attachAuthHeaders)
-                    .retrieve()
-                    .toEntity(new ParameterizedTypeReference<List<GitHubIssueResponse>>() {
+                    .exchange((request, response) -> {
+                        int status = response.getStatusCode().value();
+                        if (isRateLimited(status)) {
+                            return GitHubFetchResult.<FirstIssuesPage>rateLimited(parseRetryAfter(response.getHeaders()));
+                        }
+                        if (status != 200) {
+                            throw new IllegalStateException("GitHub issues pagination request returned unexpected status " + status);
+                        }
+                        List<GitHubIssueResponse> page = response.bodyTo(
+                                new ParameterizedTypeReference<List<GitHubIssueResponse>>() {});
+                        return GitHubFetchResult.modified(
+                                new FirstIssuesPage(page == null ? List.of() : page,
+                                        extractNextLink(response.getHeaders().getFirst(HttpHeaders.LINK))), null);
                     });
-
-            List<GitHubIssueResponse> page = response.getBody();
-            if (page != null) {
-                allIssues.addAll(page);
+            if (pageResult.isRateLimited()) {
+                return GitHubFetchResult.rateLimited(pageResult.retryAfter());
             }
-
-            nextLink = extractNextLink(response.getHeaders().getFirst(HttpHeaders.LINK));
+            FirstIssuesPage page = pageResult.data();
+            allIssues.addAll(page.issues());
+            nextLink = page.nextLink();
         }
 
         List<GitHubIssueMetadata> issues = allIssues.stream()
@@ -332,6 +373,36 @@ public class GitHubClient {
         while (matcher.find()) {
             if ("next".equals(matcher.group(2))) {
                 return matcher.group(1);
+            }
+        }
+        return null;
+    }
+
+    private static boolean isRateLimited(int status) {
+        return status == FORBIDDEN || status == TOO_MANY_REQUESTS;
+    }
+
+    /** Retry-After wins; X-RateLimit-Reset is GitHub's fallback (epoch seconds). */
+    private static Instant parseRetryAfter(HttpHeaders headers) {
+        String retryAfter = headers.getFirst(HttpHeaders.RETRY_AFTER);
+        if (retryAfter != null && !retryAfter.isBlank()) {
+            try {
+                return Instant.now().plusSeconds(Long.parseLong(retryAfter.trim()));
+            } catch (NumberFormatException ignored) {
+                try {
+                    return ZonedDateTime.parse(retryAfter.trim(), DateTimeFormatter.RFC_1123_DATE_TIME).toInstant();
+                } catch (DateTimeParseException ignoredDate) {
+                    // Fall through to GitHub's epoch-seconds header.
+                }
+            }
+        }
+
+        String reset = headers.getFirst("X-RateLimit-Reset");
+        if (reset != null && !reset.isBlank()) {
+            try {
+                return Instant.ofEpochSecond(Long.parseLong(reset.trim()));
+            } catch (NumberFormatException ignored) {
+                // Malformed/missing retry metadata is represented as null.
             }
         }
         return null;
