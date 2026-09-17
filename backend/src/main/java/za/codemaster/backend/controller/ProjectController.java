@@ -4,8 +4,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
-import za.codemaster.backend.dto.PagedProjects;
-import za.codemaster.backend.dto.ProjectDetail;
+import za.codemaster.backend.dto.*;
+import za.codemaster.backend.service.ProjectIssuesSearchParams;
 import za.codemaster.backend.service.ProjectQueryService;
 import za.codemaster.backend.service.ProjectSearchParams;
 
@@ -60,5 +60,25 @@ public class ProjectController {
     @GetMapping("/api/v1/projects/{projectId}")
     public ProjectDetail getProject(@PathVariable Long projectId) {
         return projectQueryService.getProjectDetail(projectId);
+    }
+
+    /**
+     * {@code GET /api/v1/projects/{projectId}/issues}; a project's issues, filtered and paginated.
+     * <p>
+     * Matches the {@code /projects/{projectId}/issues} GET operation in
+     * codemasters-api-spec.yaml v2.1. Throws {@code PROJECT_NOT_FOUND} (404)
+     * via GlobalExceptionHandler if the project itself doesn't exist.
+     */
+    @GetMapping("/api/v1/projects/{projectId}/issues")
+    public PagedIssues getProjectIssues(
+            @PathVariable Long projectId,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size,
+            @RequestParam(required = false) Difficulty difficulty,
+            @RequestParam(required = false) String label,
+            @RequestParam(required = false) IssueStatus status
+    ) {
+        ProjectIssuesSearchParams params = new ProjectIssuesSearchParams(page, size, difficulty, label, status);
+        return projectQueryService.getProjectIssues(projectId, params);
     }
 }
