@@ -1,10 +1,13 @@
 package za.codemaster.backend.service;
 
 
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import za.codemaster.backend.dto.PageMeta;
 import za.codemaster.backend.dto.Project;
 import za.codemaster.backend.dto.PagedProjects;
+import za.codemaster.backend.dto.ProjectDetail;
+import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.mock.MockDataStore;
 
 import java.util.Comparator;
@@ -57,6 +60,29 @@ public class ProjectQueryService {
         List<Project> pageItems = paginate(sorted, page, size);
 
         return new PagedProjects(pageItems, new PageMeta(page, size, sorted.size()));
+    }
+
+    /**
+     * Looks up a single project by id and assembles its {@link ProjectDetail}.
+     * Maintainers/featuredIssues/recentComments are empty lists for now;
+     * MockDataStore has no data for them yet; get the shape right, per
+     * API-01.4, and fill them in once Round 2 wires a real repository.
+     *
+     * @param projectId the project id from the path
+     * @return the matching project's detail view
+     * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if no project matches
+     */
+    public ProjectDetail getProjectDetail(Long projectId) {
+        Project project = mockDataStore.projects().stream()
+                .filter(p -> p.id().equals(projectId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        "PROJECT_NOT_FOUND",
+                        "No project exists with id " + projectId,
+                        HttpStatus.NOT_FOUND
+                ));
+
+        return new ProjectDetail(project, List.of(), List.of(), List.of());
     }
 
     /** True if {@code q} is blank/null, or found in the project's name, description, owner, or tags (case-insensitive). */
