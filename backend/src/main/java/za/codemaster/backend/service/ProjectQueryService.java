@@ -118,6 +118,44 @@ public class ProjectQueryService {
         return new PagedIssues(pageItems, new PageMeta(page, size, filtered.size()));
     }
 
+    /**
+     * Looks up a single issue by id and assembles its {@link IssueDetail},
+     * including the real project it belongs to. Comments/claims are empty
+     * lists for now; MockDataStore has no data for them yet; get the shape
+     * right, per API-01.6, and fill them in once Round 2 wires a real
+     * repository.
+     *
+     * @param issueId the issue id from the path
+     * @return the matching issue's detail view
+     * @throws ApiException with code {@code ISSUE_NOT_FOUND} (404) if no issue matches
+     */
+    public IssueDetail getIssueDetail(Long issueId) {
+        Issue issue = findIssueOrThrow(issueId);
+        // Reuses the same project lookup as getProjectDetail; if an issue ever
+        // references a projectId with no matching project, that's a data
+        // integrity bug in MockDataStore (or, in Round 2, in the database) -
+        // deliberately not swallowed here, since PROJECT_NOT_FOUND surfacing
+        // from this endpoint would be a confusing signal to a client that
+        // only asked about an issue.
+        Project project = findProjectOrThrow(issue.projectId());
+
+        return new IssueDetail(issue, project, List.of(), List.of());
+    }
+
+    /**
+     * Finds an issue by id, or throws the standard ISSUE_NOT_FOUND error.
+     */
+    private Issue findIssueOrThrow(Long issueId) {
+        return mockDataStore.issues().stream()
+                .filter(i -> i.id().equals(issueId))
+                .findFirst()
+                .orElseThrow(() -> new ApiException(
+                        "ISSUE_NOT_FOUND",
+                        "No issue exists with id " + issueId,
+                        HttpStatus.NOT_FOUND
+                ));
+    }
+
     /** True if {@code q} is blank/null, or found in the project's name, description, owner, or tags (case-insensitive). */
     private boolean matchesQuery(Project p, String q) {
         if (q == null || q.isBlank()) {
