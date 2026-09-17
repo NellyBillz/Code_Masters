@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
+import za.codemaster.backend.dto.GitHubFetchResult;
 import za.codemaster.backend.dto.GitHubIssueMetadata;
 
 import java.net.URI;
@@ -75,7 +76,12 @@ class GitHubClientIssuesIntegrationTest {
 
     @Test
     void fetchIssuesMapsEveryFieldForAtLeastTwoRealIssues() throws Exception {
-        List<GitHubIssueMetadata> issues = client.fetchIssues(OWNER, REPO);
+        // Updated call site only (unconditional fetch: sinceEtag null) - fetchIssues's signature
+        // and GitHubFetchResult wrapper are new in the ETag/If-None-Match ticket; this test's own
+        // field-mapping assertions below are unchanged.
+        GitHubFetchResult<List<GitHubIssueMetadata>> result = client.fetchIssues(OWNER, REPO, null);
+        assertTrue(result.isModified());
+        List<GitHubIssueMetadata> issues = result.data();
 
         assertNotNull(issues);
         assertTrue(issues.size() >= MIN_ISSUES_TO_CHECK,

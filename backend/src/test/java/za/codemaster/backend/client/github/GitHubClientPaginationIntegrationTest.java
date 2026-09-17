@@ -3,6 +3,7 @@ package za.codemaster.backend.client.github;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import za.codemaster.backend.dto.GitHubFetchResult;
 import za.codemaster.backend.dto.GitHubIssueMetadata;
 
 import java.util.HashSet;
@@ -57,7 +58,12 @@ class GitHubClientPaginationIntegrationTest {
 
     @Test
     void fetchIssuesWalksEveryPageWithNoDuplicates() {
-        List<GitHubIssueMetadata> issues = client.fetchIssues(OWNER, REPO);
+        // Updated call site only (unconditional fetch: sinceEtag null) - fetchIssues's signature
+        // and GitHubFetchResult wrapper are new in the ETag/If-None-Match ticket; this test's own
+        // pagination/duplicate assertions below are unchanged.
+        GitHubFetchResult<List<GitHubIssueMetadata>> result = client.fetchIssues(OWNER, REPO, null);
+        assertTrue(result.isModified());
+        List<GitHubIssueMetadata> issues = result.data();
 
         assertNotNull(issues);
         assertTrue(issues.size() > GITHUB_DEFAULT_PAGE_SIZE,

@@ -3,6 +3,7 @@ package za.codemaster.backend.client.github;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import za.codemaster.backend.dto.GitHubFetchResult;
 import za.codemaster.backend.dto.GitHubProjectMetadata;
 
 import java.time.OffsetDateTime;
@@ -63,7 +64,13 @@ class GitHubClientIntegrationTest {
 
     @Test
     void fetchProjectMetadataMapsEveryFieldAgainstTheRealRepoPage() {
-        GitHubProjectMetadata metadata = client.fetchProjectMetadata(OWNER, REPO);
+        // Updated call site only (unconditional fetch: sinceEtag null) - fetchProjectMetadata's
+        // signature and GitHubFetchResult wrapper are new in the ETag/If-None-Match ticket;
+        // this test's own field assertions below are unchanged.
+        GitHubFetchResult<GitHubProjectMetadata> result = client.fetchProjectMetadata(OWNER, REPO, null);
+
+        assertTrue(result.isModified());
+        GitHubProjectMetadata metadata = result.data();
 
         assertNotNull(metadata);
 
