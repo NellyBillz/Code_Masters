@@ -8,10 +8,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
+import za.codemaster.backend.dto.GitHubIssueMetadata;
+import za.codemaster.backend.dto.GitHubIssueResponse;
 import za.codemaster.backend.dto.GitHubProjectMetadata;
 import za.codemaster.backend.dto.GitHubRepositoryResponse;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -21,7 +24,8 @@ import java.util.Map;
  * {@code GITHUB_API_TOKEN} authenticates a real call and deliberately does
  * no response mapping. {@link #fetchProjectMetadata} is GH-1: it reuses that
  * same proven auth plumbing but actually parses the response into the
- * plain, decoupled {@link GitHubProjectMetadata}.
+ * plain, decoupled {@link GitHubProjectMetadata}. {@link #fetchOpenIssues}
+ * applies that same pattern to issues, scoped to a single page of results.
  * <p>
  * Auth header format confirmed against GitHub's current REST API auth docs
  * (docs.github.com/en/rest/authentication/authenticating-to-the-rest-api,
@@ -136,6 +140,60 @@ public class GitHubClient {
                 repository.license() == null ? null : repository.license().spdxId(),
                 repository.pushedAt() == null ? null : OffsetDateTime.parse(repository.pushedAt())
         );
+    }
+
+    /**
+     * Fetches the first page of open issues for {@code owner/repo} into
+     * plain, unit-testable {@link GitHubIssueMetadata} records - same
+     * pattern as {@link #fetchProjectMetadata}, applied to issues.
+     * <p>
+     * Deliberately scoped to a single call/single page of
+     * {@code GET /repos/{owner}/{repo}/issues?state=open}: GitHub's default
+     * page size (30) is left as-is, and no {@code page}/{@code per_page}
+     * params are sent. Pagination through further pages is out of scope
+     * here and is the entire point of the next ticket.
+     * <p>
+     * GitHub's {@code /issues} endpoint also returns pull requests (a PR is
+     * a special kind of issue in GitHub's model) - those entries carry a
+     * non-null {@code pull_request} field and are filtered out here so the
+     * result only contains real issues.
+     *
+     * @param owner repo owner/org, e.g. "octocat"
+     * @param repo  repo name, e.g. "Hello-World"
+     * @return normalized open issues from the first response page only, in
+     *         the order GitHub returned them
+     * @throws IllegalStateException if {@code github.api.token} is unset
+     */
+    public List<GitHubIssueMetadata> fetchOpenIssues(String owner, String repo) {
+        requireToken();
+
+        List<GitHubIssueResponse> issues = restClient.get()
+                .uri("/repos/{owner}/{repo}/issues?state=open", owner, repo)
+                .headers(this::attachAuthHeaders)
+                .retrieve()
+                .body(new ParameterizedTypeReference<List<GitHubIssueResponse>>() {
+                });
+
+        if (issues == null) {
+            return List.of();
+        }
+
+        return issues.stream()
+                .filter(issue -> issue.pullRequest() == null)
+                .map(issue -> new GitHubIssueMetadata(
+                        issue.number(),
+                        issue.title(),
+                        issue.body(),
+                        issue.labels() == null
+                                ? List.of()
+                                : issue.labels().stream()
+                                        .map(GitHubIssueResponse.Label::name)
+                                        .toList(),
+                        issue.htmlUrl(),
+                        issue.createdAt() == null ? null : OffsetDateTime.parse(issue.createdAt()),
+                        issue.updatedAt() == null ? null : OffsetDateTime.parse(issue.updatedAt())
+                ))
+                .toList();
     }
 
     private void attachAuthHeaders(HttpHeaders headers) {
