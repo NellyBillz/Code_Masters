@@ -1,10 +1,10 @@
 package za.codemaster.backend.client.github;
 
-import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 import za.codemaster.backend.dto.GitHubIssueMetadata;
 
 import java.net.URI;
@@ -23,27 +23,35 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.fail;
 
 /**
- * GH-1 (issues) acceptance test: a real call to the real GitHub API for a
- * fixed, well-known public repo, with every {@link GitHubIssueMetadata}
- * field checked for at least 2 issues.
+ * GH-1.3 acceptance test: a real call to the real GitHub API for a fixed,
+ * well-known public repo, with every {@link GitHubIssueMetadata} field
+ * checked for at least 2 issues.
  * <p>
  * Unlike {@link GitHubClientIntegrationTest} (GH-1's repo-metadata sibling,
  * which hardcodes expected values because octocat/Hello-World's About-panel
  * text is effectively frozen), this test does not hardcode issue titles or
- * bodies. octocat/Spoon-Knife is GitHub's own "fork and open a PR" tutorial
- * repo, so its open issues/PRs churn constantly - any specific title or
- * body text captured today could easily be closed or gone by the time this
- * test next runs.
+ * bodies. github/docs is a large, actively edited repo, so its open issues
+ * churn regularly - any specific title or body text captured today could
+ * easily change or close by the time this test next runs.
  * <p>
  * Instead this test independently re-fetches the exact same GitHub endpoint
  * with a plain, hand-rolled {@link HttpClient} call (deliberately bypassing
  * {@link GitHubClient} and {@link GitHubIssueMetadata} entirely) and
- * compares the raw JSON against what {@link GitHubClient#fetchOpenIssues}
+ * compares the raw JSON against what {@link GitHubClient#fetchIssues}
  * mapped, field by field, keyed by issue number rather than list position
  * so a new issue landing between the two calls can't desync the
  * comparison. That proves the mapping itself is correct against whatever
  * live data happens to be there, without depending on that data staying
  * still.
+ * <p>
+ * Deliberately points at a repo with few enough open issues (a couple of
+ * pages at most) that {@link GitHubClient#fetchIssues} - which now walks
+ * every page, per GH-1.4 - stays fast here. The raw comparison fetch below
+ * deliberately only reads page one: since the fields checked are always the
+ * first {@value #MIN_ISSUES_TO_CHECK} real issues {@code fetchIssues}
+ * returns, and pages come back in order, those will always be on page one.
+ * GH-1.4's own pagination behavior (walking every page, not just the first)
+ * is covered separately in {@link GitHubClientPaginationIntegrationTest}.
  * <p>
  * Deliberately plain JUnit, no Spring context - same rationale as {@link
  * GitHubClientIntegrationTest}. Requires {@code GITHUB_API_TOKEN} in the
@@ -52,8 +60,8 @@ import static org.junit.jupiter.api.Assertions.fail;
 @EnabledIfEnvironmentVariable(named = "GITHUB_API_TOKEN", matches = ".+")
 class GitHubClientIssuesIntegrationTest {
 
-    private static final String OWNER = "octocat";
-    private static final String REPO = "Spoon-Knife";
+    private static final String OWNER = "github";
+    private static final String REPO = "docs";
     private static final int MIN_ISSUES_TO_CHECK = 2;
 
     private GitHubClient client;
@@ -66,14 +74,14 @@ class GitHubClientIssuesIntegrationTest {
     }
 
     @Test
-    void fetchOpenIssuesMapsEveryFieldForAtLeastTwoRealIssues() throws Exception {
-        List<GitHubIssueMetadata> issues = client.fetchOpenIssues(OWNER, REPO);
+    void fetchIssuesMapsEveryFieldForAtLeastTwoRealIssues() throws Exception {
+        List<GitHubIssueMetadata> issues = client.fetchIssues(OWNER, REPO);
 
         assertNotNull(issues);
         assertTrue(issues.size() >= MIN_ISSUES_TO_CHECK,
                 "need at least " + MIN_ISSUES_TO_CHECK + " open issues in " + OWNER + "/" + REPO
-                        + " to exercise this test - it's a busy tutorial repo, but if it's gone "
-                        + "quiet, point OWNER/REPO at another public repo with open issues");
+                        + " to exercise this test - it's a busy repo, but if it's gone quiet, "
+                        + "point OWNER/REPO at another public repo with open issues");
 
         Map<Integer, JsonNode> rawIssuesByNumber = fetchRawOpenIssuesByNumber();
 

@@ -13,9 +13,13 @@ import za.codemaster.backend.dto.GitHubIssueResponse;
 import za.codemaster.backend.dto.GitHubProjectMetadata;
 import za.codemaster.backend.dto.GitHubRepositoryResponse;
 
+import java.net.URI;
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * Thin wrapper around the GitHub REST API.
@@ -24,8 +28,8 @@ import java.util.Map;
  * {@code GITHUB_API_TOKEN} authenticates a real call and deliberately does
  * no response mapping. {@link #fetchProjectMetadata} is GH-1: it reuses that
  * same proven auth plumbing but actually parses the response into the
- * plain, decoupled {@link GitHubProjectMetadata}. {@link #fetchOpenIssues}
- * applies that same pattern to issues, scoped to a single page of results.
+ * plain, decoupled {@link GitHubProjectMetadata}. {@link #fetchIssues}
+ * applies that same pattern to issues, walking every page of results.
  * <p>
  * Auth header format confirmed against GitHub's current REST API auth docs
  * (docs.github.com/en/rest/authentication/authenticating-to-the-rest-api,
@@ -40,6 +44,13 @@ public class GitHubClient {
 
     /** Pinned per GitHub's docs so responses don't silently change shape under us. */
     private static final String GITHUB_API_VERSION = "2022-11-28";
+
+    /**
+     * Matches one entry of an RFC 8288 {@code Link} header, e.g.
+     * {@code <https://api.github.com/repositories/123/issues?page=2>; rel="next"}.
+     * Group 1 is the URL, group 2 is the {@code rel} value.
+     */
+    private static final Pattern LINK_HEADER_ENTRY = Pattern.compile("<([^>]+)>;\\s*rel=\"([^\"]+)\"");
 
     private final RestClient restClient;
     private final String token;
@@ -143,42 +154,64 @@ public class GitHubClient {
     }
 
     /**
-     * Fetches the first page of open issues for {@code owner/repo} into
-     * plain, unit-testable {@link GitHubIssueMetadata} records - same
-     * pattern as {@link #fetchProjectMetadata}, applied to issues.
+     * Fetches every open issue for {@code owner/repo} into plain,
+     * unit-testable {@link GitHubIssueMetadata} records - extends GH-1.3's
+     * {@code fetchOpenIssues} (now folded into this method under the name
+     * the ticket contract calls for) by walking every page instead of
+     * stopping after the first.
      * <p>
-     * Deliberately scoped to a single call/single page of
-     * {@code GET /repos/{owner}/{repo}/issues?state=open}: GitHub's default
-     * page size (30) is left as-is, and no {@code page}/{@code per_page}
-     * params are sent. Pagination through further pages is out of scope
-     * here and is the entire point of the next ticket.
+     * Starts at {@code GET /repos/{owner}/{repo}/issues?state=open} and then
+     * follows the {@code Link} response header's {@code rel="next"} entry
+     * (RFC 8288 - the same pagination scheme GitHub uses everywhere) until
+     * a response has no {@code next} link left, at which point every page
+     * has been collected. No {@code page}/{@code per_page} params are sent
+     * on the first request, so GitHub's default page size applies; later
+     * requests reuse whatever URL GitHub itself hands back in {@code Link},
+     * which already encodes the next page/cursor.
      * <p>
      * GitHub's {@code /issues} endpoint also returns pull requests (a PR is
      * a special kind of issue in GitHub's model) - those entries carry a
-     * non-null {@code pull_request} field and are filtered out here so the
-     * result only contains real issues.
+     * non-null {@code pull_request} field and are filtered out after all
+     * pages are collected, so the result only contains real issues.
      *
-     * @param owner repo owner/org, e.g. "octocat"
-     * @param repo  repo name, e.g. "Hello-World"
-     * @return normalized open issues from the first response page only, in
-     *         the order GitHub returned them
+     * @param owner repo owner/org, e.g. "expressjs"
+     * @param repo  repo name, e.g. "express"
+     * @return every open issue across every page, in the order GitHub
+     *         returned them
      * @throws IllegalStateException if {@code github.api.token} is unset
      */
-    public List<GitHubIssueMetadata> fetchOpenIssues(String owner, String repo) {
+    public List<GitHubIssueMetadata> fetchIssues(String owner, String repo) {
         requireToken();
 
-        List<GitHubIssueResponse> issues = restClient.get()
+        List<GitHubIssueResponse> allIssues = new ArrayList<>();
+
+        ResponseEntity<List<GitHubIssueResponse>> response = restClient.get()
                 .uri("/repos/{owner}/{repo}/issues?state=open", owner, repo)
                 .headers(this::attachAuthHeaders)
                 .retrieve()
-                .body(new ParameterizedTypeReference<List<GitHubIssueResponse>>() {
+                .toEntity(new ParameterizedTypeReference<List<GitHubIssueResponse>>() {
                 });
 
-        if (issues == null) {
-            return List.of();
+        while (true) {
+            List<GitHubIssueResponse> page = response.getBody();
+            if (page != null) {
+                allIssues.addAll(page);
+            }
+
+            String nextLink = extractNextLink(response.getHeaders().getFirst(HttpHeaders.LINK));
+            if (nextLink == null) {
+                break;
+            }
+
+            response = restClient.get()
+                    .uri(URI.create(nextLink))
+                    .headers(this::attachAuthHeaders)
+                    .retrieve()
+                    .toEntity(new ParameterizedTypeReference<List<GitHubIssueResponse>>() {
+                    });
         }
 
-        return issues.stream()
+        return allIssues.stream()
                 .filter(issue -> issue.pullRequest() == null)
                 .map(issue -> new GitHubIssueMetadata(
                         issue.number(),
@@ -194,6 +227,25 @@ public class GitHubClient {
                         issue.updatedAt() == null ? null : OffsetDateTime.parse(issue.updatedAt())
                 ))
                 .toList();
+    }
+
+    /**
+     * Pulls the {@code rel="next"} URL out of a {@code Link} header value,
+     * or {@code null} if the header is absent or has no {@code next} entry
+     * (meaning the current page was the last one).
+     */
+    private String extractNextLink(String linkHeader) {
+        if (linkHeader == null) {
+            return null;
+        }
+
+        Matcher matcher = LINK_HEADER_ENTRY.matcher(linkHeader);
+        while (matcher.find()) {
+            if ("next".equals(matcher.group(2))) {
+                return matcher.group(1);
+            }
+        }
+        return null;
     }
 
     private void attachAuthHeaders(HttpHeaders headers) {
