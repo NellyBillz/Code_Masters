@@ -1,9 +1,11 @@
 package za.codemaster.backend.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import za.codemaster.backend.dto.PagedProjects;
+import za.codemaster.backend.dto.ProjectDetail;
 import za.codemaster.backend.service.ProjectQueryService;
 import za.codemaster.backend.service.ProjectSearchParams;
 
@@ -45,5 +47,18 @@ public class ProjectController {
                 page, size, q, language, category, tag, country, sort, hasBeginnerIssues
         );
         return projectQueryService.search(params);
+    }
+
+    /**
+     * {@code GET /api/v1/projects/{projectId}} - a single project's detail view.
+     * <p>
+     * Matches the {@code /projects/{projectId}} GET operation in
+     * codemasters-api-spec.yaml v2.1. Throws {@code PROJECT_NOT_FOUND} (404)
+     * via GlobalExceptionHandler if the id doesn't exist - see
+     * {@link ProjectQueryService#getProjectDetail}.
+     */
+    @GetMapping("/api/v1/projects/{projectId}")
+    public ProjectDetail getProject(@PathVariable Long projectId) {
+        return projectQueryService.getProjectDetail(projectId);
     }
 }
