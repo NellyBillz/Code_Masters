@@ -111,5 +111,47 @@ public class MockCheckConstraintTest {
             1L, 2L, "active"
         ));
     }
+
+    @Test
+    @DisplayName("SyncJobs: Reject insert when status is not in accepted/running/completed/failed")
+    void shouldRejectInvalidSyncJobStatus() {
+        when(jdbcTemplate.update(
+            contains("INSERT INTO sync_jobs"),
+            eq(1L), eq("in_progress")
+        )).thenThrow(new DataIntegrityViolationException(
+            "ERROR: new row violates check constraint \"sync_jobs_status_check\""
+        ));
+
+        DataIntegrityViolationException ex = assertThrows(
+            DataIntegrityViolationException.class,
+            () -> jdbcTemplate.update(
+                "INSERT INTO sync_jobs (project_id, status) VALUES (?, ?)",
+                1L, "in_progress"
+            )
+        );
+
+        assertTrue(ex.getMessage().contains("sync_jobs_status_check"));
+    }
+
+    @Test
+    @DisplayName("SyncJobs: Reject insert when project_id does not exist in projects")
+    void shouldRejectOrphanSyncJob() {
+        when(jdbcTemplate.update(
+            contains("INSERT INTO sync_jobs"),
+            eq(999999L), eq("accepted")
+        )).thenThrow(new DataIntegrityViolationException(
+            "ERROR: insert or update on table \"sync_jobs\" violates foreign key constraint \"fk_sync_jobs_projects\""
+        ));
+
+        DataIntegrityViolationException ex = assertThrows(
+            DataIntegrityViolationException.class,
+            () -> jdbcTemplate.update(
+                "INSERT INTO sync_jobs (project_id, status) VALUES (?, ?)",
+                999999L, "accepted"
+            )
+        );
+
+        assertTrue(ex.getMessage().contains("fk_sync_jobs_projects"));
+    }
     
 }
