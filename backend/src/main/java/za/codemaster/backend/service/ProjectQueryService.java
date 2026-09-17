@@ -3,10 +3,7 @@ package za.codemaster.backend.service;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import za.codemaster.backend.dto.PageMeta;
-import za.codemaster.backend.dto.Project;
-import za.codemaster.backend.dto.PagedProjects;
-import za.codemaster.backend.dto.ProjectDetail;
+import za.codemaster.backend.dto.*;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.mock.MockDataStore;
 
@@ -73,7 +70,18 @@ public class ProjectQueryService {
      * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if no project matches
      */
     public ProjectDetail getProjectDetail(Long projectId) {
-        Project project = mockDataStore.projects().stream()
+        Project project = findProjectOrThrow(projectId);
+        return new ProjectDetail(project, List.of(), List.of(), List.of());
+    }
+
+
+    /**
+     * Finds a project by id, or throws the standard PROJECT_NOT_FOUND error.
+     * Shared by every method that takes a projectId path variable, so there's
+     * exactly one place that defines what "project not found" means.
+     */
+    private Project findProjectOrThrow(Long projectId) {
+        return mockDataStore.projects().stream()
                 .filter(p -> p.id().equals(projectId))
                 .findFirst()
                 .orElseThrow(() -> new ApiException(
@@ -81,8 +89,33 @@ public class ProjectQueryService {
                         "No project exists with id " + projectId,
                         HttpStatus.NOT_FOUND
                 ));
+    }
 
-        return new ProjectDetail(project, List.of(), List.of(), List.of());
+    /**
+     * Lists a project's issues, filtered by difficulty/label/status and paginated.
+     *
+     * @param projectId the project id from the path
+     * @param params    the requested filters/pagination; any field may be {@code null}
+     * @return one page of matching issues for this project
+     * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if the
+     *                       project itself doesn't exist — same exception,
+     *                       same helper, as {@link #getProjectDetail}
+     */
+    public PagedIssues getProjectIssues(Long projectId, ProjectIssuesSearchParams params) {
+        findProjectOrThrow(projectId);
+
+        List<Issue> filtered = mockDataStore.issues().stream()
+                .filter(i -> i.projectId().equals(projectId))
+                .filter(i -> matchesDifficulty(i, params.difficulty()))
+                .filter(i -> matchesLabel(i, params.label()))
+                .filter(i -> matchesStatus(i, params.status()))
+                .toList();
+
+        int size = clampSize(params.size());
+        int page = clampPage(params.page());
+        List<Issue> pageItems = paginate(filtered, page, size);
+
+        return new PagedIssues(pageItems, new PageMeta(page, size, filtered.size()));
     }
 
     /** True if {@code q} is blank/null, or found in the project's name, description, owner, or tags (case-insensitive). */
@@ -122,12 +155,26 @@ public class ProjectQueryService {
         return hasBeginnerIssues == null || p.hasBeginnerFriendlyIssues() == hasBeginnerIssues;
     }
 
+    /** True if {@code difficulty} is null, or matches the issue's difficulty. */
+    private boolean matchesDifficulty(Issue i, Difficulty difficulty) {
+        return difficulty == null || i.difficulty() == difficulty;
+    }
+
+    /** True if {@code label} is null, or found among the issue's labels (case-insensitive). */
+    private boolean matchesLabel(Issue i, String label) {
+        return label == null || i.labels().stream().anyMatch(l -> l.equalsIgnoreCase(label));
+    }
+
+    /** True if {@code status} is null, or matches the issue's status. */
+    private boolean matchesStatus(Issue i, IssueStatus status) {
+        return status == null || i.status() == status;
+    }
+
     /**
      * "relevance" has no real scoring yet (Phase 2 territory, design doc §9)
      * so it's a no-op that preserves the filtered order. Everything else
      * sorts descending; newest, most stars, or most contributors first.
      */
-
     private List<Project> sort(List<Project> projects, String sortParam) {
         if (sortParam == null || sortParam.equals("relevance")) {
             return projects;
@@ -157,13 +204,13 @@ public class ProjectQueryService {
         return page;
     }
 
-    /** Slices {@code projects} to the requested page; returns an empty list if {@code page} is past the end. */
-    private List<Project> paginate(List<Project> projects, int page, int size) {
+    /** Slices {@code items} to the requested page; returns an empty list if {@code page} is past the end. */
+    private <T> List<T> paginate(List<T> items, int page, int size) {
         int fromIndex = page * size;
-        if (fromIndex >= projects.size()) {
+        if (fromIndex >= items.size()) {
             return List.of();
         }
-        int toIndex = Math.min(fromIndex + size, projects.size());
-        return projects.subList(fromIndex, toIndex);
+        int toIndex = Math.min(fromIndex + size, items.size());
+        return items.subList(fromIndex, toIndex);
     }
 }
