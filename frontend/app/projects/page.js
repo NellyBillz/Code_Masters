@@ -77,7 +77,9 @@ export default function Projects() {
                 </select>
             </div>
 
-            {/* 4. Country */}
+            {/* 4. Country — values are ISO 3166-1 alpha-2 codes, matching
+                what the real API stores/filters on. Labels stay as full
+                names for display only. */}
             <div>
                 <label htmlFor="country">Country</label>
                 <select
@@ -91,11 +93,11 @@ export default function Projects() {
                     }
                 >
                     <option value="">All countries</option>
-                    <option value="South Africa">South Africa</option>
-                    <option value="Switzerland">Switzerland</option>
-                    <option value="United States">United States</option>
-                    <option value="United Kingdom">United Kingdom</option>
-                    <option value="Germany">Germany</option>
+                    <option value="ZA">South Africa</option>
+                    <option value="CH">Switzerland</option>
+                    <option value="US">United States</option>
+                    <option value="GB">United Kingdom</option>
+                    <option value="DE">Germany</option>
                 </select>
             </div>
 
