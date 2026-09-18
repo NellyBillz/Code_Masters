@@ -1,6 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { listProjects } from "../../lib/api";
+
+const PAGE_SIZE = 20;
 
 export default function Projects() {
     const [filters, setFilters] = useState({
@@ -11,6 +14,88 @@ export default function Projects() {
         hasBeginnerIssues: false,
         sort: "relevance"
     });
+
+    const [projects, setProjects] = useState([]);
+    const [meta, setMeta] = useState({
+        page: 0,
+        size: PAGE_SIZE,
+        total: 0
+    });
+
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
+
+    const updateFilter = (key, value) => {
+        setFilters((current) => ({
+            ...current,
+            [key]: value
+        }));
+
+        // Any filter/search/sort change starts from the first page.
+        setMeta((current) => ({
+            ...current,
+            page: 0
+        }));
+    };
+
+    useEffect(() => {
+        let cancelled = false;
+
+        async function loadProjects() {
+            setLoading(true);
+            setError("");
+
+            try {
+                const result = await listProjects({
+                    page: meta.page,
+                    size: PAGE_SIZE,
+                    q: filters.q,
+                    language: filters.language,
+                    category: filters.category,
+                    country: filters.country,
+                    hasBeginnerIssues: filters.hasBeginnerIssues ? true : undefined,
+                    sort: filters.sort
+                });
+
+                if (cancelled) {
+                    return;
+                }
+
+                setProjects(result.items);
+                setMeta(result.meta);
+            } catch (err) {
+                if (cancelled) {
+                    return;
+                }
+
+                setProjects([]);
+                setError(err.message || "Failed to load projects.");
+            } finally {
+                if (!cancelled) {
+                    setLoading(false);
+                }
+            }
+        }
+
+        loadProjects();
+
+        return () => {
+            cancelled = true;
+        };
+    }, [
+        filters.q,
+        filters.language,
+        filters.category,
+        filters.country,
+        filters.hasBeginnerIssues,
+        filters.sort,
+        meta.page
+    ]);
+
+    const totalPages = Math.ceil(meta.total / PAGE_SIZE);
+
+    const canGoPrevious = meta.page > 0;
+    const canGoNext = meta.page + 1 < totalPages;
 
     return (
         <div>
@@ -24,12 +109,7 @@ export default function Projects() {
                     type="text"
                     placeholder="Search projects..."
                     value={filters.q}
-                    onChange={(e) =>
-                        setFilters({
-                            ...filters,
-                            q: e.target.value
-                        })
-                    }
+                    onChange={(e) => updateFilter("q", e.target.value)}
                 />
             </div>
 
@@ -40,10 +120,7 @@ export default function Projects() {
                     id="language"
                     value={filters.language}
                     onChange={(e) =>
-                        setFilters({
-                            ...filters,
-                            language: e.target.value
-                        })
+                        updateFilter("language", e.target.value)
                     }
                 >
                     <option value="">All languages</option>
@@ -62,10 +139,7 @@ export default function Projects() {
                     id="category"
                     value={filters.category}
                     onChange={(e) =>
-                        setFilters({
-                            ...filters,
-                            category: e.target.value
-                        })
+                        updateFilter("category", e.target.value)
                     }
                 >
                     <option value="">All categories</option>
@@ -77,19 +151,14 @@ export default function Projects() {
                 </select>
             </div>
 
-            {/* 4. Country — values are ISO 3166-1 alpha-2 codes, matching
-                what the real API stores/filters on. Labels stay as full
-                names for display only. */}
+            {/* 4. Country */}
             <div>
                 <label htmlFor="country">Country</label>
                 <select
                     id="country"
                     value={filters.country}
                     onChange={(e) =>
-                        setFilters({
-                            ...filters,
-                            country: e.target.value
-                        })
+                        updateFilter("country", e.target.value)
                     }
                 >
                     <option value="">All countries</option>
@@ -108,10 +177,10 @@ export default function Projects() {
                         type="checkbox"
                         checked={filters.hasBeginnerIssues}
                         onChange={(e) =>
-                            setFilters({
-                                ...filters,
-                                hasBeginnerIssues: e.target.checked
-                            })
+                            updateFilter(
+                                "hasBeginnerIssues",
+                                e.target.checked
+                            )
                         }
                     />
                     Has beginner issues
@@ -125,10 +194,7 @@ export default function Projects() {
                     id="sort"
                     value={filters.sort}
                     onChange={(e) =>
-                        setFilters({
-                            ...filters,
-                            sort: e.target.value
-                        })
+                        updateFilter("sort", e.target.value)
                     }
                 >
                     <option value="relevance">Relevance</option>
@@ -138,11 +204,89 @@ export default function Projects() {
                 </select>
             </div>
 
+            {/* Results */}
+            <section>
+                <h2>Projects</h2>
+
+                {loading && <p>Loading projects...</p>}
+
+                {error && <p role="alert">{error}</p>}
+
+                {!loading && !error && projects.length === 0 && (
+                    <p>No projects found.</p>
+                )}
+
+                {!loading &&
+                    !error &&
+                    projects.map((project) => (
+                        <article key={project.id}>
+                            <h3>{project.name}</h3>
+                            <p>{project.description}</p>
+
+                            {project.primaryLanguage && (
+                                <p>
+                                    Language: {project.primaryLanguage}
+                                </p>
+                            )}
+
+                            {project.category && (
+                                <p>
+                                    Category: {project.category}
+                                </p>
+                            )}
+
+                            {typeof project.stars === "number" && (
+                                <p>Stars: {project.stars}</p>
+                            )}
+                        </article>
+                    ))}
+            </section>
+
+            {/* Pagination */}
+            <section>
+                <button
+                    type="button"
+                    disabled={!canGoPrevious || loading}
+                    onClick={() =>
+                        setMeta((current) => ({
+                            ...current,
+                            page: current.page - 1
+                        }))
+                    }
+                >
+                    Previous
+                </button>
+
+                <span>
+                    Page {meta.page + 1} of {Math.max(totalPages, 1)}
+                </span>
+
+                <button
+                    type="button"
+                    disabled={!canGoNext || loading}
+                    onClick={() =>
+                        setMeta((current) => ({
+                            ...current,
+                            page: current.page + 1
+                        }))
+                    }
+                >
+                    Next
+                </button>
+            </section>
+
             {/* Debug panel */}
             <div>
                 <h2>Current Filters</h2>
                 <pre>
                     {JSON.stringify(filters, null, 2)}
+                </pre>
+            </div>
+
+            <div>
+                <h2>Pagination Meta</h2>
+                <pre>
+                    {JSON.stringify(meta, null, 2)}
                 </pre>
             </div>
         </div>
