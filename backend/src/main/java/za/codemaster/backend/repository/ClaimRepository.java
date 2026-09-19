@@ -31,6 +31,13 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
     List<Claim> findByIssueIdAndStatus(Long issueId, ClaimStatus status);
 
     /**
+     * Finds all claims on an issue in a given status, oldest first.
+     * Backs {@code GET /issues/{issueId}/claims} (API-02.5, design doc §7:
+     * "the issue detail view shows the full list of claimants, oldest first").
+     */
+    List<Claim> findByIssueIdAndStatusOrderByCreatedAtAsc(Long issueId, ClaimStatus status);
+
+    /**
      * Finds all claims associated with a given user.
      */
     List<Claim> findByUserId(Long userId);
