@@ -3,12 +3,14 @@ package za.codemaster.backend.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import za.codemaster.backend.dto.ErrorResponse;
 
-
 import java.time.OffsetDateTime;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Application-wide exception handler. Converts any exception thrown by a controller
@@ -44,6 +46,34 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(exception.getStatus()).body(body);
+    }
+
+    /**
+     * Handles a {@code @Valid}-annotated request body failing bean validation
+     * (e.g. {@code CreateCommentRequest.body} over its 5000-char max), translating
+     * field errors into the standard {@link ErrorResponse} shape as a clean 400
+     * instead of Spring's default validation error payload.
+     *
+     * @param exception the validation failure, carrying one or more field errors
+     * @param request   the current request, used to populate the {@code path} field
+     * @return an {@link ErrorResponse} with code {@code "VALIDATION_ERROR"} and status 400
+     */
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleValidationException(MethodArgumentNotValidException exception,
+                                                                     HttpServletRequest request) {
+        Map<String, Object> details = new LinkedHashMap<>();
+        exception.getBindingResult().getFieldErrors().forEach(fieldError ->
+                details.put(fieldError.getField(), fieldError.getDefaultMessage()));
+
+        ErrorResponse body = new ErrorResponse(
+                "VALIDATION_ERROR",
+                "Request validation failed.",
+                OffsetDateTime.now(),
+                request.getRequestURI(),
+                details
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     /**
