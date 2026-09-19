@@ -56,7 +56,7 @@ public class Session {
     private OffsetDateTime createdAt;
 
     @Column(name = "expires_at", nullable = false)
-    private OffsetDateTime expireAt;
+    private OffsetDateTime expiresAt;
 
     @Column(name = "last_seen_at", insertable = false)
     private OffsetDateTime lastSeenAt;

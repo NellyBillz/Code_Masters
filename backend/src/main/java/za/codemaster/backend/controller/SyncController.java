@@ -4,7 +4,8 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import za.codemaster.backend.entity.SyncJob;
+
+import za.codemaster.backend.domain.model.SyncJob;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.service.ProjectSyncService;
 import za.codemaster.backend.service.SessionUserResolver;

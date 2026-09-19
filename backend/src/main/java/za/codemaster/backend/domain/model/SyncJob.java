@@ -1,4 +1,4 @@
-package za.codemaster.backend.entity;
+package za.codemaster.backend.domain.model;
 
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;

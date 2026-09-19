@@ -1,7 +1,7 @@
 package za.codemaster.backend.service;
 
 import org.springframework.stereotype.Component;
-import za.codemaster.backend.entity.User;
+import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.repository.SessionRepository;
 
 import java.time.OffsetDateTime;
