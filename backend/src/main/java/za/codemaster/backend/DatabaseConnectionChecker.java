@@ -2,11 +2,13 @@ package za.codemaster.backend;
 
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
+@Profile("!prod")
 public class DatabaseConnectionChecker implements CommandLineRunner {
 
     private final JdbcTemplate jdbcTemplate;
