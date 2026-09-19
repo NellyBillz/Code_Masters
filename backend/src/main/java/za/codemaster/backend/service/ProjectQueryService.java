@@ -252,8 +252,12 @@ public class ProjectQueryService {
         );
     }
 
-    /** Maps a persisted maintainer relationship row to the API's {@link ProjectMaintainerDto} shape. */
-    private ProjectMaintainerDto toDto(za.codemaster.backend.domain.model.ProjectMaintainer entity) {
+    /**
+     * Maps a persisted maintainer relationship row to the API's {@link ProjectMaintainerDto} shape.
+     * Public (same reasoning as the {@code Project}/{@code Issue} overloads): reused by
+     * {@code MaintainerService} (API-02.8) after inviting a maintainer.
+     */
+    public ProjectMaintainerDto toDto(za.codemaster.backend.domain.model.ProjectMaintainer entity) {
         return new ProjectMaintainerDto(
                 toPublicProfile(entity.getUser()),
                 MaintainerRole.valueOf(entity.getRole().toUpperCase(Locale.ROOT)),
