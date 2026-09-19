@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+
 import { listProjects } from "../../lib/api";
+import ProjectCard from "../components/ProjectCard";
 
 const PAGE_SIZE = 20;
 
@@ -212,34 +213,15 @@ export default function Projects() {
 
                 {error && <p role="alert">{error}</p>}
 
-                {!loading && !error && projects.length === 0 && (
-                    <p>No projects found.</p>
+                {!loading && !error && projects.length > 0 && (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {projects.map((project) => (
+                            <ProjectCard key={project.id} project={project} />
+                        ))}
+                    </div>
                 )}
-
-                {!loading &&
-                    !error &&
-                    projects.map((project) => (
-                        <article key={project.id}>
-                            <h3>{project.name}</h3>
-                            <p>{project.description}</p>
-
-                            {project.primaryLanguage && (
-                                <p>
-                                    Language: {project.primaryLanguage}
-                                </p>
-                            )}
-
-                            {project.category && (
-                                <p>
-                                    Category: {project.category}
-                                </p>
-                            )}
-
-                            {typeof project.stars === "number" && (
-                                <p>Stars: {project.stars}</p>
-                            )}
-                        </article>
-                    ))}
+ 
+                    ))
             </section>
 
             {/* Pagination */}

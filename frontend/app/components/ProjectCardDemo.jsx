@@ -1,6 +1,7 @@
 import ProjectCard from "./ProjectCard";
-import { mockProjects } from "./mockProjects";
+import { mockProjects } from "../data/mockProjects";
 
+/**
 /**
  * Visual QA harness for FE-01.7. Not a page the app routes to — just a
  * grid so the card's every badge state can be reviewed side by side:
@@ -17,7 +18,7 @@ export default function ProjectCardDemo() {
         ProjectCard — badge state review
       </h1>
       <p className="mb-6 text-sm text-slate-500">
-        5 mock projects covering every connectionStatus / hasBeginnerFriendlyIssues
+        5 mock projects covering every verified / hasBeginnerFriendlyIssues
         combination, plus one missing-field edge case.
       </p>
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
