@@ -6,6 +6,9 @@ This document covers local database provisioning, migration workflows, resets, a
 
 ## 1. Prerequisites
 
+### Manually create the codematser_db database in Postgre SQL SHELL
+CREATE DATABASE codemaster_db;
+
 Ensure you have a local PostgreSQL instance installed and running:
 
 * **Engine:** PostgreSQL 16+
@@ -46,4 +49,3 @@ WHERE datname = 'codemaster_db' AND pid <> pg_backend_pid();
 -- Drop and recreate
 DROP DATABASE IF EXISTS codemaster_db;
 CREATE DATABASE codemaster_db;
-\q
