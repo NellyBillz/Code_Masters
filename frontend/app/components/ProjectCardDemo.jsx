@@ -1,5 +1,7 @@
 import ProjectCard from "./ProjectCard";
 import { mockProjects } from "../data/mockProjects";
+
+/**
 /**
  * Visual QA harness for FE-01.7. Not a page the app routes to — just a
  * grid so the card's every badge state can be reviewed side by side:
