@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 
 import { listProjects } from "../../lib/api";
 import ProjectCard from "../components/ProjectCard";
@@ -221,7 +222,6 @@ export default function Projects() {
                     </div>
                 )}
  
-                    ))
             </section>
 
             {/* Pagination */}
