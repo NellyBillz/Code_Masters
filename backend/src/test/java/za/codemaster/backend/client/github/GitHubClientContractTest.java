@@ -4,9 +4,9 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
-import za.codemaster.backend.dto.GitHubFetchResult;
-import za.codemaster.backend.dto.GitHubIssueMetadata;
-import za.codemaster.backend.dto.GitHubProjectMetadata;
+import za.codemaster.backend.client.github.dto.GitHubFetchResult;
+import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
+import za.codemaster.backend.client.github.dto.GitHubProjectMetadata;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;

@@ -5,7 +5,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.domain.model.Issue;
 import za.codemaster.backend.domain.model.User;
-import za.codemaster.backend.dto.UpdateIssueRequest;
+import za.codemaster.backend.dto.issue.IssueDto;
+import za.codemaster.backend.dto.issue.UpdateIssueRequest;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.IssueRepository;
 import za.codemaster.backend.repository.ProjectMaintainerRepository;
@@ -45,7 +46,7 @@ public class IssueService {
      *                       parent project
      */
     @Transactional
-    public za.codemaster.backend.dto.Issue updateClassification(Long issueId, UpdateIssueRequest request, User caller) {
+    public IssueDto updateClassification(Long issueId, UpdateIssueRequest request, User caller) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ApiException(
                         "ISSUE_NOT_FOUND", "No issue exists with id " + issueId, HttpStatus.NOT_FOUND));

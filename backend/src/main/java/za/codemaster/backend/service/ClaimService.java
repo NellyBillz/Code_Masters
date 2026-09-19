@@ -8,7 +8,9 @@ import za.codemaster.backend.domain.model.Claim;
 import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.Issue;
 import za.codemaster.backend.domain.model.User;
-import za.codemaster.backend.dto.PublicUserProfile;
+import za.codemaster.backend.dto.claim.ClaimDto;
+import za.codemaster.backend.dto.claim.ClaimStatusDto;
+import za.codemaster.backend.dto.user.PublicUserProfile;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
@@ -49,7 +51,7 @@ public class ClaimService {
      *                       claim on this issue
      */
     @Transactional
-    public za.codemaster.backend.dto.Claim createClaim(Long issueId, String note, User caller) {
+    public ClaimDto createClaim(Long issueId, String note, User caller) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ApiException(
                         "ISSUE_NOT_FOUND", "No issue exists with id " + issueId, HttpStatus.NOT_FOUND));
@@ -105,7 +107,7 @@ public class ClaimService {
      * @throws ApiException with code {@code ISSUE_NOT_FOUND} (404) if the issue doesn't exist
      */
     @Transactional(readOnly = true)
-    public List<za.codemaster.backend.dto.Claim> getActiveClaims(Long issueId) {
+    public List<ClaimDto> getActiveClaims(Long issueId) {
         if (!issueRepository.existsById(issueId)) {
             throw new ApiException(
                     "ISSUE_NOT_FOUND", "No issue exists with id " + issueId, HttpStatus.NOT_FOUND);
@@ -116,13 +118,13 @@ public class ClaimService {
                 .toList();
     }
 
-    /** Maps a persisted claim row to the API's {@link za.codemaster.backend.dto.Claim} shape. */
-    private za.codemaster.backend.dto.Claim toDto(Claim entity) {
-        return new za.codemaster.backend.dto.Claim(
+    /** Maps a persisted claim row to the API's {@link ClaimDto} shape. */
+    private ClaimDto toDto(Claim entity) {
+        return new ClaimDto(
                 entity.getId(),
                 entity.getIssue().getId(),
                 toPublicProfile(entity.getUser()),
-                za.codemaster.backend.dto.ClaimStatus.valueOf(entity.getStatus().name()),
+                ClaimStatusDto.valueOf(entity.getStatus().name()),
                 entity.getNote(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()

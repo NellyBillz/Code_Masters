@@ -11,8 +11,8 @@ import java.util.UUID;
 /**
  * Seeds a real (test) database with the same shape of data
  * {@code MockDataStore} used to hold in memory: 5 projects spanning every
- * {@link za.codemaster.backend.dto.ProjectConnection} value, 8 issues
- * spanning every {@link za.codemaster.backend.dto.Difficulty} value.
+ * {@link za.codemaster.backend.dto.project.ProjectConnection} value, 8 issues
+ * spanning every {@link za.codemaster.backend.dto.issue.Difficulty} value.
  * <p>
  * Exists so {@code ProjectQueryServiceTest}/{@code ProjectDetailTest}/
  * {@code ProjectIssuesTest}/{@code IssueDetailTest} can keep their original

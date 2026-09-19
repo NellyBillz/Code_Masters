@@ -10,8 +10,8 @@ import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OA
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.BackendApplication;
-import za.codemaster.backend.dto.PagedProjects;
-import za.codemaster.backend.dto.Project;
+import za.codemaster.backend.dto.project.PagedProjects;
+import za.codemaster.backend.dto.project.ProjectDto;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
 import za.codemaster.backend.repository.ProjectRepository;
@@ -124,7 +124,7 @@ class ProjectQueryServiceTest {
                 null, null, null, null, null, null, null, null, true));
 
         assertTrue(filtered.items().size() > 0);
-        assertTrue(filtered.items().stream().allMatch(Project::hasBeginnerFriendlyIssues));
+        assertTrue(filtered.items().stream().allMatch(ProjectDto::hasBeginnerFriendlyIssues));
     }
 
     @Test
@@ -132,7 +132,7 @@ class ProjectQueryServiceTest {
         PagedProjects sorted = search(new ProjectSearchParams(
                 null, null, null, null, null, null, null, "stars", null));
 
-        List<Integer> starCounts = sorted.items().stream().map(Project::stars).toList();
+        List<Integer> starCounts = sorted.items().stream().map(ProjectDto::stars).toList();
         List<Integer> expectedOrder = starCounts.stream().sorted((a, b) -> b - a).toList();
         assertEquals(expectedOrder, starCounts);
     }

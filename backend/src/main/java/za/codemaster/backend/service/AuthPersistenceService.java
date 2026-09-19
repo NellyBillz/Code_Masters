@@ -3,7 +3,7 @@ package za.codemaster.backend.service;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import za.codemaster.backend.dto.GitHubOAuthUser;
+import za.codemaster.backend.client.github.dto.GitHubOAuthUser;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

@@ -8,11 +8,11 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
-import za.codemaster.backend.dto.GitHubFetchResult;
-import za.codemaster.backend.dto.GitHubIssueMetadata;
-import za.codemaster.backend.dto.GitHubIssueResponse;
-import za.codemaster.backend.dto.GitHubProjectMetadata;
-import za.codemaster.backend.dto.GitHubRepositoryResponse;
+import za.codemaster.backend.client.github.dto.GitHubFetchResult;
+import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
+import za.codemaster.backend.client.github.dto.GitHubIssueResponse;
+import za.codemaster.backend.client.github.dto.GitHubProjectMetadata;
+import za.codemaster.backend.client.github.dto.GitHubRepositoryResponse;
 
 import java.net.URI;
 import java.time.OffsetDateTime;

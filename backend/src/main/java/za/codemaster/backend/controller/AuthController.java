@@ -15,7 +15,7 @@ import jakarta.servlet.http.Cookie;
 import za.codemaster.backend.repository.SessionRepository;
 import java.util.Arrays;
 import java.util.UUID;
-import za.codemaster.backend.dto.GitHubOAuthUser;
+import za.codemaster.backend.client.github.dto.GitHubOAuthUser;
 import za.codemaster.backend.service.AuthPersistenceService;
 import za.codemaster.backend.service.GitHubOAuthService;
 

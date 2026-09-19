@@ -1,7 +1,7 @@
 package za.codemaster.backend.service;
 
-import za.codemaster.backend.dto.Difficulty;
-import za.codemaster.backend.dto.IssueStatus;
+import za.codemaster.backend.dto.issue.Difficulty;
+import za.codemaster.backend.dto.issue.IssueStatus;
 
 /**
  * Bundles the query parameters accepted by

@@ -2,7 +2,7 @@ package za.codemaster.backend.controller;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
-import za.codemaster.backend.dto.HealthResponse;
+import za.codemaster.backend.dto.common.HealthResponse;
 
 import java.time.OffsetDateTime;
 

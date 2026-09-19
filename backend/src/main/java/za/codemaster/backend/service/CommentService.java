@@ -10,9 +10,10 @@ import za.codemaster.backend.domain.model.Comment;
 import za.codemaster.backend.domain.model.Issue;
 import za.codemaster.backend.domain.model.Project;
 import za.codemaster.backend.domain.model.User;
-import za.codemaster.backend.dto.PageMeta;
-import za.codemaster.backend.dto.PagedComments;
-import za.codemaster.backend.dto.PublicUserProfile;
+import za.codemaster.backend.dto.common.PageMeta;
+import za.codemaster.backend.dto.comment.CommentDto;
+import za.codemaster.backend.dto.comment.PagedComments;
+import za.codemaster.backend.dto.user.PublicUserProfile;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.exception.CommentValidationException;
 import za.codemaster.backend.repository.CommentRepository;
@@ -59,7 +60,7 @@ public class CommentService {
      * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if the project doesn't exist
      */
     @Transactional
-    public za.codemaster.backend.dto.Comment createProjectComment(Long projectId, String body, User author) {
+    public CommentDto createProjectComment(Long projectId, String body, User author) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ApiException(
                         "PROJECT_NOT_FOUND", "No project exists with id " + projectId, HttpStatus.NOT_FOUND));
@@ -82,7 +83,7 @@ public class CommentService {
      * @throws ApiException with code {@code ISSUE_NOT_FOUND} (404) if the issue doesn't exist
      */
     @Transactional
-    public za.codemaster.backend.dto.Comment createIssueComment(Long issueId, String body, User author) {
+    public CommentDto createIssueComment(Long issueId, String body, User author) {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ApiException(
                         "ISSUE_NOT_FOUND", "No issue exists with id " + issueId, HttpStatus.NOT_FOUND));
@@ -138,7 +139,7 @@ public class CommentService {
      *                       already soft-deleted, or {@code FORBIDDEN} (403) if the caller isn't the author
      */
     @Transactional
-    public za.codemaster.backend.dto.Comment editComment(Long commentId, String newBody, User caller) {
+    public CommentDto editComment(Long commentId, String newBody, User caller) {
         Comment comment = findActiveCommentOrThrow(commentId);
 
         if (!comment.getUser().getId().equals(caller.getId())) {
@@ -248,13 +249,13 @@ public class CommentService {
     }
 
     private PagedComments toPagedDto(Page<Comment> result) {
-        List<za.codemaster.backend.dto.Comment> items = result.getContent().stream().map(this::toDto).toList();
+        List<CommentDto> items = result.getContent().stream().map(this::toDto).toList();
         return new PagedComments(items, new PageMeta(result.getNumber(), result.getSize(), (int) result.getTotalElements()));
     }
 
-    /** Maps a persisted comment row to the API's {@link za.codemaster.backend.dto.Comment} shape. */
-    private za.codemaster.backend.dto.Comment toDto(Comment entity) {
-        return new za.codemaster.backend.dto.Comment(
+    /** Maps a persisted comment row to the API's {@link CommentDto} shape. */
+    private CommentDto toDto(Comment entity) {
+        return new CommentDto(
                 entity.getId(),
                 toPublicProfile(entity.getUser()),
                 entity.getBody(),

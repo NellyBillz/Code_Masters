@@ -12,10 +12,10 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import za.codemaster.backend.domain.model.User;
-import za.codemaster.backend.dto.Comment;
-import za.codemaster.backend.dto.CreateCommentRequest;
-import za.codemaster.backend.dto.PagedComments;
-import za.codemaster.backend.dto.UpdateCommentRequest;
+import za.codemaster.backend.dto.comment.CommentDto;
+import za.codemaster.backend.dto.comment.CreateCommentRequest;
+import za.codemaster.backend.dto.comment.PagedComments;
+import za.codemaster.backend.dto.comment.UpdateCommentRequest;
 import za.codemaster.backend.security.AuthenticatedUser;
 import za.codemaster.backend.service.CommentService;
 
@@ -44,11 +44,11 @@ public class CommentController {
      * {@code @AuthenticatedUser} resolving the caller as a safety net.
      */
     @PostMapping("/api/v1/projects/{projectId}/comments")
-    public ResponseEntity<Comment> createProjectComment(
+    public ResponseEntity<CommentDto> createProjectComment(
             @PathVariable Long projectId,
             @Valid @RequestBody CreateCommentRequest request,
             @AuthenticatedUser User currentUser) {
-        Comment created = commentService.createProjectComment(projectId, request.body(), currentUser);
+        CommentDto created = commentService.createProjectComment(projectId, request.body(), currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -67,11 +67,11 @@ public class CommentController {
      * {@code POST /api/v1/issues/{issueId}/comments}: comment on an issue.
      */
     @PostMapping("/api/v1/issues/{issueId}/comments")
-    public ResponseEntity<Comment> createIssueComment(
+    public ResponseEntity<CommentDto> createIssueComment(
             @PathVariable Long issueId,
             @Valid @RequestBody CreateCommentRequest request,
             @AuthenticatedUser User currentUser) {
-        Comment created = commentService.createIssueComment(issueId, request.body(), currentUser);
+        CommentDto created = commentService.createIssueComment(issueId, request.body(), currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -90,7 +90,7 @@ public class CommentController {
      * {@code PATCH /api/v1/comments/{commentId}}: edit a comment. Author-only (API-02.4).
      */
     @PatchMapping("/api/v1/comments/{commentId}")
-    public Comment editComment(
+    public CommentDto editComment(
             @PathVariable Long commentId,
             @Valid @RequestBody UpdateCommentRequest request,
             @AuthenticatedUser User currentUser) {

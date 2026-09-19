@@ -13,8 +13,8 @@ import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.domain.model.Project;
 import za.codemaster.backend.domain.model.ProjectMaintainer;
 import za.codemaster.backend.domain.model.User;
-import za.codemaster.backend.dto.Comment;
-import za.codemaster.backend.dto.PagedComments;
+import za.codemaster.backend.dto.comment.CommentDto;
+import za.codemaster.backend.dto.comment.PagedComments;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.CommentRepository;
@@ -79,7 +79,7 @@ class CommentServiceTest {
     void createProjectCommentPersistsAndReturnsAuthorAndBody() {
         Long projectId = fixtures.projectId(0);
 
-        Comment created = service.createProjectComment(projectId, "Great project!", author);
+        CommentDto created = service.createProjectComment(projectId, "Great project!", author);
 
         assertNotNull(created.id());
         assertEquals("Great project!", created.body());
@@ -100,7 +100,7 @@ class CommentServiceTest {
     void createIssueCommentPersistsAndReturnsAuthorAndBody() {
         Long issueId = fixtures.issueId(0);
 
-        Comment created = service.createIssueComment(issueId, "I can help with this.", author);
+        CommentDto created = service.createIssueComment(issueId, "I can help with this.", author);
 
         assertNotNull(created.id());
         assertEquals("I can help with this.", created.body());
@@ -182,9 +182,9 @@ class CommentServiceTest {
     @Test
     void authorCanEditOwnComment() {
         Long projectId = fixtures.projectId(0);
-        Comment created = service.createProjectComment(projectId, "Original body", author);
+        CommentDto created = service.createProjectComment(projectId, "Original body", author);
 
-        Comment edited = service.editComment(created.id(), "Edited body", author);
+        CommentDto edited = service.editComment(created.id(), "Edited body", author);
 
         assertEquals("Edited body", edited.body());
         assertTrue(edited.edited());
@@ -193,7 +193,7 @@ class CommentServiceTest {
     @Test
     void nonAuthorEditingCommentIsForbidden() {
         Long projectId = fixtures.projectId(0);
-        Comment created = service.createProjectComment(projectId, "Original body", author);
+        CommentDto created = service.createProjectComment(projectId, "Original body", author);
         User stranger = otherUser();
 
         ApiException ex = assertThrows(ApiException.class,
@@ -217,7 +217,7 @@ class CommentServiceTest {
     @Test
     void authorCanDeleteOwnComment() {
         Long projectId = fixtures.projectId(0);
-        Comment created = service.createProjectComment(projectId, "Delete me", author);
+        CommentDto created = service.createProjectComment(projectId, "Delete me", author);
 
         service.deleteComment(created.id(), author);
 
@@ -228,7 +228,7 @@ class CommentServiceTest {
     @Test
     void projectMaintainerCanDeleteAnotherUsersComment() {
         Long projectId = fixtures.projectId(0);
-        Comment created = service.createProjectComment(projectId, "Needs moderation", author);
+        CommentDto created = service.createProjectComment(projectId, "Needs moderation", author);
 
         User maintainerUser = otherUser();
         Project project = projectRepository.findById(projectId).orElseThrow();
@@ -247,7 +247,7 @@ class CommentServiceTest {
     @Test
     void nonAuthorNonMaintainerDeletingCommentIsForbidden() {
         Long projectId = fixtures.projectId(0);
-        Comment created = service.createProjectComment(projectId, "Do not delete", author);
+        CommentDto created = service.createProjectComment(projectId, "Do not delete", author);
         User stranger = otherUser();
 
         ApiException ex = assertThrows(ApiException.class,
@@ -269,7 +269,7 @@ class CommentServiceTest {
     @Test
     void deletingAlreadyDeletedCommentThrowsCommentNotFound() {
         Long projectId = fixtures.projectId(0);
-        Comment created = service.createProjectComment(projectId, "Delete twice", author);
+        CommentDto created = service.createProjectComment(projectId, "Delete twice", author);
         service.deleteComment(created.id(), author);
 
         ApiException ex = assertThrows(ApiException.class,

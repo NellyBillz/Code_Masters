@@ -7,7 +7,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.domain.model.ClaimStatus;
-import za.codemaster.backend.dto.*;
+import za.codemaster.backend.dto.common.PageMeta;
+import za.codemaster.backend.dto.issue.*;
+import za.codemaster.backend.dto.project.*;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
@@ -62,11 +64,11 @@ public class ProjectQueryService {
      */
     @Transactional(readOnly = true)
     public PagedProjects search(ProjectSearchParams params) {
-        List<Project> all = projectRepository.findAll().stream()
+        List<ProjectDto> all = projectRepository.findAll().stream()
                 .map(this::toDto)
                 .toList();
 
-        List<Project> filtered = all.stream()
+        List<ProjectDto> filtered = all.stream()
                 .filter(p -> matchesQuery(p, params.q()))
                 .filter(p -> matchesLanguage(p, params.language()))
                 .filter(p -> matchesCategory(p, params.category()))
@@ -75,11 +77,11 @@ public class ProjectQueryService {
                 .filter(p -> matchesHasBeginnerIssues(p, params.hasBeginnerIssues()))
                 .toList();
 
-        List<Project> sorted = sort(filtered, params.sort());
+        List<ProjectDto> sorted = sort(filtered, params.sort());
 
         int size = clampSize(params.size());
         int page = clampPage(params.page());
-        List<Project> pageItems = paginate(sorted, page, size);
+        List<ProjectDto> pageItems = paginate(sorted, page, size);
 
         return new PagedProjects(pageItems, new PageMeta(page, size, sorted.size()));
     }
@@ -96,7 +98,7 @@ public class ProjectQueryService {
      */
     @Transactional(readOnly = true)
     public ProjectDetail getProjectDetail(Long projectId) {
-        Project project = toDto(findProjectEntityOrThrow(projectId));
+        ProjectDto project = toDto(findProjectEntityOrThrow(projectId));
         return new ProjectDetail(project, List.of(), List.of(), List.of());
     }
 
@@ -139,7 +141,7 @@ public class ProjectQueryService {
         Page<za.codemaster.backend.domain.model.Issue> result = issueRepository.findWithFilters(
                 projectId, status, difficulty, null, params.label(), PageRequest.of(page, size));
 
-        List<Issue> items = result.getContent().stream().map(this::toDto).toList();
+        List<IssueDto> items = result.getContent().stream().map(this::toDto).toList();
 
         return new PagedIssues(items, new PageMeta(page, size, (int) result.getTotalElements()));
     }
@@ -163,15 +165,15 @@ public class ProjectQueryService {
                         HttpStatus.NOT_FOUND
                 ));
 
-        Issue issueDto = toDto(issueEntity);
-        Project projectDto = toDto(issueEntity.getProject());
+        IssueDto issueDto = toDto(issueEntity);
+        ProjectDto projectDto = toDto(issueEntity.getProject());
 
         return new IssueDetail(issueDto, projectDto, List.of(), List.of());
     }
 
-    /** Maps a persisted project row to the API's {@link Project} shape. */
-    private Project toDto(za.codemaster.backend.domain.model.Project entity) {
-        return new Project(
+    /** Maps a persisted project row to the API's {@link ProjectDto} shape. */
+    private ProjectDto toDto(za.codemaster.backend.domain.model.Project entity) {
+        return new ProjectDto(
                 entity.getId(),
                 entity.getName(),
                 entity.getSlug(),
@@ -199,7 +201,7 @@ public class ProjectQueryService {
     }
 
     /**
-     * Maps a persisted issue row to the API's {@link Issue} shape.
+     * Maps a persisted issue row to the API's {@link IssueDto} shape.
      * {@code claimCount} is computed here (active claims only) rather than
      * stored, since it is not a column on {@code issues}.
      * <p>
@@ -208,10 +210,10 @@ public class ProjectQueryService {
      * by {@code IssueService.updateClassification} (API-02.6) after saving an
      * override, rather than duplicating the claimCount/enum-mapping logic there.
      */
-    public Issue toDto(za.codemaster.backend.domain.model.Issue entity) {
+    public IssueDto toDto(za.codemaster.backend.domain.model.Issue entity) {
         long activeClaims = claimRepository.countByIssueIdAndStatus(entity.getId(), ClaimStatus.ACTIVE);
 
-        return new Issue(
+        return new IssueDto(
                 entity.getId(),
                 entity.getProject().getId(),
                 entity.getGithubIssueNumber(),
@@ -240,7 +242,7 @@ public class ProjectQueryService {
     }
 
     /** True if {@code q} is blank/null, or found in the project's name, description, owner, or tags (case-insensitive). */
-    private boolean matchesQuery(Project p, String q) {
+    private boolean matchesQuery(ProjectDto p, String q) {
         if (q == null || q.isBlank()) {
             return true;
         }
@@ -252,27 +254,27 @@ public class ProjectQueryService {
     }
 
     /** True if {@code language} is null, or matches the project's primaryLanguage (case-insensitive). */
-    private boolean matchesLanguage(Project p, String language) {
+    private boolean matchesLanguage(ProjectDto p, String language) {
         return language == null || p.primaryLanguage().equalsIgnoreCase(language);
     }
 
     /** True if {@code category} is null, or matches the project's category (case-insensitive). */
-    private boolean matchesCategory(Project p, String category) {
+    private boolean matchesCategory(ProjectDto p, String category) {
         return category == null || p.category().equalsIgnoreCase(category);
     }
 
     /** True if {@code tag} is null, or found among the project's tags (case-insensitive). */
-    private boolean matchesTag(Project p, String tag) {
+    private boolean matchesTag(ProjectDto p, String tag) {
         return tag == null || p.tags().stream().anyMatch(t -> t.equalsIgnoreCase(tag));
     }
 
     /** True if {@code country} is null, or found among the project's countryCodes (case-insensitive). */
-    private boolean matchesCountry(Project p, String country) {
+    private boolean matchesCountry(ProjectDto p, String country) {
         return country == null || p.countryCodes().stream().anyMatch(c -> c.equalsIgnoreCase(country));
     }
 
     /** True if {@code hasBeginnerIssues} is null, or equals the project's hasBeginnerFriendlyIssues flag. */
-    private boolean matchesHasBeginnerIssues(Project p, Boolean hasBeginnerIssues) {
+    private boolean matchesHasBeginnerIssues(ProjectDto p, Boolean hasBeginnerIssues) {
         return hasBeginnerIssues == null || p.hasBeginnerFriendlyIssues() == hasBeginnerIssues;
     }
 
@@ -281,14 +283,14 @@ public class ProjectQueryService {
      * so it's a no-op that preserves the filtered order. Everything else
      * sorts descending; newest, most stars, or most contributors first.
      */
-    private List<Project> sort(List<Project> projects, String sortParam) {
+    private List<ProjectDto> sort(List<ProjectDto> projects, String sortParam) {
         if (sortParam == null || sortParam.equals("relevance")) {
             return projects;
         }
-        Comparator<Project> comparator = switch (sortParam) {
-            case "recent" -> Comparator.comparing(Project::lastActivityAt).reversed();
-            case "stars" -> Comparator.comparing(Project::stars).reversed();
-            case "contributors" -> Comparator.comparing(Project::contributors).reversed();
+        Comparator<ProjectDto> comparator = switch (sortParam) {
+            case "recent" -> Comparator.comparing(ProjectDto::lastActivityAt).reversed();
+            case "stars" -> Comparator.comparing(ProjectDto::stars).reversed();
+            case "contributors" -> Comparator.comparing(ProjectDto::contributors).reversed();
             default -> throw new IllegalArgumentException("Unknown sort value: " + sortParam);
         };
         return projects.stream().sorted(comparator).toList();

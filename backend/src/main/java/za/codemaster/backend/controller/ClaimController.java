@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import za.codemaster.backend.domain.model.User;
-import za.codemaster.backend.dto.Claim;
-import za.codemaster.backend.dto.CreateClaimRequest;
+import za.codemaster.backend.dto.claim.ClaimDto;
+import za.codemaster.backend.dto.claim.CreateClaimRequest;
 import za.codemaster.backend.security.AuthenticatedUser;
 import za.codemaster.backend.service.ClaimService;
 
@@ -35,12 +35,12 @@ public class ClaimController {
      * The request body is entirely optional (a bare claim needs no note).
      */
     @PostMapping("/api/v1/issues/{issueId}/claim")
-    public ResponseEntity<Claim> createClaim(
+    public ResponseEntity<ClaimDto> createClaim(
             @PathVariable Long issueId,
             @Valid @RequestBody(required = false) CreateClaimRequest request,
             @AuthenticatedUser User currentUser) {
         String note = request == null ? null : request.note();
-        Claim created = claimService.createClaim(issueId, note, currentUser);
+        ClaimDto created = claimService.createClaim(issueId, note, currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -61,7 +61,7 @@ public class ClaimController {
      * for this endpoint exactly (unlike comments/projects/issues, this list isn't paged).
      */
     @GetMapping("/api/v1/issues/{issueId}/claims")
-    public List<Claim> getActiveClaims(@PathVariable Long issueId) {
+    public List<ClaimDto> getActiveClaims(@PathVariable Long issueId) {
         return claimService.getActiveClaims(issueId);
     }
 }

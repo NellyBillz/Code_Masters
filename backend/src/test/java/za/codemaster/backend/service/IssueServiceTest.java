@@ -13,9 +13,9 @@ import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.domain.model.Project;
 import za.codemaster.backend.domain.model.ProjectMaintainer;
 import za.codemaster.backend.domain.model.User;
-import za.codemaster.backend.dto.Difficulty;
-import za.codemaster.backend.dto.Issue;
-import za.codemaster.backend.dto.UpdateIssueRequest;
+import za.codemaster.backend.dto.issue.Difficulty;
+import za.codemaster.backend.dto.issue.IssueDto;
+import za.codemaster.backend.dto.issue.UpdateIssueRequest;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
@@ -102,7 +102,7 @@ class IssueServiceTest {
 
     @Test
     void maintainerCanOverrideDifficulty() {
-        Issue updated = service.updateClassification(
+        IssueDto updated = service.updateClassification(
                 issueId, new UpdateIssueRequest(Difficulty.ADVANCED, null), maintainer);
 
         assertEquals(Difficulty.ADVANCED, updated.difficulty());
@@ -111,7 +111,7 @@ class IssueServiceTest {
 
     @Test
     void maintainerCanOverrideBeginnerFriendlyOnly() {
-        Issue updated = service.updateClassification(
+        IssueDto updated = service.updateClassification(
                 issueId, new UpdateIssueRequest(null, true), maintainer);
 
         assertTrue(updated.isBeginnerFriendly());
@@ -120,7 +120,7 @@ class IssueServiceTest {
 
     @Test
     void maintainerCanOverrideBothFieldsAtOnce() {
-        Issue updated = service.updateClassification(
+        IssueDto updated = service.updateClassification(
                 issueId, new UpdateIssueRequest(Difficulty.INTERMEDIATE, true), maintainer);
 
         assertEquals(Difficulty.INTERMEDIATE, updated.difficulty());

@@ -11,8 +11,8 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.domain.model.User;
-import za.codemaster.backend.dto.Claim;
-import za.codemaster.backend.dto.ClaimStatus;
+import za.codemaster.backend.dto.claim.ClaimDto;
+import za.codemaster.backend.dto.claim.ClaimStatusDto;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
@@ -91,11 +91,11 @@ class ClaimServiceTest {
     void createClaimPersistsAndReturnsActiveStatus() {
         Long issueId = fixtures.issueId(0);
 
-        Claim created = service.createClaim(issueId, "I'll take this one.", claimant);
+        ClaimDto created = service.createClaim(issueId, "I'll take this one.", claimant);
 
         assertNotNull(created.id());
         assertEquals(issueId, created.issueId());
-        assertEquals(ClaimStatus.ACTIVE, created.status());
+        assertEquals(ClaimStatusDto.ACTIVE, created.status());
         assertEquals("I'll take this one.", created.note());
         assertEquals(claimant.getUsername(), created.user().username());
     }
@@ -104,7 +104,7 @@ class ClaimServiceTest {
     void createClaimWithoutNoteSucceeds() {
         Long issueId = fixtures.issueId(0);
 
-        Claim created = service.createClaim(issueId, null, claimant);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
 
         assertNull(created.note());
     }
@@ -127,7 +127,7 @@ class ClaimServiceTest {
         service.createClaim(issueId, "A is on it", userA);
         service.createClaim(issueId, "B is on it too", userB);
 
-        List<Claim> claims = service.getActiveClaims(issueId);
+        List<ClaimDto> claims = service.getActiveClaims(issueId);
 
         assertEquals(2, claims.size(),
                 "claims are a non-exclusive signal of interest (design doc §7) — both must be active");
@@ -141,12 +141,12 @@ class ClaimServiceTest {
         User userA = claimant;
         User userB = otherUser();
 
-        Claim first = service.createClaim(issueId, null, userA);
-        Claim second = service.createClaim(issueId, null, userB);
+        ClaimDto first = service.createClaim(issueId, null, userA);
+        ClaimDto second = service.createClaim(issueId, null, userB);
 
-        List<Claim> claims = service.getActiveClaims(issueId);
+        List<ClaimDto> claims = service.getActiveClaims(issueId);
 
-        assertEquals(List.of(first.id(), second.id()), claims.stream().map(Claim::id).toList());
+        assertEquals(List.of(first.id(), second.id()), claims.stream().map(ClaimDto::id).toList());
     }
 
     @Test
@@ -163,7 +163,7 @@ class ClaimServiceTest {
 
         service.releaseClaim(issueId, claimant);
 
-        List<Claim> claims = service.getActiveClaims(issueId);
+        List<ClaimDto> claims = service.getActiveClaims(issueId);
         assertTrue(claims.isEmpty(), "a released claim must not appear in the active claims list");
     }
 
@@ -190,9 +190,9 @@ class ClaimServiceTest {
         service.createClaim(issueId, "first attempt", claimant);
         service.releaseClaim(issueId, claimant);
 
-        Claim reclaimed = service.createClaim(issueId, "second attempt", claimant);
+        ClaimDto reclaimed = service.createClaim(issueId, "second attempt", claimant);
 
-        assertEquals(ClaimStatus.ACTIVE, reclaimed.status());
+        assertEquals(ClaimStatusDto.ACTIVE, reclaimed.status());
         assertEquals(1, service.getActiveClaims(issueId).size());
     }
 

@@ -6,9 +6,9 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import za.codemaster.backend.domain.model.User;
-import za.codemaster.backend.dto.Issue;
-import za.codemaster.backend.dto.IssueDetail;
-import za.codemaster.backend.dto.UpdateIssueRequest;
+import za.codemaster.backend.dto.issue.IssueDetail;
+import za.codemaster.backend.dto.issue.IssueDto;
+import za.codemaster.backend.dto.issue.UpdateIssueRequest;
 import za.codemaster.backend.security.AuthenticatedUser;
 import za.codemaster.backend.service.IssueService;
 import za.codemaster.backend.service.ProjectQueryService;
@@ -49,7 +49,7 @@ public class IssueController {
      * the override-flagging behavior that protects this from being clobbered by sync.
      */
     @PatchMapping("/api/v1/issues/{issueId}")
-    public Issue updateIssue(
+    public IssueDto updateIssue(
             @PathVariable Long issueId,
             @RequestBody UpdateIssueRequest request,
             @AuthenticatedUser User currentUser) {

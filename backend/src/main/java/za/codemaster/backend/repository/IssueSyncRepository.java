@@ -2,7 +2,7 @@ package za.codemaster.backend.repository;
 
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
-import za.codemaster.backend.dto.GitHubIssueMetadata;
+import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
 import java.sql.Array;
 import java.util.Optional;
 

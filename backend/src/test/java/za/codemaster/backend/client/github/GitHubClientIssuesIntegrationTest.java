@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
-import za.codemaster.backend.dto.GitHubFetchResult;
-import za.codemaster.backend.dto.GitHubIssueMetadata;
+import za.codemaster.backend.client.github.dto.GitHubFetchResult;
+import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
 
 import java.net.URI;
 import java.net.http.HttpClient;
