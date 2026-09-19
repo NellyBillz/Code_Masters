@@ -10,6 +10,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.PostMapping;
+import jakarta.servlet.http.Cookie;
+import za.codemaster.backend.repository.SessionRepository;
+import java.util.Arrays;
+import java.util.UUID;
 import za.codemaster.backend.dto.GitHubOAuthUser;
 import za.codemaster.backend.service.AuthPersistenceService;
 import za.codemaster.backend.service.GitHubOAuthService;
@@ -32,18 +37,21 @@ public class AuthController {
     private final String frontendUrl;
     private final Duration sessionTtl;
     private final boolean secureCookies;
+    private final SessionRepository sessionRepository;
 
     public AuthController(
             GitHubOAuthService gitHubOAuthService,
             AuthPersistenceService authPersistenceService,
             @Value("${app.frontend-url:http://localhost:3000}") String frontendUrl,
             @Value("${app.session-ttl:PT168H}") Duration sessionTtl,
-            @Value("${app.cookies.secure:false}") boolean secureCookies) {
+            @Value("${app.cookies.secure:false}") boolean secureCookies,
+            SessionRepository sessionRepository) {
         this.gitHubOAuthService = gitHubOAuthService;
         this.authPersistenceService = authPersistenceService;
         this.frontendUrl = frontendUrl;
         this.sessionTtl = sessionTtl;
         this.secureCookies = secureCookies;
+        this.sessionRepository = sessionRepository;
     }
 
     @GetMapping("/auth/github")
@@ -98,6 +106,44 @@ public class AuthController {
                 .header(HttpHeaders.SET_COOKIE, sessionCookie.toString())
                 .header(HttpHeaders.SET_COOKIE, csrfCookie.toString())
                 .location(URI.create(frontendUrl))
+                .build();
+    }
+
+
+    @PostMapping("/auth/logout")
+    public ResponseEntity<Void> logout(HttpServletRequest request) {
+        sessionCookieValue(request).ifPresent(value -> {
+            try {
+                sessionRepository.deleteById(UUID.fromString(value));
+            } catch (IllegalArgumentException ignored) {
+                // An invalid/stale cookie is already logged out from the server's perspective.
+            }
+        });
+
+        ResponseCookie clearSession = expiredCookie(SESSION_COOKIE, true);
+        ResponseCookie clearCsrf = expiredCookie(CSRF_COOKIE, false);
+        return ResponseEntity.noContent()
+                .header(HttpHeaders.SET_COOKIE, clearSession.toString())
+                .header(HttpHeaders.SET_COOKIE, clearCsrf.toString())
+                .build();
+    }
+
+    private java.util.Optional<String> sessionCookieValue(HttpServletRequest request) {
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) return java.util.Optional.empty();
+        return Arrays.stream(cookies)
+                .filter(cookie -> SESSION_COOKIE.equals(cookie.getName()))
+                .map(Cookie::getValue)
+                .findFirst();
+    }
+
+    private ResponseCookie expiredCookie(String name, boolean httpOnly) {
+        return ResponseCookie.from(name, "")
+                .httpOnly(httpOnly)
+                .secure(secureCookies)
+                .sameSite("Lax")
+                .path("/")
+                .maxAge(Duration.ZERO)
                 .build();
     }
 

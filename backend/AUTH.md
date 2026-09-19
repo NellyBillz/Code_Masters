@@ -33,3 +33,9 @@ Both cookies use the configured session TTL. In deployed HTTPS environments, set
 3. Open `http://localhost:8080/auth/github` in a browser and authorize on GitHub.
 4. Confirm the browser lands on `FRONTEND_URL` and has `CODEMASTERS_SESSION` plus readable `CODEMASTERS_CSRF` cookies.
 5. Log in again with the same GitHub account and verify only one `users` row exists for that GitHub ID. The login uses `ON CONFLICT (github_id) DO UPDATE`, so the existing user is refreshed rather than duplicated.
+
+## Shared session resolver / logout contract
+
+`POST /auth/logout` reads `CODEMASTERS_SESSION`, deletes that session when present, and expires both `CODEMASTERS_SESSION` and `CODEMASTERS_CSRF` with the same `/` path used at login. Logout is idempotent for missing, malformed, stale, or already-deleted cookies.
+
+`SessionUserResolver` is the shared authentication boundary for API-02.2. Pass the raw `CODEMASTERS_SESSION` cookie value to `resolve(String)`. It returns `Optional<User>` only when the UUID identifies a session whose `expires_at` is still in the future; missing, malformed, deleted, and expired sessions return `Optional.empty()`. API-02.2 should use this component rather than duplicating session lookup logic when constructing Spring Security authentication.
