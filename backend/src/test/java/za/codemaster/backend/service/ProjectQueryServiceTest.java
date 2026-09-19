@@ -1,9 +1,20 @@
 package za.codemaster.backend.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerAutoConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.dto.PagedProjects;
 import za.codemaster.backend.dto.Project;
-import za.codemaster.backend.mock.MockDataStore;
+import za.codemaster.backend.repository.ClaimRepository;
+import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectRepository;
 
 import java.util.List;
 
@@ -12,12 +23,42 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
  * One test per GET /api/v1/projects filter param, per API-01.3's acceptance
- * criteria — each proves the mock result set actually narrows, not that the
- * param is silently ignored.
+ * criteria — each proves the result set actually narrows, not that the param
+ * is silently ignored.
+ * <p>
+ * Post API-02.1: runs against a real (test) Postgres database instead of
+ * {@code MockDataStore}. Only the fixture setup changed
+ * ({@link ProjectQueryServiceFixtures} seeds equivalent rows) — every
+ * assertion below is unchanged from Round 1.
  */
+@SpringBootTest(
+    classes = BackendApplication.class,
+    webEnvironment = SpringBootTest.WebEnvironment.MOCK
+)
+@EnableAutoConfiguration(exclude = {
+    SecurityAutoConfiguration.class,
+    OAuth2ResourceServerAutoConfiguration.class,
+    OAuth2ClientAutoConfiguration.class
+})
+@Transactional
 class ProjectQueryServiceTest {
 
-    private final ProjectQueryService service = new ProjectQueryService(new MockDataStore());
+    @Autowired
+    private ProjectRepository projectRepository;
+
+    @Autowired
+    private IssueRepository issueRepository;
+
+    @Autowired
+    private ClaimRepository claimRepository;
+
+    private ProjectQueryService service;
+
+    @BeforeEach
+    void setUp() {
+        service = new ProjectQueryService(projectRepository, issueRepository, claimRepository);
+        ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
+    }
 
     private PagedProjects search(ProjectSearchParams params) {
         return service.search(params);

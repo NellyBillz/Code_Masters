@@ -1,32 +1,72 @@
 package za.codemaster.backend.service;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
+import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration;
+import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration;
+import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerAutoConfiguration;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.transaction.annotation.Transactional;
+import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.dto.*;
 import za.codemaster.backend.exception.ApiException;
-import za.codemaster.backend.mock.MockDataStore;
+import za.codemaster.backend.repository.ClaimRepository;
+import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectRepository;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Verifies API-01.5's acceptance criteria: one test per filter param against
- * the mock set, plus a 404 test matching API-01.4's PROJECT_NOT_FOUND exactly.
+ * Verifies API-01.5's acceptance criteria: one test per filter param, plus a
+ * 404 test matching API-01.4's PROJECT_NOT_FOUND exactly.
+ * <p>
+ * Post API-02.1: runs against a real (test) Postgres database instead of
+ * {@code MockDataStore}. Only the fixture setup changed — assertions unchanged.
  */
+@SpringBootTest(
+    classes = BackendApplication.class,
+    webEnvironment = SpringBootTest.WebEnvironment.MOCK
+)
+@EnableAutoConfiguration(exclude = {
+    SecurityAutoConfiguration.class,
+    OAuth2ResourceServerAutoConfiguration.class,
+    OAuth2ClientAutoConfiguration.class
+})
+@Transactional
 class ProjectIssuesTest {
 
-    private final MockDataStore mockDataStore = new MockDataStore();
-    private final ProjectQueryService service = new ProjectQueryService(mockDataStore);
+    @Autowired
+    private ProjectRepository projectRepository;
+
+    @Autowired
+    private IssueRepository issueRepository;
+
+    @Autowired
+    private ClaimRepository claimRepository;
+
+    private ProjectQueryService service;
+    private ProjectQueryServiceFixtures fixtures;
+
+    /** OpenLearn SA (fixture index 0) has 2 issues: one BEGINNER/OPEN, one ADVANCED/OPEN. */
+    private Long projectWithIssues;
+
+    @BeforeEach
+    void setUp() {
+        service = new ProjectQueryService(projectRepository, issueRepository, claimRepository);
+        fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
+        projectWithIssues = fixtures.projectId(0);
+    }
 
     private ProjectIssuesSearchParams emptyParams() {
         return new ProjectIssuesSearchParams(null, null, null, null, null);
     }
 
-    /** Project 1 (OpenLearn SA) has 2 mock issues: one BEGINNER/OPEN, one ADVANCED/OPEN. */
-    private static final Long PROJECT_WITH_ISSUES = 1L;
-
     @Test
     void filtersByDifficulty() {
-        PagedIssues all = service.getProjectIssues(PROJECT_WITH_ISSUES, emptyParams());
-        PagedIssues filtered = service.getProjectIssues(PROJECT_WITH_ISSUES,
+        PagedIssues all = service.getProjectIssues(projectWithIssues, emptyParams());
+        PagedIssues filtered = service.getProjectIssues(projectWithIssues,
                 new ProjectIssuesSearchParams(null, null, Difficulty.BEGINNER, null, null));
 
         assertTrue(filtered.items().size() < all.items().size());
@@ -35,7 +75,7 @@ class ProjectIssuesTest {
 
     @Test
     void filtersByLabel() {
-        PagedIssues filtered = service.getProjectIssues(PROJECT_WITH_ISSUES,
+        PagedIssues filtered = service.getProjectIssues(projectWithIssues,
                 new ProjectIssuesSearchParams(null, null, null, "good-first-issue", null));
 
         assertTrue(filtered.items().size() > 0);
@@ -45,8 +85,10 @@ class ProjectIssuesTest {
 
     @Test
     void filtersByStatus() {
-        // Project 2 (Naija DevTools) has one CLAIMED and one OPEN issue in mock data.
-        PagedIssues filtered = service.getProjectIssues(2L,
+        // Naija DevTools (fixture index 1) has one CLAIMED and one OPEN issue.
+        Long naijaDevTools = fixtures.projectId(1);
+
+        PagedIssues filtered = service.getProjectIssues(naijaDevTools,
                 new ProjectIssuesSearchParams(null, null, null, null, IssueStatus.CLAIMED));
 
         assertTrue(filtered.items().size() > 0);
@@ -55,9 +97,9 @@ class ProjectIssuesTest {
 
     @Test
     void onlyReturnsIssuesBelongingToTheRequestedProject() {
-        PagedIssues result = service.getProjectIssues(PROJECT_WITH_ISSUES, emptyParams());
+        PagedIssues result = service.getProjectIssues(projectWithIssues, emptyParams());
 
-        assertTrue(result.items().stream().allMatch(i -> i.projectId().equals(PROJECT_WITH_ISSUES)));
+        assertTrue(result.items().stream().allMatch(i -> i.projectId().equals(projectWithIssues)));
     }
 
     @Test

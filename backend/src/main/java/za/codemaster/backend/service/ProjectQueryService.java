@@ -1,24 +1,38 @@
 package za.codemaster.backend.service;
 
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.dto.*;
 import za.codemaster.backend.exception.ApiException;
-import za.codemaster.backend.mock.MockDataStore;
+import za.codemaster.backend.repository.ClaimRepository;
+import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectRepository;
 
+import java.math.BigDecimal;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 
 /**
  * Applies filtering, sorting, and pagination for {@code GET /api/v1/projects}
- * against {@link MockDataStore}.
+ * and friends against real persistence ({@link ProjectRepository},
+ * {@link IssueRepository}, {@link ClaimRepository}).
  * <p>
- * Kept separate from {@code ProjectController} so filtering logic can be unit
- * tested directly, without starting a web server. In Round 2, this class (or
- * its query logic) moves to a real repository query — the {@link #search}
- * method's return shape ({@link PagedProjects}) does not change.
+ * Round 2 (API-02.1): this class used to run the same logic against
+ * {@code MockDataStore}'s hardcoded lists. The filter/sort/paginate helpers
+ * below are unchanged from Round 1 — only where the data comes from changed.
+ * Project search still filters/sorts in Java after loading the full project
+ * table, because {@code q}/{@code tag}/{@code country} search spans a
+ * free-text match plus two normalized child tables that {@link ProjectRepository}
+ * does not yet expose as a single query; project counts are small enough for
+ * a hackathon MVP that this is not a real bottleneck. Issue listing, by
+ * contrast, delegates filtering and pagination to {@link IssueRepository#findWithFilters}
+ * since that query already exists and matches the required filters exactly.
  */
 
 @Service
@@ -28,20 +42,31 @@ public class ProjectQueryService {
     private static final int DEFAULT_SIZE = 20;
     private static final int MAX_SIZE = 50;
 
-    private final MockDataStore mockDataStore;
+    private final ProjectRepository projectRepository;
+    private final IssueRepository issueRepository;
+    private final ClaimRepository claimRepository;
 
-    public ProjectQueryService(MockDataStore mockDataStore) {
-        this.mockDataStore = mockDataStore;
+    public ProjectQueryService(ProjectRepository projectRepository,
+                                IssueRepository issueRepository,
+                                ClaimRepository claimRepository) {
+        this.projectRepository = projectRepository;
+        this.issueRepository = issueRepository;
+        this.claimRepository = claimRepository;
     }
 
     /**
-     * Filters, sorts, and paginates the mock project list.
+     * Filters, sorts, and paginates the full project table.
      *
      * @param params the requested filters/sort/pagination; any field may be {@code null}
      * @return a {@link PagedProjects} containing one page of matching results
      */
+    @Transactional(readOnly = true)
     public PagedProjects search(ProjectSearchParams params) {
-        List<Project> filtered = mockDataStore.projects().stream()
+        List<Project> all = projectRepository.findAll().stream()
+                .map(this::toDto)
+                .toList();
+
+        List<Project> filtered = all.stream()
                 .filter(p -> matchesQuery(p, params.q()))
                 .filter(p -> matchesLanguage(p, params.language()))
                 .filter(p -> matchesCategory(p, params.category()))
@@ -61,29 +86,27 @@ public class ProjectQueryService {
 
     /**
      * Looks up a single project by id and assembles its {@link ProjectDetail}.
-     * Maintainers/featuredIssues/recentComments are empty lists for now;
-     * MockDataStore has no data for them yet; get the shape right, per
-     * API-01.4, and fill them in once Round 2 wires a real repository.
+     * Maintainers/featuredIssues/recentComments stay empty lists here — wiring
+     * those is other tickets' scope; this ticket only swaps the project's own
+     * data source from mock to real.
      *
      * @param projectId the project id from the path
      * @return the matching project's detail view
      * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if no project matches
      */
+    @Transactional(readOnly = true)
     public ProjectDetail getProjectDetail(Long projectId) {
-        Project project = findProjectOrThrow(projectId);
+        Project project = toDto(findProjectEntityOrThrow(projectId));
         return new ProjectDetail(project, List.of(), List.of(), List.of());
     }
-
 
     /**
      * Finds a project by id, or throws the standard PROJECT_NOT_FOUND error.
      * Shared by every method that takes a projectId path variable, so there's
      * exactly one place that defines what "project not found" means.
      */
-    private Project findProjectOrThrow(Long projectId) {
-        return mockDataStore.projects().stream()
-                .filter(p -> p.id().equals(projectId))
-                .findFirst()
+    private za.codemaster.backend.domain.model.Project findProjectEntityOrThrow(Long projectId) {
+        return projectRepository.findById(projectId)
                 .orElseThrow(() -> new ApiException(
                         "PROJECT_NOT_FOUND",
                         "No project exists with id " + projectId,
@@ -93,6 +116,8 @@ public class ProjectQueryService {
 
     /**
      * Lists a project's issues, filtered by difficulty/label/status and paginated.
+     * Delegates to {@link IssueRepository#findWithFilters}, which already does
+     * this filtering and pagination in SQL.
      *
      * @param projectId the project id from the path
      * @param params    the requested filters/pagination; any field may be {@code null}
@@ -101,59 +126,112 @@ public class ProjectQueryService {
      *                       project itself doesn't exist — same exception,
      *                       same helper, as {@link #getProjectDetail}
      */
+    @Transactional(readOnly = true)
     public PagedIssues getProjectIssues(Long projectId, ProjectIssuesSearchParams params) {
-        findProjectOrThrow(projectId);
-
-        List<Issue> filtered = mockDataStore.issues().stream()
-                .filter(i -> i.projectId().equals(projectId))
-                .filter(i -> matchesDifficulty(i, params.difficulty()))
-                .filter(i -> matchesLabel(i, params.label()))
-                .filter(i -> matchesStatus(i, params.status()))
-                .toList();
+        findProjectEntityOrThrow(projectId);
 
         int size = clampSize(params.size());
         int page = clampPage(params.page());
-        List<Issue> pageItems = paginate(filtered, page, size);
 
-        return new PagedIssues(pageItems, new PageMeta(page, size, filtered.size()));
+        String status = params.status() == null ? null : params.status().getWireValue();
+        String difficulty = params.difficulty() == null ? null : params.difficulty().getWireValue();
+
+        Page<za.codemaster.backend.domain.model.Issue> result = issueRepository.findWithFilters(
+                projectId, status, difficulty, null, params.label(), PageRequest.of(page, size));
+
+        List<Issue> items = result.getContent().stream().map(this::toDto).toList();
+
+        return new PagedIssues(items, new PageMeta(page, size, (int) result.getTotalElements()));
     }
 
     /**
      * Looks up a single issue by id and assembles its {@link IssueDetail},
-     * including the real project it belongs to. Comments/claims are empty
-     * lists for now; MockDataStore has no data for them yet; get the shape
-     * right, per API-01.6, and fill them in once Round 2 wires a real
-     * repository.
+     * including the real project it belongs to (via the issue's own FK
+     * relationship, guaranteed non-null by the database). Comments/claims
+     * stay empty lists here — wiring those is other tickets' scope.
      *
      * @param issueId the issue id from the path
      * @return the matching issue's detail view
      * @throws ApiException with code {@code ISSUE_NOT_FOUND} (404) if no issue matches
      */
+    @Transactional(readOnly = true)
     public IssueDetail getIssueDetail(Long issueId) {
-        Issue issue = findIssueOrThrow(issueId);
-        // Reuses the same project lookup as getProjectDetail; if an issue ever
-        // references a projectId with no matching project, that's a data
-        // integrity bug in MockDataStore (or, in Round 2, in the database) -
-        // deliberately not swallowed here, since PROJECT_NOT_FOUND surfacing
-        // from this endpoint would be a confusing signal to a client that
-        // only asked about an issue.
-        Project project = findProjectOrThrow(issue.projectId());
-
-        return new IssueDetail(issue, project, List.of(), List.of());
-    }
-
-    /**
-     * Finds an issue by id, or throws the standard ISSUE_NOT_FOUND error.
-     */
-    private Issue findIssueOrThrow(Long issueId) {
-        return mockDataStore.issues().stream()
-                .filter(i -> i.id().equals(issueId))
-                .findFirst()
+        var issueEntity = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ApiException(
                         "ISSUE_NOT_FOUND",
                         "No issue exists with id " + issueId,
                         HttpStatus.NOT_FOUND
                 ));
+
+        Issue issueDto = toDto(issueEntity);
+        Project projectDto = toDto(issueEntity.getProject());
+
+        return new IssueDetail(issueDto, projectDto, List.of(), List.of());
+    }
+
+    /** Maps a persisted project row to the API's {@link Project} shape. */
+    private Project toDto(za.codemaster.backend.domain.model.Project entity) {
+        return new Project(
+                entity.getId(),
+                entity.getName(),
+                entity.getSlug(),
+                entity.getDescription(),
+                entity.getGithubUrl(),
+                entity.getGithubOwner(),
+                entity.getPrimaryLanguage(),
+                entity.getLanguages() == null ? List.of() : List.of(entity.getLanguages()),
+                entity.getCategory(),
+                entity.getTags() == null ? List.of() : List.copyOf(entity.getTags()),
+                entity.getCountryCodes() == null ? List.of() : List.copyOf(entity.getCountryCodes()),
+                ProjectConnection.valueOf(entity.getConnection().toUpperCase(Locale.ROOT)),
+                entity.getLicense(),
+                entity.getStars(),
+                entity.getForks(),
+                entity.getOpenIssues(),
+                entity.getContributors(),
+                Boolean.TRUE.equals(entity.getHasBeginnerFriendlyIssues()),
+                entity.getLastActivityAt(),
+                Boolean.TRUE.equals(entity.getVerified()),
+                entity.getVerifiedAt(),
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    /**
+     * Maps a persisted issue row to the API's {@link Issue} shape.
+     * {@code claimCount} is computed here (active claims only) rather than
+     * stored, since it is not a column on {@code issues}.
+     */
+    private Issue toDto(za.codemaster.backend.domain.model.Issue entity) {
+        long activeClaims = claimRepository.countByIssueIdAndStatus(entity.getId(), ClaimStatus.ACTIVE);
+
+        return new Issue(
+                entity.getId(),
+                entity.getProject().getId(),
+                entity.getGithubIssueNumber(),
+                entity.getTitle(),
+                entity.getBodyExcerpt(),
+                entity.getGithubUrl(),
+                IssueStatus.valueOf(entity.getStatus().toUpperCase(Locale.ROOT)),
+                entity.getLabels() == null ? List.of() : List.of(entity.getLabels()),
+                entity.getDifficulty() == null
+                        ? Difficulty.UNKNOWN
+                        : Difficulty.valueOf(entity.getDifficulty().toUpperCase(Locale.ROOT)),
+                Boolean.TRUE.equals(entity.getIsBeginnerFriendly()),
+                entity.getDifficultyOverriddenByUser() != null,
+                toDouble(entity.getMaintainerResponseScore()),
+                toDouble(entity.getProjectHealthScore()),
+                toDouble(entity.getFreshnessScore()),
+                toDouble(entity.getContributionScore()),
+                (int) activeClaims,
+                entity.getCreatedAt(),
+                entity.getUpdatedAt()
+        );
+    }
+
+    private Double toDouble(BigDecimal value) {
+        return value == null ? null : value.doubleValue();
     }
 
     /** True if {@code q} is blank/null, or found in the project's name, description, owner, or tags (case-insensitive). */
@@ -191,21 +269,6 @@ public class ProjectQueryService {
     /** True if {@code hasBeginnerIssues} is null, or equals the project's hasBeginnerFriendlyIssues flag. */
     private boolean matchesHasBeginnerIssues(Project p, Boolean hasBeginnerIssues) {
         return hasBeginnerIssues == null || p.hasBeginnerFriendlyIssues() == hasBeginnerIssues;
-    }
-
-    /** True if {@code difficulty} is null, or matches the issue's difficulty. */
-    private boolean matchesDifficulty(Issue i, Difficulty difficulty) {
-        return difficulty == null || i.difficulty() == difficulty;
-    }
-
-    /** True if {@code label} is null, or found among the issue's labels (case-insensitive). */
-    private boolean matchesLabel(Issue i, String label) {
-        return label == null || i.labels().stream().anyMatch(l -> l.equalsIgnoreCase(label));
-    }
-
-    /** True if {@code status} is null, or matches the issue's status. */
-    private boolean matchesStatus(Issue i, IssueStatus status) {
-        return status == null || i.status() == status;
     }
 
     /**

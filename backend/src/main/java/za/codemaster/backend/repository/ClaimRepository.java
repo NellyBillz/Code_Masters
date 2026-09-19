@@ -34,4 +34,10 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
      * Finds all claims associated with a given user.
      */
     List<Claim> findByUserId(Long userId);
+
+    /**
+     * Counts claims on an issue in a given status. Used to populate
+     * {@code Issue.claimCount} (active claims) without loading full claim rows.
+     */
+    long countByIssueIdAndStatus(Long issueId, ClaimStatus status);
 }
