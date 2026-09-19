@@ -3,6 +3,7 @@ package za.codemaster.backend.exception;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -71,6 +72,31 @@ public class GlobalExceptionHandler {
                 OffsetDateTime.now(),
                 request.getRequestURI(),
                 details
+        );
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+    }
+
+    /**
+     * Handles a request body that fails to deserialize — malformed JSON, or a value
+     * that doesn't match its target type (e.g. {@code UpdateIssueRequest.difficulty}
+     * sent as an unrecognized string, not one of {@code beginner/intermediate/advanced/unknown}).
+     * This happens before {@code @Valid} ever runs, so without this handler such a
+     * request would fall through to {@link #handleUnexpected} as an unhelpful 500.
+     *
+     * @param exception the deserialization failure
+     * @param request   the current request, used to populate the {@code path} field
+     * @return an {@link ErrorResponse} with code {@code "VALIDATION_ERROR"} and status 400
+     */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponse> handleMalformedRequest(HttpMessageNotReadableException exception,
+                                                                  HttpServletRequest request) {
+        ErrorResponse body = new ErrorResponse(
+                "VALIDATION_ERROR",
+                "Request body is malformed or contains an invalid value.",
+                OffsetDateTime.now(),
+                request.getRequestURI(),
+                null
         );
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);

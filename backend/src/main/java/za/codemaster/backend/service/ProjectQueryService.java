@@ -202,8 +202,13 @@ public class ProjectQueryService {
      * Maps a persisted issue row to the API's {@link Issue} shape.
      * {@code claimCount} is computed here (active claims only) rather than
      * stored, since it is not a column on {@code issues}.
+     * <p>
+     * Public (unlike {@link #toDto(za.codemaster.backend.domain.model.Project)}):
+     * this is the single source of truth for Issue entity-to-DTO mapping, reused
+     * by {@code IssueService.updateClassification} (API-02.6) after saving an
+     * override, rather than duplicating the claimCount/enum-mapping logic there.
      */
-    private Issue toDto(za.codemaster.backend.domain.model.Issue entity) {
+    public Issue toDto(za.codemaster.backend.domain.model.Issue entity) {
         long activeClaims = claimRepository.countByIssueIdAndStatus(entity.getId(), ClaimStatus.ACTIVE);
 
         return new Issue(
