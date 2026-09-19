@@ -17,8 +17,10 @@ import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.exception.CommentValidationException;
 import za.codemaster.backend.repository.CommentRepository;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
@@ -35,13 +37,16 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final ProjectRepository projectRepository;
     private final IssueRepository issueRepository;
+    private final ProjectMaintainerRepository projectMaintainerRepository;
 
     public CommentService(CommentRepository commentRepository,
                            ProjectRepository projectRepository,
-                           IssueRepository issueRepository) {
+                           IssueRepository issueRepository,
+                           ProjectMaintainerRepository projectMaintainerRepository) {
         this.commentRepository = commentRepository;
         this.projectRepository = projectRepository;
         this.issueRepository = issueRepository;
+        this.projectMaintainerRepository = projectMaintainerRepository;
     }
 
     /**
@@ -120,6 +125,84 @@ public class CommentService {
         Page<Comment> result = commentRepository.findByIssueIdAndDeletedAtIsNullOrderByCreatedAtAsc(
                 issueId, pageable(page, size));
         return toPagedDto(result);
+    }
+
+    /**
+     * Edits a comment's body, author-only (API-02.4, design doc's comment-moderation note).
+     *
+     * @param commentId the comment id from the path
+     * @param newBody   the replacement text, already length-validated by {@code @Valid} on the request DTO
+     * @param caller    the authenticated caller, injected via {@code @AuthenticatedUser}
+     * @return the updated comment, in API shape, with {@code edited: true}
+     * @throws ApiException with code {@code COMMENT_NOT_FOUND} (404) if the comment doesn't exist or is
+     *                       already soft-deleted, or {@code FORBIDDEN} (403) if the caller isn't the author
+     */
+    @Transactional
+    public za.codemaster.backend.dto.Comment editComment(Long commentId, String newBody, User caller) {
+        Comment comment = findActiveCommentOrThrow(commentId);
+
+        if (!comment.getUser().getId().equals(caller.getId())) {
+            throw new ApiException(
+                    "FORBIDDEN", "Only the comment's author may edit it.", HttpStatus.FORBIDDEN);
+        }
+
+        comment.setBody(newBody);
+        comment.setEdited(true);
+
+        return toDto(commentRepository.save(comment));
+    }
+
+    /**
+     * Soft-deletes a comment (author or the parent project's maintainer), per design doc §6's note:
+     * a deleted comment's body must never be returned by any subsequent read. That's enforced here by
+     * setting {@code deletedAt} rather than removing the row — {@link #getProjectComments} and
+     * {@link #getIssueComments} already filter on {@code deletedAtIsNull} at the query layer, so a
+     * deleted comment disappears from every list entirely (chosen over a "[deleted]" placeholder for
+     * simplicity, per the ticket's own note — flag in review if the team wants the placeholder instead).
+     *
+     * @param commentId the comment id from the path
+     * @param caller    the authenticated caller, injected via {@code @AuthenticatedUser}
+     * @throws ApiException with code {@code COMMENT_NOT_FOUND} (404) if the comment doesn't exist or is
+     *                       already soft-deleted, or {@code FORBIDDEN} (403) if the caller is neither the
+     *                       author nor a maintainer of the comment's parent project
+     */
+    @Transactional
+    public void deleteComment(Long commentId, User caller) {
+        Comment comment = findActiveCommentOrThrow(commentId);
+
+        boolean isAuthor = comment.getUser().getId().equals(caller.getId());
+        if (!isAuthor && !isMaintainerOfParentProject(comment, caller.getId())) {
+            throw new ApiException(
+                    "FORBIDDEN",
+                    "Only the comment's author or the parent project's maintainer may delete it.",
+                    HttpStatus.FORBIDDEN);
+        }
+
+        comment.setDeletedAt(OffsetDateTime.now());
+        commentRepository.save(comment);
+    }
+
+    /**
+     * Shared lookup for {@link #editComment}/{@link #deleteComment}: a soft-deleted comment is treated
+     * as not found (404), same as one that was never created — not a 403/409 on an already-gone row.
+     */
+    private Comment findActiveCommentOrThrow(Long commentId) {
+        Comment comment = commentRepository.findById(commentId)
+                .orElseThrow(() -> new ApiException(
+                        "COMMENT_NOT_FOUND", "No comment exists with id " + commentId, HttpStatus.NOT_FOUND));
+
+        if (comment.getDeletedAt() != null) {
+            throw new ApiException(
+                    "COMMENT_NOT_FOUND", "No comment exists with id " + commentId, HttpStatus.NOT_FOUND);
+        }
+
+        return comment;
+    }
+
+    /** A comment's parent project is either its own project, or its issue's project. */
+    private boolean isMaintainerOfParentProject(Comment comment, Long userId) {
+        Project parentProject = comment.getProject() != null ? comment.getProject() : comment.getIssue().getProject();
+        return projectMaintainerRepository.existsByProjectIdAndUserId(parentProject.getId(), userId);
     }
 
     /**

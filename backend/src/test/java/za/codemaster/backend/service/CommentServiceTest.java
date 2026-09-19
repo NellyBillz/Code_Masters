@@ -10,6 +10,8 @@ import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OA
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.BackendApplication;
+import za.codemaster.backend.domain.model.Project;
+import za.codemaster.backend.domain.model.ProjectMaintainer;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.Comment;
 import za.codemaster.backend.dto.PagedComments;
@@ -17,6 +19,7 @@ import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.CommentRepository;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.UserRepository;
 
@@ -54,13 +57,16 @@ class CommentServiceTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ProjectMaintainerRepository projectMaintainerRepository;
+
     private CommentService service;
     private ProjectQueryServiceFixtures fixtures;
     private User author;
 
     @BeforeEach
     void setUp() {
-        service = new CommentService(commentRepository, projectRepository, issueRepository);
+        service = new CommentService(commentRepository, projectRepository, issueRepository, projectMaintainerRepository);
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         author = userRepository.save(User.builder()
                 .githubId(System.nanoTime())
@@ -161,5 +167,114 @@ class CommentServiceTest {
 
         assertEquals(0, projectComments.items().size(),
                 "a comment posted to an issue must not appear in its parent project's comment list");
+    }
+
+    private User otherUser() {
+        return userRepository.save(User.builder()
+                .githubId(System.nanoTime())
+                .username("other_" + System.nanoTime())
+                .displayName("Other User")
+                .build());
+    }
+
+    // --- API-02.4: PATCH /comments/{commentId} ---
+
+    @Test
+    void authorCanEditOwnComment() {
+        Long projectId = fixtures.projectId(0);
+        Comment created = service.createProjectComment(projectId, "Original body", author);
+
+        Comment edited = service.editComment(created.id(), "Edited body", author);
+
+        assertEquals("Edited body", edited.body());
+        assertTrue(edited.edited());
+    }
+
+    @Test
+    void nonAuthorEditingCommentIsForbidden() {
+        Long projectId = fixtures.projectId(0);
+        Comment created = service.createProjectComment(projectId, "Original body", author);
+        User stranger = otherUser();
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.editComment(created.id(), "Hijacked body", stranger));
+
+        assertEquals("FORBIDDEN", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatus());
+    }
+
+    @Test
+    void editingMissingCommentThrowsCommentNotFound() {
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.editComment(-999L, "hello", author));
+
+        assertEquals("COMMENT_NOT_FOUND", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    // --- API-02.4: DELETE /comments/{commentId} ---
+
+    @Test
+    void authorCanDeleteOwnComment() {
+        Long projectId = fixtures.projectId(0);
+        Comment created = service.createProjectComment(projectId, "Delete me", author);
+
+        service.deleteComment(created.id(), author);
+
+        PagedComments after = service.getProjectComments(projectId, null, null);
+        assertEquals(0, after.items().size(), "a deleted comment must disappear from GET lists entirely");
+    }
+
+    @Test
+    void projectMaintainerCanDeleteAnotherUsersComment() {
+        Long projectId = fixtures.projectId(0);
+        Comment created = service.createProjectComment(projectId, "Needs moderation", author);
+
+        User maintainerUser = otherUser();
+        Project project = projectRepository.findById(projectId).orElseThrow();
+        ProjectMaintainer maintainer = new ProjectMaintainer();
+        maintainer.setProject(project);
+        maintainer.setUser(maintainerUser);
+        maintainer.setRole("maintainer");
+        projectMaintainerRepository.save(maintainer);
+
+        service.deleteComment(created.id(), maintainerUser);
+
+        PagedComments after = service.getProjectComments(projectId, null, null);
+        assertEquals(0, after.items().size());
+    }
+
+    @Test
+    void nonAuthorNonMaintainerDeletingCommentIsForbidden() {
+        Long projectId = fixtures.projectId(0);
+        Comment created = service.createProjectComment(projectId, "Do not delete", author);
+        User stranger = otherUser();
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.deleteComment(created.id(), stranger));
+
+        assertEquals("FORBIDDEN", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatus());
+    }
+
+    @Test
+    void deletingMissingCommentThrowsCommentNotFound() {
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.deleteComment(-999L, author));
+
+        assertEquals("COMMENT_NOT_FOUND", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    @Test
+    void deletingAlreadyDeletedCommentThrowsCommentNotFound() {
+        Long projectId = fixtures.projectId(0);
+        Comment created = service.createProjectComment(projectId, "Delete twice", author);
+        service.deleteComment(created.id(), author);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.deleteComment(created.id(), author));
+
+        assertEquals("COMMENT_NOT_FOUND", ex.getCode());
     }
 }

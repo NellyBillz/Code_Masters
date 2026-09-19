@@ -10,9 +10,12 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import za.codemaster.backend.domain.model.Project;
+import za.codemaster.backend.domain.model.ProjectMaintainer;
 import za.codemaster.backend.domain.model.Session;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.SessionRepository;
 import za.codemaster.backend.repository.UserRepository;
@@ -20,17 +23,21 @@ import za.codemaster.backend.repository.UserRepository;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * Full-stack acceptance tests for API-02.3 (round2-tickets.md), run through the real
- * {@code SecurityFilterChain} (unlike {@code CommentServiceTest}, which bypasses
- * security entirely). Covers the ticket's own acceptance criteria verbatim:
+ * Full-stack acceptance tests for API-02.3/API-02.4 (round2-tickets.md), run through the
+ * real {@code SecurityFilterChain} (unlike {@code CommentServiceTest}, which bypasses
+ * security entirely). Covers both tickets' acceptance criteria verbatim:
  * unauthenticated POST -> 401 (proves API-02.2 is actually wired in), a body over
- * 5000 chars -> 400, and a successful post appearing in the corresponding GET list.
+ * 5000 chars -> 400, a successful post appearing in the corresponding GET list, a
+ * non-author/non-maintainer delete -> 403, and a deleted comment disappearing from
+ * GET lists entirely.
  */
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -54,6 +61,9 @@ class CommentControllerIntegrationTest {
 
     @Autowired
     private SessionRepository sessionRepository;
+
+    @Autowired
+    private ProjectMaintainerRepository projectMaintainerRepository;
 
     private ProjectQueryServiceFixtures fixtures;
     private Long projectId;
@@ -83,6 +93,31 @@ class CommentControllerIntegrationTest {
 
     private String commentJson(String body) {
         return "{\"body\":\"" + body + "\"}";
+    }
+
+    private Long postProjectCommentAndGetId(Session session, String body) throws Exception {
+        String response = mockMvc.perform(post("/api/v1/projects/{projectId}/comments", projectId)
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
+                        .header(CSRF_HEADER, session.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(commentJson(body)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\"id\":(\\d+)").matcher(response);
+        if (!matcher.find()) {
+            throw new IllegalStateException("No id field found in response: " + response);
+        }
+        return Long.valueOf(matcher.group(1));
+    }
+
+    /** Makes {@code session}'s user a maintainer of the fixture project used by every test. */
+    private void makeMaintainer(Session session) {
+        Project project = projectRepository.findById(projectId).orElseThrow();
+        ProjectMaintainer maintainer = new ProjectMaintainer();
+        maintainer.setProject(project);
+        maintainer.setUser(session.getUser());
+        maintainer.setRole("maintainer");
+        projectMaintainerRepository.save(maintainer);
     }
 
     @Test
@@ -181,5 +216,126 @@ class CommentControllerIntegrationTest {
         mockMvc.perform(get("/api/v1/issues/{issueId}/comments", -999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ISSUE_NOT_FOUND"));
+    }
+
+    // --- API-02.4: PATCH /comments/{commentId} ---
+
+    @Test
+    @DisplayName("PATCH comment while unauthenticated -> 401")
+    void patchCommentUnauthenticatedIsRejected() throws Exception {
+        Session session = createActiveSession();
+        Long commentId = postProjectCommentAndGetId(session, "Original");
+
+        mockMvc.perform(patch("/api/v1/comments/{commentId}", commentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(commentJson("Hijacked")))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    @DisplayName("PATCH by the comment's author -> 200, edited: true, new body")
+    void authorCanEditOwnComment() throws Exception {
+        Session session = createActiveSession();
+        Long commentId = postProjectCommentAndGetId(session, "Original");
+
+        mockMvc.perform(patch("/api/v1/comments/{commentId}", commentId)
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
+                        .header(CSRF_HEADER, session.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(commentJson("Edited")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.body").value("Edited"))
+                .andExpect(jsonPath("$.edited").value(true));
+    }
+
+    @Test
+    @DisplayName("PATCH by a non-author -> 403 FORBIDDEN")
+    void nonAuthorEditingCommentIsForbidden() throws Exception {
+        Session author = createActiveSession();
+        Session stranger = createActiveSession();
+        Long commentId = postProjectCommentAndGetId(author, "Original");
+
+        mockMvc.perform(patch("/api/v1/comments/{commentId}", commentId)
+                        .cookie(new Cookie(SESSION_COOKIE, stranger.getId().toString()))
+                        .header(CSRF_HEADER, stranger.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(commentJson("Hijacked")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    // --- API-02.4: DELETE /comments/{commentId} ---
+
+    @Test
+    @DisplayName("DELETE comment while unauthenticated -> 401")
+    void deleteCommentUnauthenticatedIsRejected() throws Exception {
+        Session session = createActiveSession();
+        Long commentId = postProjectCommentAndGetId(session, "To delete");
+
+        mockMvc.perform(delete("/api/v1/comments/{commentId}", commentId))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    @DisplayName("A non-author, non-maintainer attempting to delete -> 403")
+    void nonAuthorNonMaintainerDeletingCommentIsForbidden() throws Exception {
+        Session author = createActiveSession();
+        Session stranger = createActiveSession();
+        Long commentId = postProjectCommentAndGetId(author, "Do not delete");
+
+        mockMvc.perform(delete("/api/v1/comments/{commentId}", commentId)
+                        .cookie(new Cookie(SESSION_COOKIE, stranger.getId().toString()))
+                        .header(CSRF_HEADER, stranger.getCsrToken()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("Author can delete own comment; it disappears from GET list entirely")
+    void authorCanDeleteOwnCommentAndItDisappearsFromList() throws Exception {
+        Session session = createActiveSession();
+        Long commentId = postProjectCommentAndGetId(session, "Ephemeral");
+
+        mockMvc.perform(delete("/api/v1/comments/{commentId}", commentId)
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
+                        .header(CSRF_HEADER, session.getCsrToken()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/projects/{projectId}/comments", projectId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0))
+                .andExpect(jsonPath("$.meta.total").value(0));
+    }
+
+    @Test
+    @DisplayName("The parent project's maintainer can delete another user's comment")
+    void projectMaintainerCanDeleteAnotherUsersComment() throws Exception {
+        Session author = createActiveSession();
+        Session maintainerSession = createActiveSession();
+        makeMaintainer(maintainerSession);
+        Long commentId = postProjectCommentAndGetId(author, "Needs moderation");
+
+        mockMvc.perform(delete("/api/v1/comments/{commentId}", commentId)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(get("/api/v1/projects/{projectId}/comments", projectId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items.length()").value(0));
+    }
+
+    @Test
+    @DisplayName("DELETE on a missing comment -> 404 COMMENT_NOT_FOUND")
+    void deleteMissingCommentIs404() throws Exception {
+        Session session = createActiveSession();
+
+        mockMvc.perform(delete("/api/v1/comments/{commentId}", -999L)
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
+                        .header(CSRF_HEADER, session.getCsrToken()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("COMMENT_NOT_FOUND"));
     }
 }

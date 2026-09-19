@@ -3,7 +3,9 @@ package za.codemaster.backend.controller;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -13,6 +15,7 @@ import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.Comment;
 import za.codemaster.backend.dto.CreateCommentRequest;
 import za.codemaster.backend.dto.PagedComments;
+import za.codemaster.backend.dto.UpdateCommentRequest;
 import za.codemaster.backend.security.AuthenticatedUser;
 import za.codemaster.backend.service.CommentService;
 
@@ -81,5 +84,28 @@ public class CommentController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer size) {
         return commentService.getIssueComments(issueId, page, size);
+    }
+
+    /**
+     * {@code PATCH /api/v1/comments/{commentId}}: edit a comment. Author-only (API-02.4).
+     */
+    @PatchMapping("/api/v1/comments/{commentId}")
+    public Comment editComment(
+            @PathVariable Long commentId,
+            @Valid @RequestBody UpdateCommentRequest request,
+            @AuthenticatedUser User currentUser) {
+        return commentService.editComment(commentId, request.body(), currentUser);
+    }
+
+    /**
+     * {@code DELETE /api/v1/comments/{commentId}}: soft-delete a comment. Author or the parent
+     * project's maintainer (API-02.4).
+     */
+    @DeleteMapping("/api/v1/comments/{commentId}")
+    public ResponseEntity<Void> deleteComment(
+            @PathVariable Long commentId,
+            @AuthenticatedUser User currentUser) {
+        commentService.deleteComment(commentId, currentUser);
+        return ResponseEntity.noContent().build();
     }
 }
