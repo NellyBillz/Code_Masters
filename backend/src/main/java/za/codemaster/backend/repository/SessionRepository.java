@@ -13,4 +13,7 @@ import java.util.UUID;
 public interface SessionRepository extends JpaRepository<Session, UUID> {
     @Query("select s.user from Session s where s.id = :id and s.expiresAt > :now")
     Optional<User> findActiveUser(@Param("id") UUID id, @Param("now") OffsetDateTime now);
+
+    @Query("select s from Session s join fetch s.user where s.id = :id and s.expiresAt > :now")
+    Optional<Session> findActiveSession(@Param("id") UUID id, @Param("now") OffsetDateTime now);
 }
