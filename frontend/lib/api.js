@@ -62,6 +62,15 @@
  */
 
 /**
+ * @typedef {Object} User
+ * @property {number} id
+ * @property {string} name
+ * @property {string} [avatar] GitHub avatar URL
+ * @property {string} [bio]
+ * @property {string} createdAt ISO date-time
+ */
+
+/**
  * @typedef {Object} ApiErrorBody
  * @property {string} code
  * @property {string} message
@@ -166,4 +175,24 @@ function getProject(projectId) {
   return apiFetch(`/projects/${projectId}`);
 }
 
-module.exports = { listProjects, getProject, ApiError };
+/**
+ * Get the current logged-in user. Returns the user object if authenticated.
+ * Throws ApiError with status 401 if not logged in.
+ *
+ * @returns {Promise<User>}
+ */
+function getMe() {
+  return apiFetch('/users/me');
+}
+
+/**
+ * Log out the current user by calling POST /auth/logout.
+ * Clears the session cookie server-side.
+ *
+ * @returns {Promise<void>}
+ */
+function logout() {
+  return apiFetch('/auth/logout', { method: 'POST' });
+}
+
+module.exports = { listProjects, getProject, getMe, logout, ApiError };

@@ -2,8 +2,9 @@
 
 import React, { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
-import { listProjects } from '../lib/api';
+import { listProjects } from './lib/api';
 import ProjectCard from './components/ProjectCard';
+import AuthButtons from './components/AuthButtons';
 
 const FEATURED_SIZE = 6;
 const MORE_SIZE = 6;
@@ -56,8 +57,13 @@ export default function CodeMastersHome() {
         <a href="/projects" className="bg-white text-gray-900 px-4 py-2 rounded-full text-sm font-semibold hover:bg-green-500 hover:text-white transition-all">
           Browse Projects
         </a>
+        <div className="border-l border-gray-700 pl-6">
+          <AuthButtons />
+        </div>
       </nav>
+
       <div className="fixed left-6 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-white border border-gray-300 rounded-full flex items-center justify-center cursor-pointer z-40 hover:shadow-md transition-all">←</div>
+
       <div className="max-w-6xl mx-auto p-6 pt-32">
         <section className="bg-white rounded-lg p-12 mb-12 border border-gray-200">
           <h1 className="text-5xl font-bold leading-tight mb-4">The front door to African <span className="text-green-500">open-source</span> discovery</h1>
@@ -67,6 +73,7 @@ export default function CodeMastersHome() {
             <ChevronRight size={18} />
           </a>
         </section>
+
         <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
           <h2 className="text-3xl font-bold">Projects</h2>
           {total !== null && (
@@ -76,9 +83,11 @@ export default function CodeMastersHome() {
             </div>
           )}
         </div>
+
         {loading && <p className="text-gray-600 mb-8">Loading projects...</p>}
         {error && <p role="alert" className="text-red-600 mb-8">{error}</p>}
         {!loading && !error && featured.length === 0 && <p className="text-gray-600 mb-8">No projects found yet.</p>}
+
         {!loading && !error && featured.length > 0 && (
           <section className="mb-12">
             <div className="mb-6">
@@ -91,6 +100,7 @@ export default function CodeMastersHome() {
             </div>
           </section>
         )}
+
         {!loading && !error && more.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
