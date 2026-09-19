@@ -2,7 +2,7 @@ package za.codemaster.backend.service;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
-import za.codemaster.backend.entity.SyncJob;
+import za.codemaster.backend.domain.model.SyncJob;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ProjectSyncRepository;
 import za.codemaster.backend.repository.SyncJobRepository;
