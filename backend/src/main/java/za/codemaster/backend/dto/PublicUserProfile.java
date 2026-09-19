@@ -17,6 +17,7 @@ public record PublicUserProfile(
         String location,
         List<String> skills,
         Integer projectsCount,
-        Integer contributionsCount
+        Integer contributionsCount,
+        Integer reputation
 ) {
 }
