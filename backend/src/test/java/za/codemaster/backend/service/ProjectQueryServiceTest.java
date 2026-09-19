@@ -14,6 +14,7 @@ import za.codemaster.backend.dto.project.PagedProjects;
 import za.codemaster.backend.dto.project.ProjectDto;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 
 import java.util.List;
@@ -52,11 +53,14 @@ class ProjectQueryServiceTest {
     @Autowired
     private ClaimRepository claimRepository;
 
+    @Autowired
+    private ProjectMaintainerRepository projectMaintainerRepository;
+
     private ProjectQueryService service;
 
     @BeforeEach
     void setUp() {
-        service = new ProjectQueryService(projectRepository, issueRepository, claimRepository);
+        service = new ProjectQueryService(projectRepository, issueRepository, claimRepository, projectMaintainerRepository);
         ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
     }
 

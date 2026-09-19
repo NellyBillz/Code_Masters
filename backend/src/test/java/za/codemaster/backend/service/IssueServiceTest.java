@@ -71,7 +71,7 @@ class IssueServiceTest {
     @BeforeEach
     void setUp() {
         ProjectQueryService projectQueryService =
-                new ProjectQueryService(projectRepository, issueRepository, claimRepository);
+                new ProjectQueryService(projectRepository, issueRepository, claimRepository, projectMaintainerRepository);
         service = new IssueService(issueRepository, projectMaintainerRepository, projectQueryService);
 
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);

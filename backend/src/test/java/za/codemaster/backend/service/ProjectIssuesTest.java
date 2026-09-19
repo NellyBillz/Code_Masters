@@ -14,6 +14,7 @@ import za.codemaster.backend.dto.issue.*;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -46,6 +47,9 @@ class ProjectIssuesTest {
     @Autowired
     private ClaimRepository claimRepository;
 
+    @Autowired
+    private ProjectMaintainerRepository projectMaintainerRepository;
+
     private ProjectQueryService service;
     private ProjectQueryServiceFixtures fixtures;
 
@@ -54,7 +58,7 @@ class ProjectIssuesTest {
 
     @BeforeEach
     void setUp() {
-        service = new ProjectQueryService(projectRepository, issueRepository, claimRepository);
+        service = new ProjectQueryService(projectRepository, issueRepository, claimRepository, projectMaintainerRepository);
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         projectWithIssues = fixtures.projectId(0);
     }

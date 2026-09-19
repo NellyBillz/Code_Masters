@@ -7,12 +7,15 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.domain.model.ClaimStatus;
+import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.common.PageMeta;
 import za.codemaster.backend.dto.issue.*;
 import za.codemaster.backend.dto.project.*;
+import za.codemaster.backend.dto.user.PublicUserProfile;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 
 import java.math.BigDecimal;
@@ -47,13 +50,16 @@ public class ProjectQueryService {
     private final ProjectRepository projectRepository;
     private final IssueRepository issueRepository;
     private final ClaimRepository claimRepository;
+    private final ProjectMaintainerRepository projectMaintainerRepository;
 
     public ProjectQueryService(ProjectRepository projectRepository,
                                 IssueRepository issueRepository,
-                                ClaimRepository claimRepository) {
+                                ClaimRepository claimRepository,
+                                ProjectMaintainerRepository projectMaintainerRepository) {
         this.projectRepository = projectRepository;
         this.issueRepository = issueRepository;
         this.claimRepository = claimRepository;
+        this.projectMaintainerRepository = projectMaintainerRepository;
     }
 
     /**
@@ -88,9 +94,10 @@ public class ProjectQueryService {
 
     /**
      * Looks up a single project by id and assembles its {@link ProjectDetail}.
-     * Maintainers/featuredIssues/recentComments stay empty lists here — wiring
-     * those is other tickets' scope; this ticket only swaps the project's own
-     * data source from mock to real.
+     * Maintainers are real (API-02.7 needs this for its own acceptance criteria —
+     * a successful {@code POST /projects} must immediately show the caller in
+     * the maintainer list). featuredIssues/recentComments stay empty lists here —
+     * wiring those is other tickets' scope.
      *
      * @param projectId the project id from the path
      * @return the matching project's detail view
@@ -99,7 +106,10 @@ public class ProjectQueryService {
     @Transactional(readOnly = true)
     public ProjectDetail getProjectDetail(Long projectId) {
         ProjectDto project = toDto(findProjectEntityOrThrow(projectId));
-        return new ProjectDetail(project, List.of(), List.of(), List.of());
+        List<ProjectMaintainerDto> maintainers = projectMaintainerRepository.findByProjectId(projectId).stream()
+                .map(this::toDto)
+                .toList();
+        return new ProjectDetail(project, maintainers, List.of(), List.of());
     }
 
     /**
@@ -171,8 +181,13 @@ public class ProjectQueryService {
         return new IssueDetail(issueDto, projectDto, List.of(), List.of());
     }
 
-    /** Maps a persisted project row to the API's {@link ProjectDto} shape. */
-    private ProjectDto toDto(za.codemaster.backend.domain.model.Project entity) {
+    /**
+     * Maps a persisted project row to the API's {@link ProjectDto} shape.
+     * Public (same reasoning as {@link #toDto(za.codemaster.backend.domain.model.Issue)}):
+     * reused by {@code ProjectService} (API-02.7) after creating/updating a project,
+     * rather than duplicating this mapping there.
+     */
+    public ProjectDto toDto(za.codemaster.backend.domain.model.Project entity) {
         return new ProjectDto(
                 entity.getId(),
                 entity.getName(),
@@ -234,6 +249,36 @@ public class ProjectQueryService {
                 (int) activeClaims,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
+        );
+    }
+
+    /** Maps a persisted maintainer relationship row to the API's {@link ProjectMaintainerDto} shape. */
+    private ProjectMaintainerDto toDto(za.codemaster.backend.domain.model.ProjectMaintainer entity) {
+        return new ProjectMaintainerDto(
+                toPublicProfile(entity.getUser()),
+                MaintainerRole.valueOf(entity.getRole().toUpperCase(Locale.ROOT)),
+                entity.getCreatedAt()
+        );
+    }
+
+    /**
+     * Maps a user to the API's {@link PublicUserProfile} shape.
+     * {@code projectsCount}/{@code contributionsCount} are not yet computed anywhere
+     * in the codebase (no ticket populates them); left {@code null} here rather than
+     * a made-up value — same note as {@code CommentService.toPublicProfile}.
+     */
+    private PublicUserProfile toPublicProfile(User user) {
+        return new PublicUserProfile(
+                user.getId(),
+                user.getUsername(),
+                user.getDisplayName(),
+                user.getAvatarUrl(),
+                user.getBio(),
+                user.getLocation(),
+                user.getSkills() == null ? List.of() : List.of(user.getSkills()),
+                null,
+                null,
+                user.getReputation()
         );
     }
 
