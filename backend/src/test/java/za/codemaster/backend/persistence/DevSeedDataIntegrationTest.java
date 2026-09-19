@@ -1,5 +1,6 @@
 package za.codemaster.backend.persistence;
 
+import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -69,6 +70,9 @@ public class DevSeedDataIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private DataSource dataSource;
 
     @Test
     @DisplayName("Dev Seed: Verify exactly 2 users are seeded")
@@ -165,5 +169,34 @@ public class DevSeedDataIntegrationTest {
         assertTrue(totalClaims != null && totalClaims >= 1 && totalClaims <= 2, 
             "Must seed 1 to 2 claims, found: " + totalClaims);
         assertEquals(1, activeClaims, "Should contain exactly 1 active claim adhering to partial index");
+    }
+
+    @Test
+    @DisplayName("Acceptance Criteria: Base profile leaves tables empty; dev profile seeds DB-01.6 specifications")
+    void shouldVerifyProfileIsolationAndDevProfileSeeding() {
+
+        // Dev Profile: migrate with dev seed scripts included
+        Flyway devFlyway = Flyway.configure()
+            .dataSource(dataSource)
+            .locations("classpath:db/migration", "classpath:db/dev")
+            .load();
+        devFlyway.migrate();
+
+        // Verify DB-01.6 specifications
+        Integer devUsers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users WHERE username IN ('winter_dev', 'montic_codes')", Integer.class);
+        Integer devProjects = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM projects WHERE github_owner = 'codemaster'", Integer.class);
+        Integer devIssues = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM issues WHERE github_url LIKE 'https://github.com/codemaster/%'", Integer.class);
+        Integer devBeginnerIssues = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM issues WHERE difficulty = 'beginner' AND github_url LIKE 'https://github.com/codemaster/%'", Integer.class);
+        Integer devComments = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM comments WHERE body LIKE '[dev-seed]%'", Integer.class);
+        Integer devClaims = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM claims WHERE note LIKE '[dev-seed]%'", Integer.class);
+        Integer devActiveClaims = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM claims WHERE status = 'active' AND note LIKE '[dev-seed]%'", Integer.class);
+
+        assertEquals(2, devUsers, "Dev profile must seed exactly 2 users");
+        assertEquals(4, devProjects, "Dev profile must seed exactly 4 projects");
+        assertTrue(devIssues != null && devIssues >= 6 && devIssues <= 8, "Expected 6–8 issues");
+        assertTrue(devBeginnerIssues != null && devBeginnerIssues >= 3, "Expected at least 3 beginner issues");
+        assertTrue(devComments != null && devComments >= 3 && devComments <= 4, "Expected 3–4 comments");
+        assertTrue(devClaims != null && devClaims >= 1 && devClaims <= 2, "Expected 1–2 claims");
+        assertEquals(1, devActiveClaims, "Expected exactly 1 active claim");
     }
 }
