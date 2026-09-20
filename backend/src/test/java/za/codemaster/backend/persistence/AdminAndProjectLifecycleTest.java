@@ -9,7 +9,6 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.BackendApplication;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 

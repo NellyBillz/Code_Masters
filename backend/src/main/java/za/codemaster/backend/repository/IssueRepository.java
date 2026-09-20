@@ -65,4 +65,70 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         @Param("label") String label,
         Pageable pageable
     );
+
+    /**
+     * Native PostgreSQL relevance-ranked search query.
+     * Combines full-text search over the generated tsvector (title + body_excerpt)
+     * with trigram similarity fallback on title for typo tolerance.
+     *
+     * @param q optional free-text search query (supports typos via pg_trgm)
+     * @param projectId optional parent project filter
+     * @param status optional status filter ('open', 'closed', 'claimed')
+     * @param difficulty optional difficulty filter ('beginner', 'intermediate', 'advanced', 'unknown')
+     * @param isBeginnerFriendly optional flag filter
+     * @param label optional label filter matching against PostgreSQL text[]
+     * @param sortByRelevance if true, sorts descending by ts_rank + trigram similarity
+     * @param pageable pagination parameters
+     * @return paged list of matching issues
+     */
+    @Query(
+        value = """
+            SELECT i.*
+            FROM issues i
+            WHERE (:projectId IS NULL OR i.project_id = :projectId)
+              AND (:status IS NULL OR :status = '' OR i.status = :status)
+              AND (:difficulty IS NULL OR :difficulty = '' OR i.difficulty = :difficulty)
+              AND (:isBeginnerFriendly IS NULL OR i.is_beginner_friendly = :isBeginnerFriendly)
+              AND (:label IS NULL OR :label = '' OR :label = ANY(i.labels))
+              AND (
+                    :q IS NULL OR :q = ''
+                    OR i.tsv @@ plainto_tsquery('english', :q)
+                    OR similarity(i.title, :q) >= 0.2
+                    OR word_similarity(:q, i.title) >= 0.25
+                    OR i.title % :q
+                  )
+            ORDER BY
+              CASE WHEN :sortByRelevance = true THEN (
+                ts_rank(i.tsv, plainto_tsquery('english', coalesce(:q, ''))) + similarity(i.title, coalesce(:q, ''))
+              ) END DESC NULLS LAST,
+              i.id DESC
+        """,
+        countQuery = """
+            SELECT count(*)
+            FROM issues i
+            WHERE (:projectId IS NULL OR i.project_id = :projectId)
+              AND (:status IS NULL OR :status = '' OR i.status = :status)
+              AND (:difficulty IS NULL OR :difficulty = '' OR i.difficulty = :difficulty)
+              AND (:isBeginnerFriendly IS NULL OR i.is_beginner_friendly = :isBeginnerFriendly)
+              AND (:label IS NULL OR :label = '' OR :label = ANY(i.labels))
+              AND (
+                    :q IS NULL OR :q = ''
+                    OR i.tsv @@ plainto_tsquery('english', :q)
+                    OR similarity(i.title, :q) >= 0.2
+                    OR word_similarity(:q, i.title) >= 0.25
+                    OR i.title % :q
+                  )
+        """,
+        nativeQuery = true
+    )
+    Page<Issue> searchIssues(
+        @Param("q") String q,
+        @Param("projectId") Long projectId,
+        @Param("status") String status,
+        @Param("difficulty") String difficulty,
+        @Param("isBeginnerFriendly") Boolean isBeginnerFriendly,
+        @Param("label") String label,
+        @Param("sortByRelevance") boolean sortByRelevance,
+        Pageable pageable
+    );
 }

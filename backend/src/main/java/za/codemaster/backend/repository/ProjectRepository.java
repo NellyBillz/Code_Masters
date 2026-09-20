@@ -20,21 +20,23 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     Optional<Project> findByGithubUrl(String githubUrl);
 
     /**
-     * Public visibility lookup: retrieves a project by ID only if it is in the target listing status.
+     * Public visibility lookup: finds a project by ID only if it is in the specified status (e.g., PUBLISHED).
      */
     Optional<Project> findByIdAndListingStatus(Long id, ListingStatus listingStatus);
 
     /**
-     * Public visibility lookup by slug: retrieves a project by slug only if it is in the target listing status.
+     * Public visibility lookup by slug: finds a project by slug only if it is in the specified status.
      */
     Optional<Project> findBySlugAndListingStatus(String slug, ListingStatus listingStatus);
 
     /**
-     * Moderation queue query: pages projects by listing status. Backs
-     * {@code GET /admin/projects/pending} (API-03.1).
+     * Moderation queue query: returns projects matching a given listing status (e.g., PENDING).
      */
     Page<Project> findByListingStatus(ListingStatus listingStatus, Pageable pageable);
 
+    /**
+     * Preserved legacy JPQL filter method to maintain backwards compatibility with existing tests.
+     */
     @Query("""
         SELECT p FROM Project p
         WHERE (:primaryLanguage IS NULL OR LOWER(p.primaryLanguage) = LOWER(:primaryLanguage))
@@ -47,6 +49,76 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
         @Param("category") String category,
         @Param("connection") String connection,
         @Param("hasBeginnerFriendlyIssues") Boolean hasBeginnerFriendlyIssues,
+        Pageable pageable
+    );
+
+    /**
+     * Native PostgreSQL relevance-ranked search query.
+     * Integrates ts_rank over weighted tsvector, trigram similarity fallback,
+     * and in-query tag and country filtering without in-memory post-filtering.
+     */
+    @Query(
+        value = """
+            SELECT p.*
+            FROM projects p
+            WHERE (:listingStatus IS NULL OR :listingStatus = '' OR p.listing_status = :listingStatus)
+              AND (:primaryLanguage IS NULL OR :primaryLanguage = '' OR LOWER(p.primary_language) = LOWER(:primaryLanguage))
+              AND (:category IS NULL OR :category = '' OR LOWER(p.category) = LOWER(:category))
+              AND (:connection IS NULL OR :connection = '' OR LOWER(p.connection) = LOWER(:connection))
+              AND (:hasBeginnerFriendlyIssues IS NULL OR p.has_beginner_friendly_issues = :hasBeginnerFriendlyIssues)
+              AND (:tag IS NULL OR :tag = '' OR EXISTS (
+                    SELECT 1 FROM project_tags pt WHERE pt.project_id = p.id AND LOWER(pt.tag) = LOWER(:tag)
+                  ))
+              AND (:country IS NULL OR :country = '' OR EXISTS (
+                    SELECT 1 FROM project_countries pc WHERE pc.project_id = p.id AND UPPER(pc.country_code) = UPPER(:country)
+                  ))
+              AND (
+                    :q IS NULL OR :q = ''
+                    OR p.tsv @@ plainto_tsquery('english', :q)
+                    OR similarity(p.name, :q) >= 0.2
+                    OR word_similarity(:q, p.name) >= 0.25
+                    OR p.name % :q
+                  )
+            ORDER BY
+              CASE WHEN :sortByRelevance = true THEN (
+                ts_rank(p.tsv, plainto_tsquery('english', coalesce(:q, ''))) + similarity(p.name, coalesce(:q, ''))
+              ) END DESC NULLS LAST,
+              p.id DESC
+        """,
+        countQuery = """
+            SELECT count(*)
+            FROM projects p
+            WHERE (:listingStatus IS NULL OR :listingStatus = '' OR p.listing_status = :listingStatus)
+              AND (:primaryLanguage IS NULL OR :primaryLanguage = '' OR LOWER(p.primary_language) = LOWER(:primaryLanguage))
+              AND (:category IS NULL OR :category = '' OR LOWER(p.category) = LOWER(:category))
+              AND (:connection IS NULL OR :connection = '' OR LOWER(p.connection) = LOWER(:connection))
+              AND (:hasBeginnerFriendlyIssues IS NULL OR p.has_beginner_friendly_issues = :hasBeginnerFriendlyIssues)
+              AND (:tag IS NULL OR :tag = '' OR EXISTS (
+                    SELECT 1 FROM project_tags pt WHERE pt.project_id = p.id AND LOWER(pt.tag) = LOWER(:tag)
+                  ))
+              AND (:country IS NULL OR :country = '' OR EXISTS (
+                    SELECT 1 FROM project_countries pc WHERE pc.project_id = p.id AND UPPER(pc.country_code) = UPPER(:country)
+                  ))
+              AND (
+                    :q IS NULL OR :q = ''
+                    OR p.tsv @@ plainto_tsquery('english', :q)
+                    OR similarity(p.name, :q) >= 0.2
+                    OR word_similarity(:q, p.name) >= 0.25
+                    OR p.name % :q
+                  )
+        """,
+        nativeQuery = true
+    )
+    Page<Project> searchProjects(
+        @Param("q") String q,
+        @Param("listingStatus") String listingStatus,
+        @Param("primaryLanguage") String primaryLanguage,
+        @Param("category") String category,
+        @Param("connection") String connection,
+        @Param("hasBeginnerFriendlyIssues") Boolean hasBeginnerFriendlyIssues,
+        @Param("tag") String tag,
+        @Param("country") String country,
+        @Param("sortByRelevance") boolean sortByRelevance,
         Pageable pageable
     );
 }
