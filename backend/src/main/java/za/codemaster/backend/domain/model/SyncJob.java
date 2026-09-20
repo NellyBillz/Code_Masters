@@ -11,13 +11,14 @@ public class SyncJob {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
     @Column(name="project_id", nullable=false) private Long projectId;
-    @Column(nullable=false) private String status;
+    @Column(name = "status", nullable=false) private String status;
     @Column(name="started_at") private OffsetDateTime startedAt;
     @Column(name="completed_at") private OffsetDateTime completedAt;
     @Column(name="error_message") private String errorMessage;
     @Column(name="retry_after") private OffsetDateTime retryAfter;
     @Column(name="issues_created_count") private Integer issuesCreatedCount;
     @Column(name="issues_updated_count") private Integer issuesUpdatedCount;
+    @Column(name = "contributions_verified_count")private Integer contributionsVerifiedCount;
     @Column(name="created_at", insertable=false, updatable=false) private OffsetDateTime createdAt;
 
     protected SyncJob() {}
@@ -30,4 +31,5 @@ public class SyncJob {
     public String getErrorMessage(){return errorMessage;} public OffsetDateTime getRetryAfter(){return retryAfter;}
     public Integer getIssuesCreatedCount(){return issuesCreatedCount;} public Integer getIssuesUpdatedCount(){return issuesUpdatedCount;}
     public OffsetDateTime getCreatedAt(){return createdAt;}
+    public Integer getContibutionVerifiedCount(){return contributionsVerifiedCount;}
 }
