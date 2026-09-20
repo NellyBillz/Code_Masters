@@ -5,6 +5,7 @@ import org.springframework.stereotype.Repository;
 import za.codemaster.backend.domain.model.Claim;
 import za.codemaster.backend.domain.model.ClaimStatus;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -32,10 +33,17 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
 
     /**
      * Finds all claims on an issue in a given status, oldest first.
-     * Backs {@code GET /issues/{issueId}/claims} (API-02.5, design doc §7:
-     * "the issue detail view shows the full list of claimants, oldest first").
      */
     List<Claim> findByIssueIdAndStatusOrderByCreatedAtAsc(Long issueId, ClaimStatus status);
+
+    /**
+     * Finds every claim on an issue regardless of status, oldest first. Backs
+     * {@code GET /issues/{issueId}/claims} (API-03.5 — the spec's updated
+     * description: "returns every claim on the issue regardless of status...
+     * so a contributor or maintainer can see the issue's full history, not
+     * just who is currently active").
+     */
+    List<Claim> findByIssueIdOrderByCreatedAtAsc(Long issueId);
 
     /**
      * Finds all claims associated with a given user.
@@ -44,7 +52,21 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
 
     /**
      * Counts claims on an issue in a given status. Used to populate
-     * {@code Issue.claimCount} (active claims) without loading full claim rows.
+     * {@code Issue.claimCount} without loading full claim rows.
      */
     long countByIssueIdAndStatus(Long issueId, ClaimStatus status);
+
+    /**
+     * Counts claims on an issue whose status is one of {@code statuses}.
+     * Backs {@code Issue.claimCount} (API-03.5): in-flight claims only —
+     * {@code active}/{@code changes_requested} — not {@code completed}/{@code released}.
+     */
+    long countByIssueIdAndStatusIn(Long issueId, Collection<ClaimStatus> statuses);
+
+    /**
+     * Counts a user's claims in a given status. Backs
+     * {@code PublicUserProfile.contributionsCount} (API-03.5): verified
+     * contributions only, i.e. status {@code completed} — not a raw claim count.
+     */
+    long countByUserIdAndStatus(Long userId, ClaimStatus status);
 }

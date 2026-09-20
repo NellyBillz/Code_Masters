@@ -5,13 +5,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.claim.ClaimDto;
+import za.codemaster.backend.dto.claim.ClaimReviewRequest;
 import za.codemaster.backend.dto.claim.CreateClaimRequest;
+import za.codemaster.backend.dto.claim.UpdateClaimRequest;
 import za.codemaster.backend.security.AuthenticatedUser;
 import za.codemaster.backend.service.ClaimService;
 
@@ -56,12 +59,41 @@ public class ClaimController {
     }
 
     /**
-     * {@code GET /api/v1/issues/{issueId}/claims}: list active claims, oldest first.
-     * Returns a bare array, not a paginated envelope — matches the spec's schema
-     * for this endpoint exactly (unlike comments/projects/issues, this list isn't paged).
+     * {@code GET /api/v1/issues/{issueId}/claims}: list every claim on the issue,
+     * regardless of status, oldest first (API-03.5). Returns a bare array, not a
+     * paginated envelope — matches the spec's schema for this endpoint exactly
+     * (unlike comments/projects/issues, this list isn't paged).
      */
     @GetMapping("/api/v1/issues/{issueId}/claims")
-    public List<ClaimDto> getActiveClaims(@PathVariable Long issueId) {
-        return claimService.getActiveClaims(issueId);
+    public List<ClaimDto> getClaims(@PathVariable Long issueId) {
+        return claimService.getClaims(issueId);
+    }
+
+    /**
+     * {@code PATCH /api/v1/issues/{issueId}/claims/{claimId}}: attach or update
+     * the pull request link on the caller's own claim (API-03.3). The claim's
+     * owner only — a maintainer of the project is not exempt from this check.
+     */
+    @PatchMapping("/api/v1/issues/{issueId}/claims/{claimId}")
+    public ClaimDto attachPullRequest(
+            @PathVariable Long issueId,
+            @PathVariable Long claimId,
+            @Valid @RequestBody UpdateClaimRequest request,
+            @AuthenticatedUser User currentUser) {
+        return claimService.attachPullRequest(issueId, claimId, request.pullRequestUrl(), currentUser);
+    }
+
+    /**
+     * {@code POST /api/v1/issues/{issueId}/claims/{claimId}/review}: a maintainer's
+     * review decision on a claim (API-03.4) — request changes with feedback, or
+     * manually confirm completion.
+     */
+    @PostMapping("/api/v1/issues/{issueId}/claims/{claimId}/review")
+    public ClaimDto reviewClaim(
+            @PathVariable Long issueId,
+            @PathVariable Long claimId,
+            @Valid @RequestBody ClaimReviewRequest request,
+            @AuthenticatedUser User currentUser) {
+        return claimService.reviewClaim(issueId, claimId, request, currentUser);
     }
 }

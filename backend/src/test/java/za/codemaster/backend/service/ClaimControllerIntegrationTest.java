@@ -10,19 +10,26 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import za.codemaster.backend.domain.model.Project;
+import za.codemaster.backend.domain.model.ProjectMaintainer;
 import za.codemaster.backend.domain.model.Session;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.SessionRepository;
 import za.codemaster.backend.repository.UserRepository;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -51,6 +58,9 @@ class ClaimControllerIntegrationTest {
 
     @Autowired
     private IssueRepository issueRepository;
+
+    @Autowired
+    private ProjectMaintainerRepository projectMaintainerRepository;
 
     @Autowired
     private UserRepository userRepository;
@@ -84,6 +94,29 @@ class ClaimControllerIntegrationTest {
 
     private String claimJson(String note) {
         return note == null ? "{}" : "{\"note\":\"" + note + "\"}";
+    }
+
+    private void addMaintainer(User user) {
+        Project project = projectRepository.findById(fixtures.projectId(0)).orElseThrow();
+        ProjectMaintainer relationship = new ProjectMaintainer();
+        relationship.setProject(project);
+        relationship.setUser(user);
+        relationship.setRole("maintainer");
+        projectMaintainerRepository.save(relationship);
+    }
+
+    private Long createClaimAndExtractId(Session session) throws Exception {
+        String response = mockMvc.perform(post("/api/v1/issues/{issueId}/claim", issueId)
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
+                        .header(CSRF_HEADER, session.getCsrToken()))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+
+        Matcher matcher = Pattern.compile("\"id\":(\\d+)").matcher(response);
+        if (!matcher.find()) {
+            throw new IllegalStateException("No id field found in response: " + response);
+        }
+        return Long.valueOf(matcher.group(1));
     }
 
     @Test
@@ -193,8 +226,8 @@ class ClaimControllerIntegrationTest {
     }
 
     @Test
-    @DisplayName("Releasing an own active claim -> 204, disappears from the claims list")
-    void releaseOwnClaimRemovesItFromList() throws Exception {
+    @DisplayName("Releasing an own active claim -> 204, still visible in the claims list as released (API-03.5)")
+    void releaseOwnClaimStillAppearsInListAsReleased() throws Exception {
         Session session = createActiveSession();
         mockMvc.perform(post("/api/v1/issues/{issueId}/claim", issueId)
                         .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
@@ -206,9 +239,12 @@ class ClaimControllerIntegrationTest {
                         .header(CSRF_HEADER, session.getCsrToken()))
                 .andExpect(status().isNoContent());
 
+        // API-03.5: GET /issues/{issueId}/claims returns every status, not just
+        // active — a released claim is still part of the issue's history.
         mockMvc.perform(get("/api/v1/issues/{issueId}/claims", issueId))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].status").value("released"));
     }
 
     @Test
@@ -241,5 +277,264 @@ class ClaimControllerIntegrationTest {
         mockMvc.perform(get("/api/v1/issues/{issueId}/claims", -999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ISSUE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("PATCH claim while unauthenticated -> 401")
+    void attachPullRequestUnauthenticatedIsRejected() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+
+        mockMvc.perform(patch("/api/v1/issues/{issueId}/claims/{claimId}", issueId, claimId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pullRequestUrl\":\"https://github.com/example-org/repo/pull/7\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    @DisplayName("The claim owner attaching a pull request -> 200, reflected in the next GET claims list")
+    void ownerAttachingPullRequestIsReflectedInList() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+
+        mockMvc.perform(patch("/api/v1/issues/{issueId}/claims/{claimId}", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, owner.getId().toString()))
+                        .header(CSRF_HEADER, owner.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pullRequestUrl\":\"https://github.com/example-org/repo/pull/7\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.pullRequestUrl").value("https://github.com/example-org/repo/pull/7"))
+                .andExpect(jsonPath("$.pullRequestState").value("open"));
+
+        mockMvc.perform(get("/api/v1/issues/{issueId}/claims", issueId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].pullRequestUrl").value("https://github.com/example-org/repo/pull/7"))
+                .andExpect(jsonPath("$[0].pullRequestState").value("open"));
+    }
+
+    @Test
+    @DisplayName("A non-owner attempting to attach a pull request -> 403, even a maintainer of the project")
+    void nonOwnerAttachingPullRequestIsForbiddenEvenForAMaintainer() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+
+        Session maintainerSession = createActiveSession();
+        addMaintainer(maintainerSession.getUser());
+
+        mockMvc.perform(patch("/api/v1/issues/{issueId}/claims/{claimId}", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pullRequestUrl\":\"https://github.com/example-org/repo/pull/7\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("A blank pullRequestUrl -> 400 VALIDATION_ERROR")
+    void blankPullRequestUrlIsRejectedWith400() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+
+        mockMvc.perform(patch("/api/v1/issues/{issueId}/claims/{claimId}", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, owner.getId().toString()))
+                        .header(CSRF_HEADER, owner.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pullRequestUrl\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("A missing pullRequestUrl field -> 400 VALIDATION_ERROR")
+    void missingPullRequestUrlIsRejectedWith400() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+
+        mockMvc.perform(patch("/api/v1/issues/{issueId}/claims/{claimId}", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, owner.getId().toString()))
+                        .header(CSRF_HEADER, owner.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("PATCH on a missing claim -> 404 CLAIM_NOT_FOUND")
+    void attachPullRequestOnMissingClaimIs404() throws Exception {
+        Session owner = createActiveSession();
+
+        mockMvc.perform(patch("/api/v1/issues/{issueId}/claims/{claimId}", issueId, -999L)
+                        .cookie(new Cookie(SESSION_COOKIE, owner.getId().toString()))
+                        .header(CSRF_HEADER, owner.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pullRequestUrl\":\"https://github.com/example-org/repo/pull/7\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLAIM_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("PATCH on a missing issue -> 404 ISSUE_NOT_FOUND")
+    void attachPullRequestOnMissingIssueIs404() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+
+        mockMvc.perform(patch("/api/v1/issues/{issueId}/claims/{claimId}", -999L, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, owner.getId().toString()))
+                        .header(CSRF_HEADER, owner.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"pullRequestUrl\":\"https://github.com/example-org/repo/pull/7\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ISSUE_NOT_FOUND"));
+    }
+
+    @Test
+    @DisplayName("POST review while unauthenticated -> 401")
+    void reviewClaimUnauthenticatedIsRejected() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+
+        mockMvc.perform(post("/api/v1/issues/{issueId}/claims/{claimId}/review", issueId, claimId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"confirm_completed\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    @DisplayName("A non-maintainer attempting to review -> 403")
+    void reviewByNonMaintainerIsForbidden() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+        Session stranger = createActiveSession();
+
+        mockMvc.perform(post("/api/v1/issues/{issueId}/claims/{claimId}/review", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, stranger.getId().toString()))
+                        .header(CSRF_HEADER, stranger.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"confirm_completed\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
+
+    @Test
+    @DisplayName("request_changes with no feedback -> 400 VALIDATION_ERROR")
+    void requestChangesWithoutFeedbackIs400() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+        Session maintainerSession = createActiveSession();
+        addMaintainer(maintainerSession.getUser());
+
+        mockMvc.perform(post("/api/v1/issues/{issueId}/claims/{claimId}/review", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"request_changes\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    @DisplayName("request_changes with feedback -> 200, changes_requested, feedback visible on next GET")
+    void requestChangesWithFeedbackIsVisibleOnNextRead() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+        Session maintainerSession = createActiveSession();
+        addMaintainer(maintainerSession.getUser());
+
+        mockMvc.perform(post("/api/v1/issues/{issueId}/claims/{claimId}/review", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"request_changes\",\"feedback\":\"Please add tests.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("changes_requested"))
+                .andExpect(jsonPath("$.maintainerFeedback").value("Please add tests."));
+    }
+
+    @Test
+    @DisplayName("confirm_completed -> 200, completed, completionSource maintainer_confirmed")
+    void confirmCompletedSetsCompletedWithMaintainerConfirmedSource() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+        Session maintainerSession = createActiveSession();
+        addMaintainer(maintainerSession.getUser());
+
+        mockMvc.perform(post("/api/v1/issues/{issueId}/claims/{claimId}/review", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"confirm_completed\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("completed"))
+                .andExpect(jsonPath("$.completionSource").value("maintainer_confirmed"))
+                .andExpect(jsonPath("$.completedAt").exists());
+    }
+
+    @Test
+    @DisplayName("Re-confirming an already-completed claim -> 200, unchanged")
+    void reconfirmingAnAlreadyCompletedClaimIsANoOp() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+        Session maintainerSession = createActiveSession();
+        addMaintainer(maintainerSession.getUser());
+
+        String firstResponse = mockMvc.perform(post("/api/v1/issues/{issueId}/claims/{claimId}/review", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"confirm_completed\"}"))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        mockMvc.perform(post("/api/v1/issues/{issueId}/claims/{claimId}/review", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"confirm_completed\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("completed"))
+                .andExpect(jsonPath("$.completionSource").value("maintainer_confirmed"));
+
+        assertTrue(firstResponse.contains("\"completionSource\":\"maintainer_confirmed\""));
+    }
+
+    @Test
+    @DisplayName("Reviewing a released claim -> 409 CLAIM_NOT_REVIEWABLE")
+    void reviewingAReleasedClaimIs409() throws Exception {
+        Session owner = createActiveSession();
+        Long claimId = createClaimAndExtractId(owner);
+        Session maintainerSession = createActiveSession();
+        addMaintainer(maintainerSession.getUser());
+
+        mockMvc.perform(delete("/api/v1/issues/{issueId}/claim", issueId)
+                        .cookie(new Cookie(SESSION_COOKIE, owner.getId().toString()))
+                        .header(CSRF_HEADER, owner.getCsrToken()))
+                .andExpect(status().isNoContent());
+
+        mockMvc.perform(post("/api/v1/issues/{issueId}/claims/{claimId}/review", issueId, claimId)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"confirm_completed\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CLAIM_NOT_REVIEWABLE"));
+    }
+
+    @Test
+    @DisplayName("PATCH review on a missing claim -> 404 CLAIM_NOT_FOUND")
+    void reviewOnMissingClaimIs404() throws Exception {
+        Session maintainerSession = createActiveSession();
+        addMaintainer(maintainerSession.getUser());
+
+        mockMvc.perform(post("/api/v1/issues/{issueId}/claims/{claimId}/review", issueId, -999L)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"confirm_completed\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CLAIM_NOT_FOUND"));
     }
 }

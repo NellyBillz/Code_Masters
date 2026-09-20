@@ -20,6 +20,11 @@ public record ClaimDto(
         PublicUserProfile user,
         ClaimStatusDto status,
         String note,
+        String pullRequestUrl,
+        PullRequestStateDto pullRequestState,
+        String maintainerFeedback,
+        ClaimCompletionSourceDto completionSource,
+        OffsetDateTime completedAt,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {

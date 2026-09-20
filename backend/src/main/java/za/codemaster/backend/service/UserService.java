@@ -3,11 +3,13 @@ package za.codemaster.backend.service;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.user.PublicUserProfile;
 import za.codemaster.backend.dto.user.UpdateUserRequest;
 import za.codemaster.backend.dto.user.UserProfile;
 import za.codemaster.backend.exception.ApiException;
+import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.UserRepository;
 
 import java.util.List;
@@ -21,9 +23,11 @@ import java.util.List;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final ClaimRepository claimRepository;
 
-    public UserService(UserRepository userRepository) {
+    public UserService(UserRepository userRepository, ClaimRepository claimRepository) {
         this.userRepository = userRepository;
+        this.claimRepository = claimRepository;
     }
 
     /**
@@ -95,9 +99,10 @@ public class UserService {
 
     /**
      * Maps a user to the API's {@link PublicUserProfile} shape.
-     * {@code projectsCount}/{@code contributionsCount} are not yet computed anywhere
-     * in the codebase (no ticket populates them); left {@code null} here rather than
-     * a made-up value — same note as {@code CommentService.toPublicProfile}.
+     * {@code projectsCount} is not yet computed anywhere in the codebase (no
+     * ticket populates it); left {@code null} rather than a made-up value.
+     * {@code contributionsCount} (API-03.5) counts only this user's
+     * {@code completed} claims — verified contributions, not raw claim activity.
      */
     private PublicUserProfile toPublicProfile(User user) {
         return new PublicUserProfile(
@@ -109,7 +114,7 @@ public class UserService {
                 user.getLocation(),
                 user.getSkills() == null ? List.of() : List.of(user.getSkills()),
                 null,
-                null,
+                (int) claimRepository.countByUserIdAndStatus(user.getId(), ClaimStatus.COMPLETED),
                 user.getReputation()
         );
     }

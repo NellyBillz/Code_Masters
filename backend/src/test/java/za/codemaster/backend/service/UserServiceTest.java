@@ -10,11 +10,17 @@ import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OA
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.BackendApplication;
+import za.codemaster.backend.domain.model.Claim;
+import za.codemaster.backend.domain.model.ClaimStatus;
+import za.codemaster.backend.domain.model.Issue;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.user.PublicUserProfile;
 import za.codemaster.backend.dto.user.UpdateUserRequest;
 import za.codemaster.backend.dto.user.UserProfile;
 import za.codemaster.backend.exception.ApiException;
+import za.codemaster.backend.repository.ClaimRepository;
+import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.UserRepository;
 
 import java.util.List;
@@ -44,11 +50,20 @@ class UserServiceTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ClaimRepository claimRepository;
+
+    @Autowired
+    private IssueRepository issueRepository;
+
+    @Autowired
+    private ProjectRepository projectRepository;
+
     private UserService service;
 
     @BeforeEach
     void setUp() {
-        service = new UserService(userRepository);
+        service = new UserService(userRepository, claimRepository);
     }
 
     private User createUser(String username, String email) {
@@ -99,6 +114,61 @@ class UserServiceTest {
 
         assertEquals("USER_NOT_FOUND", ex.getCode());
         assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    private Issue seedIssue() {
+        ProjectQueryServiceFixtures fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
+        return issueRepository.findById(fixtures.issueId(0)).orElseThrow();
+    }
+
+    private Claim claim(Issue issue, User user, ClaimStatus status) {
+        Claim claim = new Claim();
+        claim.setIssue(issue);
+        claim.setUser(user);
+        claim.setStatus(status);
+        return claimRepository.save(claim);
+    }
+
+    @Test
+    void contributionsCountOnlyCountsCompletedClaims() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("contrib_" + suffix, "contrib_" + suffix + "@example.com");
+        Issue issue = seedIssue();
+
+        claim(issue, user, ClaimStatus.ACTIVE);
+        claim(issue, user, ClaimStatus.CHANGES_REQUESTED);
+        claim(issue, user, ClaimStatus.RELEASED);
+        claim(issue, user, ClaimStatus.COMPLETED);
+
+        PublicUserProfile profile = service.getPublicProfile(user.getUsername());
+
+        assertEquals(1, profile.contributionsCount(),
+                "only the single completed claim should count, not the active/changes_requested/released ones");
+    }
+
+    @Test
+    void contributionsCountIncrementsWithEachAdditionalCompletedClaim() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("multicontrib_" + suffix, "multicontrib_" + suffix + "@example.com");
+        Issue issueA = seedIssue();
+        Issue issueB = seedIssue();
+
+        claim(issueA, user, ClaimStatus.COMPLETED);
+        assertEquals(1, service.getPublicProfile(user.getUsername()).contributionsCount());
+
+        claim(issueB, user, ClaimStatus.COMPLETED);
+        assertEquals(2, service.getPublicProfile(user.getUsername()).contributionsCount());
+    }
+
+    @Test
+    void contributionsCountIsZeroForAUserWithNoCompletedClaims() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("nocontrib_" + suffix, "nocontrib_" + suffix + "@example.com");
+        Issue issue = seedIssue();
+
+        claim(issue, user, ClaimStatus.ACTIVE);
+
+        assertEquals(0, service.getPublicProfile(user.getUsername()).contributionsCount());
     }
 
     @Test

@@ -239,8 +239,11 @@ public class ProjectQueryService {
 
     /**
      * Maps a persisted issue row to the API's {@link IssueDto} shape.
-     * {@code claimCount} is computed here (active claims only) rather than
-     * stored, since it is not a column on {@code issues}.
+     * {@code claimCount} is computed here rather than stored, since it is not
+     * a column on {@code issues}. Counts only in-flight claims — {@code active}
+     * or {@code changes_requested} — not {@code completed}/{@code released}
+     * (API-03.5: a claim that already resolved, one way or another, shouldn't
+     * still read as "N people are working on this").
      * <p>
      * Public (unlike {@link #toDto(za.codemaster.backend.domain.model.Project)}):
      * this is the single source of truth for Issue entity-to-DTO mapping, reused
@@ -248,7 +251,8 @@ public class ProjectQueryService {
      * override, rather than duplicating the claimCount/enum-mapping logic there.
      */
     public IssueDto toDto(za.codemaster.backend.domain.model.Issue entity) {
-        long activeClaims = claimRepository.countByIssueIdAndStatus(entity.getId(), ClaimStatus.ACTIVE);
+        long inFlightClaims = claimRepository.countByIssueIdAndStatusIn(
+                entity.getId(), List.of(ClaimStatus.ACTIVE, ClaimStatus.CHANGES_REQUESTED));
 
         return new IssueDto(
                 entity.getId(),
@@ -268,7 +272,7 @@ public class ProjectQueryService {
                 toDouble(entity.getProjectHealthScore()),
                 toDouble(entity.getFreshnessScore()),
                 toDouble(entity.getContributionScore()),
-                (int) activeClaims,
+                (int) inFlightClaims,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -290,8 +294,10 @@ public class ProjectQueryService {
     /**
      * Maps a user to the API's {@link PublicUserProfile} shape.
      * {@code projectsCount}/{@code contributionsCount} are not yet computed anywhere
-     * in the codebase (no ticket populates them); left {@code null} here rather than
-     * a made-up value — same note as {@code CommentService.toPublicProfile}.
+     * in the codebase (no ticket populates it); left {@code null} rather than a
+     * made-up value. {@code contributionsCount} (API-03.5) counts only that
+     * user's {@code completed} claims — verified contributions, not raw claim
+     * activity.
      */
     private PublicUserProfile toPublicProfile(User user) {
         return new PublicUserProfile(
@@ -303,7 +309,7 @@ public class ProjectQueryService {
                 user.getLocation(),
                 user.getSkills() == null ? List.of() : List.of(user.getSkills()),
                 null,
-                null,
+                (int) claimRepository.countByUserIdAndStatus(user.getId(), ClaimStatus.COMPLETED),
                 user.getReputation()
         );
     }
