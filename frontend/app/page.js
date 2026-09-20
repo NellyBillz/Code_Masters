@@ -122,7 +122,7 @@ export default function CodeMastersHome() {
             The front door to African <span className="text-green-500">open-source</span> discovery
           </h1>
           <p className="text-lg text-gray-600 mb-6 leading-relaxed max-w-2xl">
-            Explore projects, connect with developers, and discover the innovation happening across Africa's open-source communities.
+            Explore projects, connect with developers, and discover the innovation happening across Africa&apos;s open-source communities.
           </p>
           <a
             href="/projects"
