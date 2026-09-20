@@ -2,8 +2,6 @@ package za.codemaster.backend.domain.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -61,9 +59,10 @@ public class Claim {
 
     /**
      * Lifecycle status of the claim ('active', 'released', 'completed').
-     * Stored as lower-case string via JPA enumeration mapping.
+     * Stored as the lower-case DB value via {@link ClaimStatusConverter}, not
+     * {@code @Enumerated(EnumType.STRING)} — that would store the Java constant
+     * name ({@code "ACTIVE"}) instead, which the database check constraint rejects.
      */
-    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     private ClaimStatus status = ClaimStatus.ACTIVE;
 

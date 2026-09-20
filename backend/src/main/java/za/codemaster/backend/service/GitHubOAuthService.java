@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
-import za.codemaster.backend.dto.GitHubOAuthUser;
+import za.codemaster.backend.client.github.dto.GitHubOAuthUser;
 
 import java.net.URI;
 import java.net.URLEncoder;

@@ -1,6 +1,7 @@
 package za.codemaster.backend.service;
 
 import org.springframework.stereotype.Component;
+import za.codemaster.backend.domain.model.Session;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.repository.SessionRepository;
 
@@ -21,11 +22,20 @@ public class SessionUserResolver {
     }
 
     public Optional<User> resolve(String sessionCookieValue) {
+        return resolveSession(sessionCookieValue).map(Session::getUser);
+    }
+
+    /**
+     * Resolves the full {@link Session} row (not just its user), since CSRF
+     * enforcement needs the session's stored {@code csrf_token} to compare
+     * against the request's {@code X-CSRF-Token} header.
+     */
+    public Optional<Session> resolveSession(String sessionCookieValue) {
         if (sessionCookieValue == null || sessionCookieValue.isBlank()) {
             return Optional.empty();
         }
         try {
-            return sessionRepository.findActiveUser(UUID.fromString(sessionCookieValue), OffsetDateTime.now());
+            return sessionRepository.findActiveSession(UUID.fromString(sessionCookieValue), OffsetDateTime.now());
         } catch (IllegalArgumentException ignored) {
             return Optional.empty();
         }

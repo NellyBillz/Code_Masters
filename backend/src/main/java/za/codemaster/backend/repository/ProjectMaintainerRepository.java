@@ -47,4 +47,15 @@ public interface ProjectMaintainerRepository extends JpaRepository<ProjectMainta
      * @return list of project maintainers
      */
     List<ProjectMaintainer> findByUserId(Long userId);
+
+    /**
+     * Counts maintainers on a project holding a given role. Used by
+     * {@code MaintainerService.removeMaintainer} (API-02.8) to refuse removing
+     * the last remaining {@code owner}.
+     *
+     * @param projectId the project identifier
+     * @param role      the role's raw DB value, e.g. {@code "owner"}
+     * @return how many maintainer rows on this project currently hold that role
+     */
+    long countByProjectIdAndRole(Long projectId, String role);
 }

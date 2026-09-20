@@ -25,7 +25,14 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     List<Comment> findByIssueIdAndDeletedAtIsNullOrderByCreatedAtDesc(Long issueId);
 
     /**
-     * Paginated retrieval of active comments for an issue.
+     * Paginated, oldest-first retrieval of active comments for a project.
+     * Backs {@code GET /projects/{projectId}/comments} (API-02.3).
      */
-    Page<Comment> findByIssueIdAndDeletedAtIsNull(Long issueId, Pageable pageable);
+    Page<Comment> findByProjectIdAndDeletedAtIsNullOrderByCreatedAtAsc(Long projectId, Pageable pageable);
+
+    /**
+     * Paginated, oldest-first retrieval of active comments for an issue.
+     * Backs {@code GET /issues/{issueId}/comments} (API-02.3).
+     */
+    Page<Comment> findByIssueIdAndDeletedAtIsNullOrderByCreatedAtAsc(Long issueId, Pageable pageable);
 }

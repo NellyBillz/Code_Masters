@@ -3,8 +3,8 @@ package za.codemaster.backend.client.github;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
-import za.codemaster.backend.dto.GitHubFetchResult;
-import za.codemaster.backend.dto.GitHubProjectMetadata;
+import za.codemaster.backend.client.github.dto.GitHubFetchResult;
+import za.codemaster.backend.client.github.dto.GitHubProjectMetadata;
 
 import java.time.OffsetDateTime;
 

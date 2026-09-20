@@ -35,3 +35,6 @@ build/
 
 # Local runtime logs
 run.log
+
+# Project planning/spec docs — kept local only, not tracked in the shared repo
+project_docs/

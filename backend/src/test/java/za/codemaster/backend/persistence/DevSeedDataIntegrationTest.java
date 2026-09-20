@@ -172,13 +172,25 @@ public class DevSeedDataIntegrationTest {
     }
 
     @Test
-    @DisplayName("Acceptance Criteria: Base profile leaves tables empty; dev profile seeds DB-01.6 specifications")
+    @DisplayName("Acceptance Criteria: Base profile has no seed migration available; dev profile seeds DB-01.6 specifications")
     void shouldVerifyProfileIsolationAndDevProfileSeeding() {
+
+        // Base profile: the repeatable dev seed migration must not even be
+        // discoverable from the base (non-dev) migration locations, so a
+        // prod/base boot can never run it.
+        Flyway baseFlyway = Flyway.configure()
+            .dataSource(dataSource)
+            .locations("classpath:db/migration")
+            .load();
+        boolean baseSeesDevSeedMigration = java.util.Arrays.stream(baseFlyway.info().all())
+            .anyMatch(info -> info.getDescription().toLowerCase().contains("seed"));
+        assertTrue(!baseSeesDevSeedMigration,
+            "Base migration locations must not include the dev seed migration");
 
         // Dev Profile: migrate with dev seed scripts included
         Flyway devFlyway = Flyway.configure()
             .dataSource(dataSource)
-            .locations("classpath:db/migration", "classpath:db/dev")
+            .locations("classpath:db/migration", "classpath:db/migration/dev")
             .load();
         devFlyway.migrate();
 

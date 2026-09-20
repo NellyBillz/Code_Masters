@@ -4,7 +4,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.client.github.GitHubClient;
-import za.codemaster.backend.dto.*;
+import za.codemaster.backend.client.github.dto.*;
 import za.codemaster.backend.domain.model.SyncJob;
 import za.codemaster.backend.repository.*;
 import java.time.*;

@@ -86,7 +86,14 @@ public class Project {
     @Column(name = "connection", nullable = false)
     private String connection;
 
-    @Column(name = "license", nullable = false)
+    /**
+     * GitHub-derived; not known until the first sync (GH-02.3), so must stay
+     * nullable to match the actual DB column ({@code license TEXT}, no NOT NULL,
+     * V2__projects.sql) — {@code nullable = false} here would make Hibernate
+     * reject any insert with no license at flush time, independent of what the
+     * database itself allows (API-02.7: project submission doesn't collect one).
+     */
+    @Column(name = "license")
     private String license;
 
     @Column(name = "stars")
