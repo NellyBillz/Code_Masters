@@ -107,7 +107,10 @@ class ProjectControllerIntegrationTest {
 
         Long projectId = extractId(response);
 
-        mockMvc.perform(get("/api/v1/projects/{projectId}", projectId))
+        // A freshly submitted project is `pending` (API-03.1) — the submitter
+        // must be authenticated as themselves to still see it.
+        mockMvc.perform(get("/api/v1/projects/{projectId}", projectId)
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString())))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.maintainers.length()").value(1))
                 .andExpect(jsonPath("$.maintainers[0].user.username").value(session.getUser().getUsername()))

@@ -64,7 +64,7 @@ class ProjectDetailTest {
     void validIdReturnsProjectDetailWithAllFourExtraFieldsPresent() {
         Long existingId = fixtures.projectId(0);
 
-        ProjectDetail detail = service.getProjectDetail(existingId);
+        ProjectDetail detail = service.getProjectDetail(existingId, null);
 
         assertNotNull(detail.project(), "project fields should be present (via @JsonUnwrapped)");
         assertEquals(existingId, detail.project().id());
@@ -77,7 +77,7 @@ class ProjectDetailTest {
     void invalidIdThrowsProjectNotFound() {
         Long missingId = -999L;
 
-        ApiException ex = assertThrows(ApiException.class, () -> service.getProjectDetail(missingId));
+        ApiException ex = assertThrows(ApiException.class, () -> service.getProjectDetail(missingId, null));
 
         assertEquals("PROJECT_NOT_FOUND", ex.getCode());
         assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatus());

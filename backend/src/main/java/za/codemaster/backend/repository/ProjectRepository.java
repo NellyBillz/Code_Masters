@@ -30,9 +30,9 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     Optional<Project> findBySlugAndListingStatus(String slug, ListingStatus listingStatus);
 
     /**
-     * Moderation queue query: pages projects by listing status.
+     * Moderation queue query: pages projects by listing status. Backs
+     * {@code GET /admin/projects/pending} (API-03.1).
      */
-    
     Page<Project> findByListingStatus(ListingStatus listingStatus, Pageable pageable);
 
     @Query("""

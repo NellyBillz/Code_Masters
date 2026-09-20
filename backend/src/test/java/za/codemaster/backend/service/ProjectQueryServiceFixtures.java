@@ -1,6 +1,7 @@
 package za.codemaster.backend.service;
 
 import za.codemaster.backend.domain.model.Issue;
+import za.codemaster.backend.domain.model.ListingStatus;
 import za.codemaster.backend.domain.model.Project;
 import za.codemaster.backend.repository.IssueRepository;
 import za.codemaster.backend.repository.ProjectRepository;
@@ -151,6 +152,9 @@ final class ProjectQueryServiceFixtures {
         p.setContributors(contributors);
         p.setHasBeginnerFriendlyIssues(hasBeginnerFriendlyIssues);
         p.setVerified(verified);
+        // API-03.1: these fixtures represent already-live projects, not new
+        // submissions — published, same as DB-03.1's backfill for pre-existing rows.
+        p.setListingStatus(ListingStatus.PUBLISHED);
         p.setTags(tags);
         p.setCountryCodes(countryCodes);
         return p;

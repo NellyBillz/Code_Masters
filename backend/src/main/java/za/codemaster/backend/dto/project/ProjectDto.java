@@ -35,6 +35,7 @@ public record ProjectDto(
         Integer contributors,
         boolean hasBeginnerFriendlyIssues,
         OffsetDateTime lastActivityAt,
+        ProjectListingStatus listingStatus,
         boolean verified,
         OffsetDateTime verifiedAt,
         OffsetDateTime createdAt,
