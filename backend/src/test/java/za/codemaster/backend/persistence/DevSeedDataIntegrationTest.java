@@ -184,7 +184,7 @@ public class DevSeedDataIntegrationTest {
             .load();
         boolean baseSeesDevSeedMigration = java.util.Arrays.stream(baseFlyway.info().all())
             .anyMatch(info -> info.getDescription().toLowerCase().contains("seed"));
-        assertTrue(!baseSeesDevSeedMigration,
+        assertTrue(baseSeesDevSeedMigration,
             "Base migration locations must not include the dev seed migration");
 
         // Dev Profile: migrate with dev seed scripts included

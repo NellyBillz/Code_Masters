@@ -73,6 +73,21 @@ public class Claim {
     @Column(name = "note")
     private String note;
 
+    @Column(name = "pull_request_url")
+    private String pullRequestUrl;
+
+    @Column(name = "pull_request_state", nullable = false)
+    private String pullRequestState = "none";
+
+    @Column(name = "maintainer_feedback")
+    private String maintainerFeedback;
+
+    @Column(name = "completion_source")
+    private String completionSource;
+
+    @Column(name = "completed_at")
+    private OffsetDateTime completedAt;
+
     /**
      * Creation timestamp generated automatically by the database default.
      */

@@ -1,3 +1,4 @@
+import Link from "next/link";
 import styles from "./ProjectCard.module.css";
 
 const LANGUAGE_COLORS = {
@@ -11,17 +12,30 @@ const LANGUAGE_COLORS = {
   Ruby: "#dc2626",
 };
 
-// Keys must match the API's `connection` enum exactly (lowercase snake_case).
 const CONNECTION_META = {
-  south_african: { label: "South African", className: styles.connSouthAfrican },
-  africa_focused: { label: "Africa-focused", className: styles.connAfricaFocused },
-  africa_led: { label: "Africa-led", className: styles.connAfricaLed },
-  community_verified: { label: "Community", className: styles.connCommunityVerified },
+  south_african: {
+    label: "South African",
+    className: styles.connSouthAfrican,
+  },
+  africa_focused: {
+    label: "Africa-focused",
+    className: styles.connAfricaFocused,
+  },
+  africa_led: {
+    label: "Africa-led",
+    className: styles.connAfricaLed,
+  },
+  community_verified: {
+    label: "Community",
+    className: styles.connCommunityVerified,
+  },
 };
 
 function formatRelativeTime(isoString) {
   if (!isoString) return "unknown";
+
   const date = new Date(isoString);
+
   if (Number.isNaN(date.getTime())) return "unknown";
 
   const diffMs = Date.now() - date.getTime();
@@ -30,20 +44,31 @@ function formatRelativeTime(isoString) {
   if (diffDays <= 0) return "today";
   if (diffDays === 1) return "1 day ago";
   if (diffDays < 30) return `${diffDays} days ago`;
+
   const diffMonths = Math.floor(diffDays / 30);
-  if (diffMonths < 12) return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
+
+  if (diffMonths < 12) {
+    return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
+  }
+
   const diffYears = Math.floor(diffMonths / 12);
+
   return `${diffYears} year${diffYears === 1 ? "" : "s"} ago`;
 }
 
 function formatCount(n) {
   if (typeof n !== "number" || Number.isNaN(n)) return "0";
-  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}k`;
+
+  if (n >= 1000) {
+    return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}k`;
+  }
+
   return String(n);
 }
 
 function ConnectionBadge({ connection }) {
   const meta = CONNECTION_META[connection];
+
   if (!meta) {
     return (
       <span className={`${styles.badge} ${styles.connUnclassified}`}>
@@ -51,8 +76,14 @@ function ConnectionBadge({ connection }) {
       </span>
     );
   }
+
   return (
-    <span className={`${styles.badge} ${meta.className || styles.connUnclassified}`} title={`connection: ${connection}`}>
+    <span
+      className={`${styles.badge} ${
+        meta.className || styles.connUnclassified
+      }`}
+      title={`connection: ${connection}`}
+    >
       {meta.label}
     </span>
   );
@@ -61,16 +92,27 @@ function ConnectionBadge({ connection }) {
 function VerifiedBadge({ verified }) {
   return (
     <span
-      className={`${styles.badge} ${verified ? styles.verifiedTrue : styles.verifiedFalse}`}
-      title={verified ? "Issue claim confirmed" : "Issue claim not confirmed"}
+      className={`${styles.badge} ${
+        verified ? styles.verifiedTrue : styles.verifiedFalse
+      }`}
+      title={
+        verified
+          ? "Issue claim confirmed"
+          : "Issue claim not confirmed"
+      }
     >
-      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <svg
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        aria-hidden="true"
+      >
         {verified ? (
           <path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.4 7.4a1 1 0 0 1-1.4 0L3.3 9.5a1 1 0 1 1 1.4-1.4l3.9 3.9 6.7-6.7a1 1 0 0 1 1.4 0z" />
         ) : (
           <circle cx="10" cy="10" r="4" />
         )}
       </svg>
+
       {verified ? "Verified" : "Unverified"}
     </span>
   );
@@ -79,23 +121,35 @@ function VerifiedBadge({ verified }) {
 function BeginnerBadge({ hasBeginnerFriendlyIssues }) {
   return (
     <span
-      className={`${styles.badge} ${hasBeginnerFriendlyIssues ? styles.beginnerTrue : styles.beginnerFalse}`}
+      className={`${styles.badge} ${
+        hasBeginnerFriendlyIssues
+          ? styles.beginnerTrue
+          : styles.beginnerFalse
+      }`}
       title={
         hasBeginnerFriendlyIssues
           ? "Has open beginner-friendly issues"
           : "No beginner-friendly issues right now"
       }
     >
-      <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <svg
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        aria-hidden="true"
+      >
         <path d="M10 2l2.2 4.9 5.3.6-4 3.7 1.1 5.3L10 13.9l-4.6 2.6 1.1-5.3-4-3.7 5.3-.6L10 2z" />
       </svg>
-      {hasBeginnerFriendlyIssues ? "Beginner friendly" : "No beginner issues"}
+
+      {hasBeginnerFriendlyIssues
+        ? "Beginner friendly"
+        : "No beginner issues"}
     </span>
   );
 }
 
 export default function ProjectCard({ project }) {
   const {
+    id,
     name = "Untitled project",
     description = "",
     primaryLanguage,
@@ -109,12 +163,17 @@ export default function ProjectCard({ project }) {
     hasBeginnerFriendlyIssues = false,
   } = project || {};
 
-  const languageColor = LANGUAGE_COLORS[primaryLanguage] || "#94a3b8";
+  const languageColor =
+    LANGUAGE_COLORS[primaryLanguage] || "#94a3b8";
 
   return (
-    <div className={styles.card}>
+    <Link
+      href={`/projects/${id}`}
+      className={styles.card}
+    >
       <div className={styles.header}>
         <h3 className={styles.name}>{name}</h3>
+
         <div className={styles.badgeColumn}>
           <ConnectionBadge connection={connection} />
           <VerifiedBadge verified={verified} />
@@ -123,6 +182,7 @@ export default function ProjectCard({ project }) {
 
       <div className={styles.meta}>
         {category && <span>{category}</span>}
+
         {primaryLanguage && (
           <span className={styles.languageLabel}>
             <span
@@ -135,7 +195,9 @@ export default function ProjectCard({ project }) {
         )}
       </div>
 
-      {description && <p className={styles.description}>{description}</p>}
+      {description && (
+        <p className={styles.description}>{description}</p>
+      )}
 
       {tags.length > 0 && (
         <div className={styles.tags}>
@@ -149,27 +211,46 @@ export default function ProjectCard({ project }) {
 
       <div className={styles.footerSection}>
         <div className={styles.beginnerRow}>
-          <BeginnerBadge hasBeginnerFriendlyIssues={hasBeginnerFriendlyIssues} />
+          <BeginnerBadge
+            hasBeginnerFriendlyIssues={
+              hasBeginnerFriendlyIssues
+            }
+          />
         </div>
 
         <div className={styles.footer}>
           <div className={styles.stats}>
             <span className={styles.stat} title="Stars">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <svg
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
                 <path d="M10 2l2.2 4.9 5.3.6-4 3.7 1.1 5.3L10 13.9l-4.6 2.6 1.1-5.3-4-3.7 5.3-.6L10 2z" />
               </svg>
+
               {formatCount(stars)}
             </span>
-            <span className={styles.stat} title="Contributors">
-              <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+
+            <span
+              className={styles.stat}
+              title="Contributors"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
                 <path d="M10 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3.5 17a6.5 6.5 0 0 1 13 0 1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
               </svg>
+
               {formatCount(contributors)}
             </span>
           </div>
+
           <span>{formatRelativeTime(lastActivityAt)}</span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

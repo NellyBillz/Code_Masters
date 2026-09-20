@@ -77,4 +77,8 @@ public class User {
 
     @Column(name = "updated_at", insertable = false, updatable = false)
     private OffsetDateTime updateAt;
+
+    @Column(name = "is_site_admin", nullable = false)
+    @Builder.Default
+    private boolean isSiteAdmin = false;
 }

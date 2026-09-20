@@ -37,6 +37,10 @@ inside the .env store your local postgre password
 
 ### Resetting the Local Database
 
+Open Your bash Terminal  and run the followng command:
+./mvnw flyway:clean -Dflyway.password="your_local_postgres_password"
+
+### Alternitively
 Open your SQL SHELL Terminal and run psql as user postgres: psql -U postgres
 
 The past the following:
@@ -47,5 +51,7 @@ FROM pg_stat_activity
 WHERE datname = 'codemaster_db' AND pid <> pg_backend_pid();
 
 -- Drop and recreate
+\c postgres
 DROP DATABASE IF EXISTS codemaster_db;
 CREATE DATABASE codemaster_db;
+\c codemaster_db
