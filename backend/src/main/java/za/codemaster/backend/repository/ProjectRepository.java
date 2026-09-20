@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+
+import za.codemaster.backend.domain.model.ListingStatus;
 import za.codemaster.backend.domain.model.Project;
 
 import java.util.Optional;
@@ -16,6 +18,22 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     Optional<Project> findBySlug(String slug);
 
     Optional<Project> findByGithubUrl(String githubUrl);
+
+    /**
+     * Public visibility lookup: retrieves a project by ID only if it is in the target listing status.
+     */
+    Optional<Project> findByIdAndListingStatus(Long id, ListingStatus listingStatus);
+
+    /**
+     * Public visibility lookup by slug: retrieves a project by slug only if it is in the target listing status.
+     */
+    Optional<Project> findBySlugAndListingStatus(String slug, ListingStatus listingStatus);
+
+    /**
+     * Moderation queue query: pages projects by listing status.
+     */
+    
+    Page<Project> findByListingStatus(ListingStatus listingStatus, Pageable pageable);
 
     @Query("""
         SELECT p FROM Project p

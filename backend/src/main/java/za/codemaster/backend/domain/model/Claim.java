@@ -9,6 +9,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -33,7 +35,9 @@ import java.time.OffsetDateTime;
 @Table(name = "claims")
 @Getter
 @Setter
-@NoArgsConstructor
+@Builder
+@NoArgsConstructor 
+@AllArgsConstructor
 public class Claim {
 
     /**
@@ -63,7 +67,9 @@ public class Claim {
      * {@code @Enumerated(EnumType.STRING)} — that would store the Java constant
      * name ({@code "ACTIVE"}) instead, which the database check constraint rejects.
      */
+
     @Column(name = "status", nullable = false)
+    @Builder.Default
     private ClaimStatus status = ClaimStatus.ACTIVE;
 
     /**
@@ -77,13 +83,14 @@ public class Claim {
     private String pullRequestUrl;
 
     @Column(name = "pull_request_state", nullable = false)
-    private String pullRequestState = "none";
+    @Builder.Default
+    private PullRequestState pullRequestState = PullRequestState.NONE;
 
     @Column(name = "maintainer_feedback")
     private String maintainerFeedback;
 
     @Column(name = "completion_source")
-    private String completionSource;
+    private CompletionSource completionSource;
 
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;

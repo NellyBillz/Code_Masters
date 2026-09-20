@@ -21,7 +21,7 @@ public class SyncJob {
     @Column(name = "contributions_verified_count")private Integer contributionsVerifiedCount;
     @Column(name="created_at", insertable=false, updatable=false) private OffsetDateTime createdAt;
 
-    protected SyncJob() {}
+    public SyncJob() {}
     public SyncJob(Long projectId) { this.projectId=projectId; this.status="accepted"; this.issuesCreatedCount=0; this.issuesUpdatedCount=0; }
     public void running(){ status="running"; startedAt=OffsetDateTime.now(); }
     public void completed(int created,int updated){ status="completed"; completedAt=OffsetDateTime.now(); issuesCreatedCount=created; issuesUpdatedCount=updated; errorMessage=null; retryAfter=null; }
@@ -31,5 +31,12 @@ public class SyncJob {
     public String getErrorMessage(){return errorMessage;} public OffsetDateTime getRetryAfter(){return retryAfter;}
     public Integer getIssuesCreatedCount(){return issuesCreatedCount;} public Integer getIssuesUpdatedCount(){return issuesUpdatedCount;}
     public OffsetDateTime getCreatedAt(){return createdAt;}
-    public Integer getContibutionVerifiedCount(){return contributionsVerifiedCount;}
+    public Integer getContributionsVerifiedCount(){return contributionsVerifiedCount;}
+    public void setProject(Project project) {
+        this.projectId = project != null ? project.getId() : null;
+    }
+    public void setStatus(String status){this.status = status;}
+    public void setContributionsVerifiedCount(Integer contibutions){this.contributionsVerifiedCount = contibutions;}
+
+
 }

@@ -124,11 +124,11 @@ public class Project {
 
     @Column(name = "has_code_of_conduct", nullable = false)
     @Builder.Default
-    private boolean hasCodeOfDonduct = false;
+    private boolean hasCodeOfConduct = false;
 
     @Column(name = "listing_status", nullable = false)
     @Builder.Default
-    private String listingStatus = "pending";
+    private ListingStatus listingStatus = ListingStatus.PENDING;
 
     @Column(name = "accepting_contributions", nullable = false)
     @Builder.Default
