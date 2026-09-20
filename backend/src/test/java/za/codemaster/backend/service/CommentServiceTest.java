@@ -60,13 +60,16 @@ class CommentServiceTest {
     @Autowired
     private ProjectMaintainerRepository projectMaintainerRepository;
 
+    @Autowired
+    private ClaimRepository claimRepository;
+
     private CommentService service;
     private ProjectQueryServiceFixtures fixtures;
     private User author;
 
     @BeforeEach
     void setUp() {
-        service = new CommentService(commentRepository, projectRepository, issueRepository, projectMaintainerRepository);
+        service = new CommentService(commentRepository, projectRepository, issueRepository, projectMaintainerRepository, claimRepository);
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         author = userRepository.save(User.builder()
                 .githubId(System.nanoTime())

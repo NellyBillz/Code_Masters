@@ -10,6 +10,7 @@ import za.codemaster.backend.dto.search.IssueSearchResult;
 import za.codemaster.backend.dto.search.PagedSearchResults;
 import za.codemaster.backend.dto.search.ProjectSearchResult;
 import za.codemaster.backend.dto.search.SearchResultItem;
+import za.codemaster.backend.domain.model.ListingStatus;
 import za.codemaster.backend.dto.search.SearchType;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.IssueRepository;
@@ -89,6 +90,7 @@ public class SearchService {
 
     private List<SearchResultItem> searchProjects(String needle, SearchParams params) {
         return projectRepository.findAll().stream()
+                .filter(p -> p.getListingStatus() == ListingStatus.PUBLISHED)
                 .filter(p -> matchesProjectQuery(p, needle))
                 .filter(p -> params.language() == null || params.language().equalsIgnoreCase(p.getPrimaryLanguage()))
                 .filter(p -> matchesCountry(p, params.country()))

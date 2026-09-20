@@ -109,7 +109,9 @@ class ProjectServiceTest {
 
         ProjectDto created = service.createProject(request, submitter);
 
-        ProjectDetail detail = projectQueryService.getProjectDetail(created.id());
+        // A freshly submitted project is `pending` (API-03.1) — only visible
+        // to its submitter/maintainer, not anonymously.
+        ProjectDetail detail = projectQueryService.getProjectDetail(created.id(), submitter);
         assertEquals(1, detail.maintainers().size());
         assertEquals(submitter.getUsername(), detail.maintainers().get(0).user().username());
         assertEquals(za.codemaster.backend.dto.project.MaintainerRole.OWNER, detail.maintainers().get(0).role());

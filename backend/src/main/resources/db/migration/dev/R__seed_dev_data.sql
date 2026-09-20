@@ -26,28 +26,29 @@ SELECT setval('users_id_seq', (SELECT GREATEST(MAX(id), 1002) FROM users));
 -- Spanning 2 connections ('south_african', 'africa_led') and 2 primary languages ('Java', 'Python')
 INSERT INTO projects (
     id, github_owner, github_repo, github_url, name, slug, description,
-    primary_language, languages, category, connection, license, stars, forks, open_issues, verified
+    primary_language, languages, category, connection, license, stars, forks, open_issues, verified,
+    listing_status
 )
-VALUES 
+VALUES
     (
         2001, 'codemaster', 'mzansi-open-api', 'https://github.com/codemaster/mzansi-open-api',
         'Mzansi Open API', 'mzansi-open-api', 'A unified open API aggregating South African civic services.',
-        'Java', ARRAY['Java', 'SQL'], 'Civic Tech', 'south_african', 'MIT', 35, 8, 3, true
+        'Java', ARRAY['Java', 'SQL'], 'Civic Tech', 'south_african', 'MIT', 35, 8, 3, true, 'published'
     ),
     (
         2002, 'codemaster', 'afri-lang-nlp', 'https://github.com/codemaster/afri-lang-nlp',
         'Afri-Lang NLP', 'afri-lang-nlp', 'Natural Language Processing models for African indigenous languages.',
-        'Python', ARRAY['Python', 'Shell'], 'Machine Learning', 'africa_led', 'Apache-2.0', 142, 29, 4, true
+        'Python', ARRAY['Python', 'Shell'], 'Machine Learning', 'africa_led', 'Apache-2.0', 142, 29, 4, true, 'published'
     ),
     (
         2003, 'codemaster', 'sa-tax-calculator', 'https://github.com/codemaster/sa-tax-calculator',
         'SA Tax Calculator', 'sa-tax-calculator', 'Open-source SARS income tax and VAT calculating engine.',
-        'Java', ARRAY['Java'], 'FinTech', 'south_african', 'GPL-3.0', 21, 4, 2, false
+        'Java', ARRAY['Java'], 'FinTech', 'south_african', 'GPL-3.0', 21, 4, 2, false, 'published'
     ),
     (
         2004, 'codemaster', 'agri-pulse-africa', 'https://github.com/codemaster/agri-pulse-africa',
         'Agri Pulse Africa', 'agri-pulse-africa', 'Crop disease forecasting and soil analytics dashboard.',
-        'Python', ARRAY['Python', 'JavaScript'], 'AgriTech', 'africa_led', 'MIT', 67, 12, 2, true
+        'Python', ARRAY['Python', 'JavaScript'], 'AgriTech', 'africa_led', 'MIT', 67, 12, 2, true, 'published'
     )
 ON CONFLICT (id) DO NOTHING;
 

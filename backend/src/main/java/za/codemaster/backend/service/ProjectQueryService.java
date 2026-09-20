@@ -75,6 +75,7 @@ public class ProjectQueryService {
                 .toList();
 
         List<ProjectDto> filtered = all.stream()
+                .filter(p -> p.listingStatus() == ProjectListingStatus.PUBLISHED)
                 .filter(p -> matchesQuery(p, params.q()))
                 .filter(p -> matchesLanguage(p, params.language()))
                 .filter(p -> matchesCategory(p, params.category()))
@@ -98,14 +99,30 @@ public class ProjectQueryService {
      * a successful {@code POST /projects} must immediately show the caller in
      * the maintainer list). featuredIssues/recentComments stay empty lists here —
      * wiring those is other tickets' scope.
+     * <p>
+     * API-03.1: a non-{@code published} project (pending review, or rejected)
+     * is only visible to its submitter/any maintainer — everyone else, including
+     * an anonymous caller, gets the same {@code PROJECT_NOT_FOUND} a missing id
+     * would produce, matching the spec's documented exception.
      *
      * @param projectId the project id from the path
+     * @param caller    the requesting user, or {@code null} if anonymous
      * @return the matching project's detail view
-     * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if no project matches
+     * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if no project matches,
+     *                       or if it exists but isn't visible to {@code caller}
      */
     @Transactional(readOnly = true)
-    public ProjectDetail getProjectDetail(Long projectId) {
-        ProjectDto project = toDto(findProjectEntityOrThrow(projectId));
+    public ProjectDetail getProjectDetail(Long projectId, User caller) {
+        za.codemaster.backend.domain.model.Project entity = findProjectEntityOrThrow(projectId);
+
+        boolean published = entity.getListingStatus() == za.codemaster.backend.domain.model.ListingStatus.PUBLISHED;
+        boolean callerIsMaintainer = caller != null
+                && projectMaintainerRepository.existsByProjectIdAndUserId(projectId, caller.getId());
+        if (!published && !callerIsMaintainer) {
+            throw projectNotFound(projectId);
+        }
+
+        ProjectDto project = toDto(entity);
         List<ProjectMaintainerDto> maintainers = projectMaintainerRepository.findByProjectId(projectId).stream()
                 .map(this::toDto)
                 .toList();
@@ -119,11 +136,15 @@ public class ProjectQueryService {
      */
     private za.codemaster.backend.domain.model.Project findProjectEntityOrThrow(Long projectId) {
         return projectRepository.findById(projectId)
-                .orElseThrow(() -> new ApiException(
-                        "PROJECT_NOT_FOUND",
-                        "No project exists with id " + projectId,
-                        HttpStatus.NOT_FOUND
-                ));
+                .orElseThrow(() -> projectNotFound(projectId));
+    }
+
+    private ApiException projectNotFound(Long projectId) {
+        return new ApiException(
+                "PROJECT_NOT_FOUND",
+                "No project exists with id " + projectId,
+                HttpStatus.NOT_FOUND
+        );
     }
 
     /**
@@ -208,6 +229,7 @@ public class ProjectQueryService {
                 entity.getContributors(),
                 Boolean.TRUE.equals(entity.getHasBeginnerFriendlyIssues()),
                 entity.getLastActivityAt(),
+                ProjectListingStatus.valueOf(entity.getListingStatus().name()),
                 Boolean.TRUE.equals(entity.getVerified()),
                 entity.getVerifiedAt(),
                 entity.getCreatedAt(),
@@ -217,8 +239,11 @@ public class ProjectQueryService {
 
     /**
      * Maps a persisted issue row to the API's {@link IssueDto} shape.
-     * {@code claimCount} is computed here (active claims only) rather than
-     * stored, since it is not a column on {@code issues}.
+     * {@code claimCount} is computed here rather than stored, since it is not
+     * a column on {@code issues}. Counts only in-flight claims — {@code active}
+     * or {@code changes_requested} — not {@code completed}/{@code released}
+     * (API-03.5: a claim that already resolved, one way or another, shouldn't
+     * still read as "N people are working on this").
      * <p>
      * Public (unlike {@link #toDto(za.codemaster.backend.domain.model.Project)}):
      * this is the single source of truth for Issue entity-to-DTO mapping, reused
@@ -226,7 +251,8 @@ public class ProjectQueryService {
      * override, rather than duplicating the claimCount/enum-mapping logic there.
      */
     public IssueDto toDto(za.codemaster.backend.domain.model.Issue entity) {
-        long activeClaims = claimRepository.countByIssueIdAndStatus(entity.getId(), ClaimStatus.ACTIVE);
+        long inFlightClaims = claimRepository.countByIssueIdAndStatusIn(
+                entity.getId(), List.of(ClaimStatus.ACTIVE, ClaimStatus.CHANGES_REQUESTED));
 
         return new IssueDto(
                 entity.getId(),
@@ -246,7 +272,7 @@ public class ProjectQueryService {
                 toDouble(entity.getProjectHealthScore()),
                 toDouble(entity.getFreshnessScore()),
                 toDouble(entity.getContributionScore()),
-                (int) activeClaims,
+                (int) inFlightClaims,
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
@@ -268,8 +294,10 @@ public class ProjectQueryService {
     /**
      * Maps a user to the API's {@link PublicUserProfile} shape.
      * {@code projectsCount}/{@code contributionsCount} are not yet computed anywhere
-     * in the codebase (no ticket populates them); left {@code null} here rather than
-     * a made-up value — same note as {@code CommentService.toPublicProfile}.
+     * in the codebase (no ticket populates it); left {@code null} rather than a
+     * made-up value. {@code contributionsCount} (API-03.5) counts only that
+     * user's {@code completed} claims — verified contributions, not raw claim
+     * activity.
      */
     private PublicUserProfile toPublicProfile(User user) {
         return new PublicUserProfile(
@@ -281,7 +309,7 @@ public class ProjectQueryService {
                 user.getLocation(),
                 user.getSkills() == null ? List.of() : List.of(user.getSkills()),
                 null,
-                null,
+                (int) claimRepository.countByUserIdAndStatus(user.getId(), ClaimStatus.COMPLETED),
                 user.getReputation()
         );
     }
@@ -290,16 +318,25 @@ public class ProjectQueryService {
         return value == null ? null : value.doubleValue();
     }
 
-    /** True if {@code q} is blank/null, or found in the project's name, description, owner, or tags (case-insensitive). */
+    /**
+     * True if {@code q} is blank/null, or found in the project's name, description, owner, or tags
+     * (case-insensitive). {@code description} is null-safe: a project submitted via
+     * {@code POST /projects} (API-02.7) has no description until sync fills one in, and this
+     * predicate runs against every row, so a single such project used to 500 any {@code q} search.
+     */
     private boolean matchesQuery(ProjectDto p, String q) {
         if (q == null || q.isBlank()) {
             return true;
         }
         String needle = q.toLowerCase(Locale.ROOT);
-        return p.name().toLowerCase(Locale.ROOT).contains(needle)
-                || p.description().toLowerCase(Locale.ROOT).contains(needle)
-                || p.owner().toLowerCase(Locale.ROOT).contains(needle)
-                || p.tags().stream().anyMatch(t -> t.toLowerCase(Locale.ROOT).contains(needle));
+        return containsIgnoreCase(p.name(), needle)
+                || containsIgnoreCase(p.description(), needle)
+                || containsIgnoreCase(p.owner(), needle)
+                || p.tags().stream().anyMatch(t -> containsIgnoreCase(t, needle));
+    }
+
+    private boolean containsIgnoreCase(String haystack, String needle) {
+        return haystack != null && haystack.toLowerCase(Locale.ROOT).contains(needle);
     }
 
     /** True if {@code language} is null, or matches the project's primaryLanguage (case-insensitive). */

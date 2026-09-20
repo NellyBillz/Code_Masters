@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.Comment;
 import za.codemaster.backend.domain.model.Issue;
 import za.codemaster.backend.domain.model.Project;
@@ -16,6 +17,7 @@ import za.codemaster.backend.dto.comment.PagedComments;
 import za.codemaster.backend.dto.user.PublicUserProfile;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.exception.CommentValidationException;
+import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.CommentRepository;
 import za.codemaster.backend.repository.IssueRepository;
 import za.codemaster.backend.repository.ProjectMaintainerRepository;
@@ -39,15 +41,18 @@ public class CommentService {
     private final ProjectRepository projectRepository;
     private final IssueRepository issueRepository;
     private final ProjectMaintainerRepository projectMaintainerRepository;
+    private final ClaimRepository claimRepository;
 
     public CommentService(CommentRepository commentRepository,
                            ProjectRepository projectRepository,
                            IssueRepository issueRepository,
-                           ProjectMaintainerRepository projectMaintainerRepository) {
+                           ProjectMaintainerRepository projectMaintainerRepository,
+                           ClaimRepository claimRepository) {
         this.commentRepository = commentRepository;
         this.projectRepository = projectRepository;
         this.issueRepository = issueRepository;
         this.projectMaintainerRepository = projectMaintainerRepository;
+        this.claimRepository = claimRepository;
     }
 
     /**
@@ -267,10 +272,10 @@ public class CommentService {
 
     /**
      * Maps a comment's author to the API's {@link PublicUserProfile} shape.
-     * {@code projectsCount}/{@code contributionsCount} are not yet computed anywhere
-     * in the codebase (no ticket populates them); left {@code null} here rather than
-     * a made-up value, matching how other unimplemented aggregate fields are handled
-     * elsewhere (e.g. {@code ProjectDetail}'s still-empty {@code recentComments}).
+     * {@code projectsCount} is not yet computed anywhere in the codebase (no
+     * ticket populates it); left {@code null} rather than a made-up value.
+     * {@code contributionsCount} (API-03.5) counts only this user's
+     * {@code completed} claims.
      */
     private PublicUserProfile toPublicProfile(User user) {
         return new PublicUserProfile(
@@ -282,7 +287,7 @@ public class CommentService {
                 user.getLocation(),
                 user.getSkills() == null ? List.of() : List.of(user.getSkills()),
                 null,
-                null,
+                (int) claimRepository.countByUserIdAndStatus(user.getId(), ClaimStatus.COMPLETED),
                 user.getReputation()
         );
     }

@@ -13,9 +13,11 @@ import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.claim.ClaimDto;
 import za.codemaster.backend.dto.claim.ClaimStatusDto;
+import za.codemaster.backend.dto.claim.PullRequestStateDto;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.UserRepository;
 
@@ -62,6 +64,9 @@ class ClaimServiceTest {
     private ClaimRepository claimRepository;
 
     @Autowired
+    private ProjectMaintainerRepository projectMaintainerRepository;
+
+    @Autowired
     private UserRepository userRepository;
 
     private ClaimService service;
@@ -70,7 +75,7 @@ class ClaimServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ClaimService(claimRepository, issueRepository);
+        service = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository);
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         claimant = userRepository.save(User.builder()
                 .githubId(System.nanoTime())
@@ -85,6 +90,17 @@ class ClaimServiceTest {
                 .username("other_" + System.nanoTime())
                 .displayName("Other User")
                 .build());
+    }
+
+    /** Makes {@code user} a maintainer of the project the given issue belongs to. */
+    private void addMaintainer(Long issueId, User user) {
+        za.codemaster.backend.domain.model.Issue issue = issueRepository.findById(issueId).orElseThrow();
+        za.codemaster.backend.domain.model.ProjectMaintainer relationship =
+                new za.codemaster.backend.domain.model.ProjectMaintainer();
+        relationship.setProject(issue.getProject());
+        relationship.setUser(user);
+        relationship.setRole("maintainer");
+        projectMaintainerRepository.save(relationship);
     }
 
     @Test
@@ -127,7 +143,7 @@ class ClaimServiceTest {
         service.createClaim(issueId, "A is on it", userA);
         service.createClaim(issueId, "B is on it too", userB);
 
-        List<ClaimDto> claims = service.getActiveClaims(issueId);
+        List<ClaimDto> claims = service.getClaims(issueId);
 
         assertEquals(2, claims.size(),
                 "claims are a non-exclusive signal of interest (design doc §7) — both must be active");
@@ -136,7 +152,7 @@ class ClaimServiceTest {
     }
 
     @Test
-    void activeClaimsAreListedOldestFirst() {
+    void claimsAreListedOldestFirst() {
         Long issueId = fixtures.issueId(0);
         User userA = claimant;
         User userB = otherUser();
@@ -144,27 +160,30 @@ class ClaimServiceTest {
         ClaimDto first = service.createClaim(issueId, null, userA);
         ClaimDto second = service.createClaim(issueId, null, userB);
 
-        List<ClaimDto> claims = service.getActiveClaims(issueId);
+        List<ClaimDto> claims = service.getClaims(issueId);
 
         assertEquals(List.of(first.id(), second.id()), claims.stream().map(ClaimDto::id).toList());
     }
 
     @Test
-    void getActiveClaimsOnMissingIssueThrowsIssueNotFound() {
-        ApiException ex = assertThrows(ApiException.class, () -> service.getActiveClaims(-999L));
+    void getClaimsOnMissingIssueThrowsIssueNotFound() {
+        ApiException ex = assertThrows(ApiException.class, () -> service.getClaims(-999L));
 
         assertEquals("ISSUE_NOT_FOUND", ex.getCode());
     }
 
     @Test
-    void releaseClaimMarksItReleasedAndRemovesItFromActiveList() {
+    void releaseClaimMarksItReleasedButItStillAppearsInTheFullClaimsList() {
         Long issueId = fixtures.issueId(0);
         service.createClaim(issueId, null, claimant);
 
         service.releaseClaim(issueId, claimant);
 
-        List<ClaimDto> claims = service.getActiveClaims(issueId);
-        assertTrue(claims.isEmpty(), "a released claim must not appear in the active claims list");
+        // API-03.5: GET /issues/{issueId}/claims returns every status, oldest
+        // first — a released claim is part of the issue's history, not erased.
+        List<ClaimDto> claims = service.getClaims(issueId);
+        assertEquals(1, claims.size());
+        assertEquals(ClaimStatusDto.RELEASED, claims.get(0).status());
     }
 
     @Test
@@ -193,7 +212,11 @@ class ClaimServiceTest {
         ClaimDto reclaimed = service.createClaim(issueId, "second attempt", claimant);
 
         assertEquals(ClaimStatusDto.ACTIVE, reclaimed.status());
-        assertEquals(1, service.getActiveClaims(issueId).size());
+        // Both the released claim and the new active one are part of the
+        // issue's full history now (API-03.5) — exactly one of them is active.
+        List<ClaimDto> claims = service.getClaims(issueId);
+        assertEquals(2, claims.size());
+        assertEquals(1, claims.stream().filter(c -> c.status() == ClaimStatusDto.ACTIVE).count());
     }
 
     @Test
@@ -208,5 +231,243 @@ class ClaimServiceTest {
 
         assertEquals("CLAIM_ALREADY_ACTIVE", ex.getCode());
         assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+    }
+
+    @Test
+    void attachPullRequestSetsUrlAndDefaultsToOpenState() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+
+        ClaimDto updated = service.attachPullRequest(
+                issueId, created.id(), "https://github.com/example-org/repo/pull/7", claimant);
+
+        assertEquals("https://github.com/example-org/repo/pull/7", updated.pullRequestUrl());
+        assertEquals(PullRequestStateDto.OPEN, updated.pullRequestState());
+    }
+
+    @Test
+    void attachPullRequestIsReflectedOnNextRead() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+
+        service.attachPullRequest(issueId, created.id(), "https://github.com/example-org/repo/pull/7", claimant);
+
+        ClaimDto reread = service.getClaims(issueId).get(0);
+        assertEquals("https://github.com/example-org/repo/pull/7", reread.pullRequestUrl());
+        assertEquals(PullRequestStateDto.OPEN, reread.pullRequestState());
+    }
+
+    @Test
+    void attachPullRequestByNonOwnerIsForbidden() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        User stranger = otherUser();
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.attachPullRequest(issueId, created.id(), "https://github.com/example-org/repo/pull/7", stranger));
+
+        assertEquals("FORBIDDEN", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatus());
+    }
+
+    @Test
+    void attachPullRequestOnMissingClaimThrowsClaimNotFound() {
+        Long issueId = fixtures.issueId(0);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.attachPullRequest(issueId, -999L, "https://github.com/example-org/repo/pull/7", claimant));
+
+        assertEquals("CLAIM_NOT_FOUND", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    @Test
+    void attachPullRequestOnMissingIssueThrowsIssueNotFound() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.attachPullRequest(-999L, created.id(), "https://github.com/example-org/repo/pull/7", claimant));
+
+        assertEquals("ISSUE_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    void attachPullRequestWhenClaimBelongsToADifferentIssueThrowsClaimNotFound() {
+        Long issueIdA = fixtures.issueId(0);
+        Long issueIdB = fixtures.issueId(1);
+        ClaimDto created = service.createClaim(issueIdA, null, claimant);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.attachPullRequest(issueIdB, created.id(), "https://github.com/example-org/repo/pull/7", claimant));
+
+        assertEquals("CLAIM_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    void requestChangesSetsStatusAndFeedback() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        User maintainer = otherUser();
+        addMaintainer(issueId, maintainer);
+
+        ClaimDto reviewed = service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.REQUEST_CHANGES,
+                        "Please add a test for the edge case."),
+                maintainer);
+
+        assertEquals(ClaimStatusDto.CHANGES_REQUESTED, reviewed.status());
+        assertEquals("Please add a test for the edge case.", reviewed.maintainerFeedback());
+    }
+
+    @Test
+    void requestChangesFeedbackIsVisibleToContributorOnNextRead() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        User maintainer = otherUser();
+        addMaintainer(issueId, maintainer);
+
+        service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.REQUEST_CHANGES, "Fix the linter warning."),
+                maintainer);
+
+        // API-03.5: GET /issues/{issueId}/claims now returns every status, so a
+        // changes_requested claim (no longer active) is still visible here.
+        ClaimDto reread = service.getClaims(issueId).get(0);
+        assertEquals("Fix the linter warning.", reread.maintainerFeedback());
+        assertEquals(ClaimStatusDto.CHANGES_REQUESTED, reread.status());
+    }
+
+    @Test
+    void requestChangesWithoutFeedbackThrowsValidationError() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        User maintainer = otherUser();
+        addMaintainer(issueId, maintainer);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.REQUEST_CHANGES, null),
+                maintainer));
+
+        assertEquals("VALIDATION_ERROR", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.BAD_REQUEST, ex.getStatus());
+    }
+
+    @Test
+    void confirmCompletedSetsStatusAndMaintainerConfirmedSource() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        User maintainer = otherUser();
+        addMaintainer(issueId, maintainer);
+
+        ClaimDto reviewed = service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.CONFIRM_COMPLETED, null),
+                maintainer);
+
+        assertEquals(ClaimStatusDto.COMPLETED, reviewed.status());
+        assertEquals(za.codemaster.backend.dto.claim.ClaimCompletionSourceDto.MAINTAINER_CONFIRMED, reviewed.completionSource());
+        assertNotNull(reviewed.completedAt());
+    }
+
+    @Test
+    void reconfirmingAnAlreadyCompletedClaimIsANoOp() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        User maintainer = otherUser();
+        addMaintainer(issueId, maintainer);
+
+        ClaimDto firstConfirm = service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.CONFIRM_COMPLETED, null),
+                maintainer);
+
+        ClaimDto secondConfirm = service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.CONFIRM_COMPLETED, null),
+                maintainer);
+
+        assertEquals(ClaimStatusDto.COMPLETED, secondConfirm.status());
+        assertEquals(firstConfirm.completedAt(), secondConfirm.completedAt(),
+                "re-confirming must not change completedAt");
+        assertEquals(firstConfirm.completionSource(), secondConfirm.completionSource());
+    }
+
+    @Test
+    void reviewingAReleasedClaimIsRejectedAsNotReviewable() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        service.releaseClaim(issueId, claimant);
+        User maintainer = otherUser();
+        addMaintainer(issueId, maintainer);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.CONFIRM_COMPLETED, null),
+                maintainer));
+
+        assertEquals("CLAIM_NOT_REVIEWABLE", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+    }
+
+    @Test
+    void requestingChangesOnAnAlreadyCompletedClaimIsRejectedAsNotReviewable() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        User maintainer = otherUser();
+        addMaintainer(issueId, maintainer);
+        service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.CONFIRM_COMPLETED, null),
+                maintainer);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.REQUEST_CHANGES, "too late"),
+                maintainer));
+
+        assertEquals("CLAIM_NOT_REVIEWABLE", ex.getCode());
+    }
+
+    @Test
+    void reviewByNonMaintainerIsForbidden() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        User stranger = otherUser();
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.CONFIRM_COMPLETED, null),
+                stranger));
+
+        assertEquals("FORBIDDEN", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatus());
+    }
+
+    @Test
+    void reviewOnMissingClaimThrowsClaimNotFound() {
+        Long issueId = fixtures.issueId(0);
+        User maintainer = otherUser();
+        addMaintainer(issueId, maintainer);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.reviewClaim(issueId, -999L,
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.CONFIRM_COMPLETED, null),
+                maintainer));
+
+        assertEquals("CLAIM_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    void reviewOnMissingIssueThrowsIssueNotFound() {
+        ApiException ex = assertThrows(ApiException.class, () -> service.reviewClaim(-999L, 1L,
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.CONFIRM_COMPLETED, null),
+                claimant));
+
+        assertEquals("ISSUE_NOT_FOUND", ex.getCode());
     }
 }

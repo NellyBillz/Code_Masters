@@ -8,6 +8,7 @@ import za.codemaster.backend.dto.issue.Difficulty;
 import za.codemaster.backend.dto.issue.IssueStatus;
 import za.codemaster.backend.dto.search.SearchType;
 import za.codemaster.backend.security.AuthenticatedUserArgumentResolver;
+import za.codemaster.backend.security.OptionalAuthenticatedUserArgumentResolver;
 
 import java.util.List;
 
@@ -26,14 +27,18 @@ import java.util.List;
 public class WebMvcConfig implements WebMvcConfigurer {
 
     private final AuthenticatedUserArgumentResolver authenticatedUserArgumentResolver;
+    private final OptionalAuthenticatedUserArgumentResolver optionalAuthenticatedUserArgumentResolver;
 
-    public WebMvcConfig(AuthenticatedUserArgumentResolver authenticatedUserArgumentResolver) {
+    public WebMvcConfig(AuthenticatedUserArgumentResolver authenticatedUserArgumentResolver,
+                         OptionalAuthenticatedUserArgumentResolver optionalAuthenticatedUserArgumentResolver) {
         this.authenticatedUserArgumentResolver = authenticatedUserArgumentResolver;
+        this.optionalAuthenticatedUserArgumentResolver = optionalAuthenticatedUserArgumentResolver;
     }
 
     @Override
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(authenticatedUserArgumentResolver);
+        resolvers.add(optionalAuthenticatedUserArgumentResolver);
     }
 
     @Override
