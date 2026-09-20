@@ -2,12 +2,13 @@ package za.codemaster.backend.domain.model;
 
 /**
  * Valid states for an issue claim matching the DB check constraint:
- * {@code CHECK (status IN ('active', 'released', 'completed'))}.
+ * {@code CHECK (status IN ('active', 'released', 'completed', 'changes_requested'))}.
  */
 public enum ClaimStatus {
     ACTIVE("active"),
     RELEASED("released"),
-    COMPLETED("completed");
+    COMPLETED("completed"),
+    CHANGES_REQUESTED("changes_requested");
 
     private final String value;
 
