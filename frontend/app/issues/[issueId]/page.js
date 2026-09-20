@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getIssue } from "../../../lib/api";
 import IssueComments from "../../components/IssueComments";
   import ClaimPanel from "../../components/ClaimPanel";
+import IssueMaintainerOverride from "../../components/IssueMaintainerOverride";
 
 export default async function IssueDetailPage({ params }) {
     const { issueId } = await params;
@@ -58,6 +59,7 @@ export default async function IssueDetailPage({ params }) {
 
             <IssueComments issueId={issueId} />
                            <ClaimPanel issueId={issueId} initialClaims={issue.claims || []} />
+            <IssueMaintainerOverride issue={issue} />
         </main>
     );
 }
