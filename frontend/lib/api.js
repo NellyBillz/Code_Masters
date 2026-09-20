@@ -121,8 +121,7 @@ async function apiFetch(path, init) {
     ...init,
   });
 
-       const text = await res.text();
-     return text ? JSON.parse(text) : null; {
+  if (!res.ok) {
     /** @type {ApiErrorBody} */
     let body;
     try {
@@ -133,7 +132,9 @@ async function apiFetch(path, init) {
     throw new ApiError(res.status, body);
   }
 
-  return res.json();
+  // DELETE (and some POSTs) may legitimately return no body (204).
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 /**
