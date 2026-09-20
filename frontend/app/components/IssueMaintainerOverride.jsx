@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCurrentUser } from "../../lib/api";
+import { getCurrentUser, getProject } from "../../lib/api";
 import DifficultyOverride from "./DifficultyOverride";
 
 export default function IssueMaintainerOverride({ issue }) {
   const [currentUser, setCurrentUser] = useState(null);
+  const [project, setProject] = useState(null);
 
   useEffect(() => {
     getCurrentUser()
@@ -13,9 +14,20 @@ export default function IssueMaintainerOverride({ issue }) {
       .catch(() => setCurrentUser(null));
   }, []);
 
-  const isMaintainer = issue?.project?.maintainers?.some(
+  useEffect(() => {
+    if (!issue?.project?.id) {
+      return;
+    }
+
+    getProject(issue.project.id)
+      .then(setProject)
+      .catch(() => setProject(null));
+  }, [issue?.project?.id]);
+
+  const isMaintainer = project?.maintainers?.some(
     (maintainer) =>
-      maintainer.user?.id === currentUser?.id
+      maintainer.user?.id === currentUser?.id ||
+      maintainer.user?.username === currentUser?.username
   );
 
   return (
