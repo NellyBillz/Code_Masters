@@ -20,7 +20,13 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(
     classes = BackendApplication.class,
-    webEnvironment = SpringBootTest.WebEnvironment.NONE
+    webEnvironment = SpringBootTest.WebEnvironment.MOCK,
+    properties = {
+        "spring.autoconfigure.exclude=" +
+            "org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration," +
+            "org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientAutoConfiguration," +
+            "org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration"
+    }
 )
 @Transactional
 public class AdminAndProjectLifecycleTest {

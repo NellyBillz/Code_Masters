@@ -86,13 +86,6 @@ public class Project {
     @Column(name = "connection", nullable = false)
     private String connection;
 
-    /**
-     * GitHub-derived; not known until the first sync (GH-02.3), so must stay
-     * nullable to match the actual DB column ({@code license TEXT}, no NOT NULL,
-     * V2__projects.sql) — {@code nullable = false} here would make Hibernate
-     * reject any insert with no license at flush time, independent of what the
-     * database itself allows (API-02.7: project submission doesn't collect one).
-     */
     @Column(name = "license")
     private String license;
 
@@ -119,7 +112,29 @@ public class Project {
     @Column(name = "last_activity_at", insertable = false, updatable = false)
     private OffsetDateTime lastActivityAt;
 
-    @Column(name = "verified")
+    @Column(name = "github_metadata_etag")
+    private String githubMetadataEtag;
+
+    @Column(name = "github_issues_etag")
+    private String githubIssuesEtag;
+
+    @Column(name = "has_contributing_guide", nullable = false)
+    @Builder.Default
+    private boolean hasContributingGuide = false;
+
+    @Column(name = "has_code_of_conduct", nullable = false)
+    @Builder.Default
+    private boolean hasCodeOfDonduct = false;
+
+    @Column(name = "listing_status", nullable = false)
+    @Builder.Default
+    private String listingStatus = "pending";
+
+    @Column(name = "accepting_contributions", nullable = false)
+    @Builder.Default
+    private boolean acceptingContributions = true;
+
+    @Column(name = "verified", nullable = false)
     @Builder.Default
     private Boolean verified = false;
 
