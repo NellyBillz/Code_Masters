@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getIssue } from "../../../lib/api";
 import IssueComments from "../../components/IssueComments";
+  import ClaimPanel from "../../components/ClaimPanel";
 
 export default async function IssueDetailPage({ params }) {
     const { issueId } = await params;
@@ -33,9 +34,6 @@ export default async function IssueDetailPage({ params }) {
                     {issue.isBeginnerFriendly ? "Yes" : "No"}
                 </p>
 
-                <p>
-                    Claims: {issue.claimCount}
-                </p>
 
                 <p>
                     <a
@@ -59,20 +57,7 @@ export default async function IssueDetailPage({ params }) {
             </section>
 
             <IssueComments issueId={issueId} />
-
-            <section style={{ marginTop: "2rem" }}>
-                <h2>Claims</h2>
-
-                {issue.claims?.length ? (
-                    issue.claims.map((claim) => (
-                        <article key={claim.id}>
-                            <p>{JSON.stringify(claim)}</p>
-                        </article>
-                    ))
-                ) : (
-                    <p>No active claims.</p>
-                )}
-            </section>
+                           <ClaimPanel issueId={issueId} initialClaims={issue.claims || []} />
         </main>
     );
 }

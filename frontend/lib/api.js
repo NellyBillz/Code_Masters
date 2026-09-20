@@ -121,7 +121,8 @@ async function apiFetch(path, init) {
     ...init,
   });
 
-  if (!res.ok) {
+       const text = await res.text();
+     return text ? JSON.parse(text) : null; {
     /** @type {ApiErrorBody} */
     let body;
     try {
@@ -220,6 +221,37 @@ function postComment(issueId, body) {
   });
 }
 
+
+  function getIssueClaims(issueId) {
+    return apiFetch(`/issues/${issueId}/claims`);
+  }
+
+  function getCurrentUser() {
+    return apiFetch('/users/me');
+  }
+
+  function postClaim(issueId, note) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/issues/${issueId}/claim`, {
+      method: 'POST',
+      headers: {
+        ...(note ? { 'Content-Type': 'application/json' } : {}),
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      },
+      body: note ? JSON.stringify({ note }) : undefined,
+    });
+  }
+
+  function deleteClaim(issueId) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/issues/${issueId}/claim`, {
+      method: 'DELETE',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+  }
+
 module.exports = {
   listProjects,
   getProject,
@@ -227,4 +259,12 @@ module.exports = {
   getIssueComments,
   postComment,
   ApiError,
+    getIssueClaims,
+  getCurrentUser,
+  postClaim,
+  deleteClaim,
+  getIssueClaims, 
+  getCurrentUser,
+   postClaim,
+    deleteClaim,
 };
