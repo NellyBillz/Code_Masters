@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getIssue } from "../../../lib/api";
+import IssueComments from "../../components/IssueComments";
 
 export default async function IssueDetailPage({ params }) {
     const { issueId } = await params;
@@ -57,19 +58,7 @@ export default async function IssueDetailPage({ params }) {
                 <p>{issue.project.description}</p>
             </section>
 
-            <section style={{ marginTop: "2rem" }}>
-                <h2>Comments</h2>
-
-                {issue.comments?.length ? (
-                    issue.comments.map((comment) => (
-                        <article key={comment.id}>
-                            <p>{comment.body}</p>
-                        </article>
-                    ))
-                ) : (
-                    <p>No comments yet.</p>
-                )}
-            </section>
+            <IssueComments issueId={issueId} />
 
             <section style={{ marginTop: "2rem" }}>
                 <h2>Claims</h2>

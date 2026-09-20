@@ -166,4 +166,65 @@ function getProject(projectId) {
   return apiFetch(`/projects/${projectId}`);
 }
 
-module.exports = { listProjects, getProject, ApiError };
+/**
+ * Get a single issue's details, including its parent project,
+ * comments, and claims.
+ *
+ * @param {number|string} issueId
+ * @returns {Promise<Object>}
+ */
+function getIssue(issueId) {
+  return apiFetch(`/issues/${issueId}`);
+}
+
+/**
+ * Get paginated comments for an issue.
+ *
+ * @param {number|string} issueId
+ * @param {Object} [params]
+ * @param {number} [params.page]
+ * @param {number} [params.size]
+ * @returns {Promise<Object>}
+ */
+function getIssueComments(issueId, params) {
+  return apiFetch(`/issues/${issueId}/comments${buildQuery(params)}`);
+}
+
+/**
+ * Create a comment on an issue.
+ *
+ * @param {number|string} issueId
+ * @param {string} body
+ * @returns {Promise<Object>}
+ */
+function getCsrfToken() {
+  if (typeof document === 'undefined') return null;
+
+  const cookie = document.cookie
+    .split('; ')
+    .find((row) => row.startsWith('CODEMASTERS_CSRF='));
+
+  return cookie ? decodeURIComponent(cookie.split('=')[1]) : null;
+}
+
+function postComment(issueId, body) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/issues/${issueId}/comments`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ body }),
+  });
+}
+
+module.exports = {
+  listProjects,
+  getProject,
+  getIssue,
+  getIssueComments,
+  postComment,
+  ApiError,
+};
