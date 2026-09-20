@@ -150,6 +150,7 @@
 					<url>jdbc:postgresql://localhost:5432/codemaster_db</url>
 					<user>postgres</user>
 					<password>${flyway.password}</password>
+					<cleanDisabled>false</cleanDisabled>
 					<locations>
                     	<location>filesystem:src/main/resources/db/migration</location>
                 </locations>
