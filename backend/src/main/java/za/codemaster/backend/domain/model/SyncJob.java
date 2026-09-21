@@ -22,9 +22,10 @@ public class SyncJob {
     @Column(name="created_at", insertable=false, updatable=false) private OffsetDateTime createdAt;
 
     public SyncJob() {}
-    public SyncJob(Long projectId) { this.projectId=projectId; this.status="accepted"; this.issuesCreatedCount=0; this.issuesUpdatedCount=0; }
+    public SyncJob(Long projectId) { this.projectId=projectId; this.status="accepted"; this.issuesCreatedCount=0; this.issuesUpdatedCount=0; this.contributionsVerifiedCount=0; }
     public void running(){ status="running"; startedAt=OffsetDateTime.now(); }
-    public void completed(int created,int updated){ status="completed"; completedAt=OffsetDateTime.now(); issuesCreatedCount=created; issuesUpdatedCount=updated; errorMessage=null; retryAfter=null; }
+    public void completed(int created,int updated){ completed(created,updated,0); }
+    public void completed(int created,int updated,int verified){ status="completed"; completedAt=OffsetDateTime.now(); issuesCreatedCount=created; issuesUpdatedCount=updated; contributionsVerifiedCount=verified; errorMessage=null; retryAfter=null; }
     public void failed(String message, OffsetDateTime retry){ status="failed"; completedAt=OffsetDateTime.now(); errorMessage=message; retryAfter=retry; }
     public UUID getId(){return id;} public Long getProjectId(){return projectId;} public String getStatus(){return status;}
     public OffsetDateTime getStartedAt(){return startedAt;} public OffsetDateTime getCompletedAt(){return completedAt;}
@@ -37,6 +38,4 @@ public class SyncJob {
     }
     public void setStatus(String status){this.status = status;}
     public void setContributionsVerifiedCount(Integer contibutions){this.contributionsVerifiedCount = contibutions;}
-
-
 }

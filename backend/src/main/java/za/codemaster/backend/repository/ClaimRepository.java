@@ -34,6 +34,9 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
      */
     List<Claim> findByIssueIdAndStatus(Long issueId, ClaimStatus status);
 
+    /** Claims that are still eligible for automatic GitHub verification. */
+    List<Claim> findByIssueIdAndStatusIn(Long issueId, Collection<ClaimStatus> statuses);
+
     /**
      * Finds all claims on an issue in a given status, oldest first.
      */
