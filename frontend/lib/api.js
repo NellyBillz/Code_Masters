@@ -18,7 +18,7 @@
  */
 
 /**
- * @typedef {'south_african'|'africa_focused'|'africa_led'|'community_verified'} ProjectConnection
+ * @typedef {'south_african'|'community_verified'} ProjectConnection
  */
 
 /**

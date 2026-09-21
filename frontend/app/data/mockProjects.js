@@ -5,8 +5,8 @@
  * fields is covered at least once:
  *   verified:                    true | false
  *   hasBeginnerFriendlyIssues:   true | false
- * `connection` (south_african | africa_focused | africa_led |
- * community_verified) is varied across entries so every label renders.
+ * `connection` (south_african | community_verified) is varied across
+ * entries so every label renders.
  *
  * Shape matches the Project contract exactly — no extra fields, so this
  * can be swapped for API-01's real response later with no reshaping.
@@ -24,7 +24,7 @@ export const mockProjects = [
     stars: 34200,
     contributors: 187,
     lastActivityAt: "2026-09-14T10:00:00Z",
-    connection: "africa_focused",
+    connection: "south_african",
     verified: true,
     hasBeginnerFriendlyIssues: true,
   },
@@ -54,7 +54,7 @@ export const mockProjects = [
     stars: 640,
     contributors: 52,
     lastActivityAt: "2026-06-02T14:00:00Z",
-    connection: "africa_led",
+    connection: "community_verified",
     verified: false,
     hasBeginnerFriendlyIssues: true,
   },

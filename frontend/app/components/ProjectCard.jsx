@@ -17,16 +17,8 @@ const CONNECTION_META = {
     label: "South African",
     className: styles.connSouthAfrican,
   },
-  africa_focused: {
-    label: "Africa-focused",
-    className: styles.connAfricaFocused,
-  },
-  africa_led: {
-    label: "Africa-led",
-    className: styles.connAfricaLed,
-  },
   community_verified: {
-    label: "Community",
+    label: "Community Verified",
     className: styles.connCommunityVerified,
   },
 };

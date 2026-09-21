@@ -11,7 +11,6 @@ export default function Projects() {
         q: "",
         language: "",
         category: "",
-        country: "",
         hasBeginnerIssues: false,
         sort: "relevance"
     });
@@ -52,7 +51,6 @@ export default function Projects() {
                     q: filters.q,
                     language: filters.language,
                     category: filters.category,
-                    country: filters.country,
                     hasBeginnerIssues: filters.hasBeginnerIssues
                         ? true
                         : undefined,
@@ -88,7 +86,6 @@ export default function Projects() {
         filters.q,
         filters.language,
         filters.category,
-        filters.country,
         filters.hasBeginnerIssues,
         filters.sort,
         meta.page
@@ -110,7 +107,7 @@ export default function Projects() {
                 </h1>
 
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                    Discover African open-source projects and find
+                    Discover South African open-source projects and find
                     opportunities to contribute.
                 </p>
             </header>
@@ -139,7 +136,7 @@ export default function Projects() {
                     />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
                         <label
                             htmlFor="language"
@@ -197,38 +194,6 @@ export default function Projects() {
                             <option value="AI">AI</option>
                             <option value="Backend">Backend</option>
                             <option value="Game">Game</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label
-                            htmlFor="country"
-                            className="mb-2 block text-sm font-medium text-slate-700"
-                        >
-                            Country
-                        </label>
-
-                        <select
-                            id="country"
-                            value={filters.country}
-                            onChange={(e) =>
-                                updateFilter(
-                                    "country",
-                                    e.target.value
-                                )
-                            }
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        >
-                            <option value="">All countries</option>
-                            <option value="ZA">South Africa</option>
-                            <option value="CH">Switzerland</option>
-                            <option value="US">
-                                United States
-                            </option>
-                            <option value="GB">
-                                United Kingdom
-                            </option>
-                            <option value="DE">Germany</option>
                         </select>
                     </div>
 
