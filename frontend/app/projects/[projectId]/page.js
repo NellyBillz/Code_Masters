@@ -119,6 +119,35 @@ export default function ProjectDetail() {
         </Link>
       </div>
 
+      {project.listingStatus === "pending" && (
+        <div
+          role="status"
+          className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800"
+        >
+          <p className="font-semibold">Pending review</p>
+          <p className="mt-1">
+            This project isn&apos;t public yet. A site admin needs to
+            approve it before it appears in search and the projects list —
+            only you and its other maintainers can see this page in the
+            meantime.
+          </p>
+        </div>
+      )}
+
+      {project.listingStatus === "rejected" && (
+        <div
+          role="status"
+          className="mb-8 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-800"
+        >
+          <p className="font-semibold">Submission rejected</p>
+          <p className="mt-1">
+            A site admin reviewed this submission and it wasn&apos;t
+            approved. It stays hidden from public discovery — only you and
+            its other maintainers can see this page.
+          </p>
+        </div>
+      )}
+
       <header className="mb-8 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
         <div className="mb-4 flex flex-wrap gap-2">
           {project.primaryLanguage && (

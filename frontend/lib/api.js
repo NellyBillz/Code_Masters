@@ -22,6 +22,10 @@
  */
 
 /**
+ * @typedef {'pending'|'published'|'rejected'} ProjectListingStatus
+ */
+
+/**
  * @typedef {Object} Project
  * @property {number} id
  * @property {string} name
@@ -42,6 +46,10 @@
  * @property {number} [contributors]
  * @property {boolean} [hasBeginnerFriendlyIssues]
  * @property {string} [lastActivityAt] ISO date-time
+ * @property {ProjectListingStatus} [listingStatus] `pending` until a site
+ *   admin approves it (FE-03.1/.2); only `published` projects are publicly
+ *   discoverable.
+ * @property {boolean} [acceptingContributions]
  * @property {boolean} [verified]
  * @property {string|null} [verifiedAt] ISO date-time or null
  * @property {string} createdAt ISO date-time
