@@ -1,283 +1,202 @@
-'use client';
+import Link from "next/link";
+import { ArrowRight } from "lucide-react";
+import Button from "./components/ui/Button";
+import ProjectCard from "./components/ProjectCard";
+import IssueRow from "./components/IssueRow";
+import EmptyState from "./components/ui/EmptyState";
+import Footer from "./components/Footer";
+import { listProjects, listProjectIssues, getStats } from "../lib/api";
 
-import React, { useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+/**
+ * The product's own stated core loop (product definition §4) — used as the
+ * homepage's only "features" section, in place of a generic icon-grid
+ * feature list that carries no information specific to this product.
+ */
+const CORE_LOOP = [
+  {
+    index: "01",
+    title: "Discover",
+    description: "Search the South African open-source ecosystem by language, category and tag.",
+  },
+  {
+    index: "02",
+    title: "Understand",
+    description: "See a project's activity, maintainers and contribution opportunities.",
+  },
+  {
+    index: "03",
+    title: "Discuss",
+    description: "Ask questions on the project or issue before you commit any time.",
+  },
+  {
+    index: "04",
+    title: "Contribute",
+    description: "Move to the real GitHub repository and open a pull request.",
+  },
+];
 
-export default function CodeMastersHome() {
-  const [activeFilter, setActiveFilter] = useState('all');
+const FEATURED_PROJECTS_SIZE = 6;
+const ISSUE_SOURCE_PROJECTS = 3;
+const CONTRIBUTION_OPPORTUNITIES_SIZE = 4;
 
-  const projects = [
-    {
-      id: 1,
-      title: 'Code Masters API',
-      subtitle: 'Platform Foundation',
-      description: 'RESTful API powering African open-source discovery. Built with Node.js and PostgreSQL.',
-      avatar: 'CM',
-      tags: ['Node.js', 'API', 'Open Source'],
-      stars: '2.3K',
-      updated: 'Updated today',
-      featured: true,
-    },
-    {
-      id: 2,
-      title: 'African Vision',
-      subtitle: 'Computer Vision Library',
-      description: 'Open-source ML toolkit for African-specific computer vision applications.',
-      avatar: 'AV',
-      tags: ['Python', 'ML', 'CV'],
-      stars: '1.8K',
-      updated: '2 days ago',
-    },
-    {
-      id: 3,
-      title: 'Data Toolkit',
-      subtitle: 'Analytics Framework',
-      description: 'Lightweight data processing and analytics framework for development teams.',
-      avatar: 'DT',
-      tags: ['Python', 'Data', 'Analytics'],
-      stars: '1.2K',
-      updated: '1 week ago',
-    },
-    {
-      id: 4,
-      title: 'Weave Design',
-      subtitle: 'UI Component Library',
-      description: 'Modern React components designed for African tech products and applications.',
-      avatar: 'WD',
-      tags: ['React', 'UI', 'Design System'],
-      stars: '956',
-      updated: '3 days ago',
-    },
-    {
-      id: 5,
-      title: 'LangServe Africa',
-      subtitle: 'Language Processing',
-      description: 'NLP tools optimized for African languages including Swahili, Amharic, and Yoruba.',
-      avatar: 'LS',
-      tags: ['NLP', 'Languages', 'ML'],
-      stars: '745',
-      updated: '1 week ago',
-    },
-  ];
+async function getHomepageData() {
+  const statsPromise = getStats().catch(() => null);
 
-  const moreProjects = [
-    {
-      id: 6,
-      title: 'MobileBase',
-      subtitle: 'Mobile Backend',
-      description: 'Backend-as-a-service platform for mobile apps across Africa.',
-      avatar: 'MB',
-      tags: ['Backend', 'Mobile'],
-      stars: '523',
-      updated: '2 weeks ago',
-    },
-    {
-      id: 7,
-      title: 'FinConnect',
-      subtitle: 'Fintech Library',
-      description: 'Open-source fintech integration library for African payment systems.',
-      avatar: 'FC',
-      tags: ['Fintech', 'Payments'],
-      stars: '412',
-      updated: '3 weeks ago',
-    },
-    {
-      id: 8,
-      title: 'EduHub',
-      subtitle: 'Education Platform',
-      description: 'Open learning management system designed for African schools and universities.',
-      avatar: 'EH',
-      tags: ['Education', 'LMS'],
-      stars: '387',
-      updated: '1 month ago',
-    },
-  ];
+  let projects = [];
+  let error = null;
+  try {
+    const featured = await listProjects({ sort: "stars", size: FEATURED_PROJECTS_SIZE });
+    projects = featured.items || [];
+  } catch (err) {
+    error = err.message || "Failed to load projects.";
+  }
 
-  const filters = ['All', 'Web', 'Mobile', 'Data', 'Tools'];
+  const issueSourceProjects = projects.slice(0, ISSUE_SOURCE_PROJECTS);
+  const issueLists = await Promise.all(
+    issueSourceProjects.map((project) =>
+      listProjectIssues(project.id, { difficulty: "beginner", status: "open", size: 2 })
+        .then((result) => (result.items || []).map((issue) => ({ issue, project })))
+        .catch(() => [])
+    )
+  );
+  const opportunities = issueLists.flat().slice(0, CONTRIBUTION_OPPORTUNITIES_SIZE);
+
+  const stats = await statsPromise;
+
+  return { projects, opportunities, stats, error };
+}
+
+export default async function Home() {
+  const { projects, opportunities, stats, error } = await getHomepageData();
 
   return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Navigation Pill */}
-      <nav className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 bg-gray-900 text-white rounded-full px-6 py-3 flex items-center gap-6 shadow-lg max-w-fit">
-        <div className="font-bold text-lg tracking-tight">Code Masters</div>
-        <div className="bg-green-500 text-white px-4 py-2 rounded-full text-sm font-semibold flex items-center gap-2">
-          <div className="w-4 h-4 bg-white/30 rounded-full"></div>
-          Discover & Explore
-        </div>
-        <a href="/projects" className="bg-white text-gray-900 px-4 py-2 rounded-full text-sm font-semibold hover:bg-green-500 hover:text-white transition-all">
-          Browse Projects
-        </a>
-      </nav>
+    <main>
+      {/* Hero */}
+      <section className="mx-auto max-w-[1280px] px-4 pb-12 pt-16 sm:px-6 sm:pt-20 lg:px-8">
+        <p className="mb-3 text-sm font-medium text-accent">South African Open Source</p>
+        <h1 className="max-w-2xl font-display text-[3rem] font-extrabold leading-[1.05] tracking-tight text-foreground sm:text-[3.75rem]">
+          Find the projects worth contributing to.
+        </h1>
+        <p className="mt-5 max-w-xl text-base leading-relaxed text-foreground-secondary">
+          Discover South African open-source projects, understand where help is
+          needed, and connect with the people building them.
+        </p>
 
-      {/* Sidebar Toggle */}
-      <div className="fixed left-6 top-1/2 transform -translate-y-1/2 w-10 h-10 bg-white border border-gray-300 rounded-full flex items-center justify-center cursor-pointer z-40 hover:shadow-md transition-all">
-        ←
-      </div>
-
-      {/* Main Container */}
-      <div className="max-w-6xl mx-auto p-6 pt-32">
-        {/* Hero Section */}
-        <section className="bg-white rounded-lg p-12 mb-12 border border-gray-200">
-          <h1 className="text-5xl font-bold leading-tight mb-4">
-            The front door to African <span className="text-green-500">open-source</span> discovery
-          </h1>
-          <p className="text-lg text-gray-600 mb-6 leading-relaxed max-w-2xl">
-            Explore projects, connect with developers, and discover the innovation happening across Africa&apos;s open-source communities.
-          </p>
-          <a
-            href="/projects"
-            className="inline-flex items-center gap-2 bg-green-500 text-white font-semibold px-6 py-3 rounded hover:bg-green-600 transition-all"
+        <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+          <Button href="/projects" variant="primary">
+            Explore projects
+          </Button>
+          <Link
+            href="/projects?hasBeginnerIssues=true"
+            className="inline-flex items-center gap-1.5 text-sm font-medium text-foreground-secondary transition-colors hover:text-primary"
           >
-            Explore Projects
-            <ChevronRight size={18} />
-          </a>
-        </section>
-
-        {/* Page Header with Stats */}
-        <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-          <h2 className="text-3xl font-bold">Projects</h2>
-          <div className="flex gap-8">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-green-500">500+</div>
-              <div className="text-xs text-gray-600 font-semibold uppercase tracking-wider">Projects</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-gray-900">15K+</div>
-              <div className="text-xs text-gray-600 font-semibold uppercase tracking-wider">Developers</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-yellow-500">50+</div>
-              <div className="text-xs text-gray-600 font-semibold uppercase tracking-wider">Countries</div>
-            </div>
-          </div>
+            Browse beginner-friendly issues
+            <ArrowRight size={15} strokeWidth={1.75} aria-hidden="true" />
+          </Link>
         </div>
 
-        {/* Featured Projects Section */}
-        <section className="mb-12">
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-            <div>
-              <h3 className="text-lg font-bold">
-                Featured Projects <span className="text-gray-600 font-normal text-sm">5 projects</span>
-              </h3>
+        {stats && (
+          <dl className="mt-10 flex flex-wrap gap-x-8 gap-y-3 border-t border-border pt-6 text-sm tabular-nums">
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-foreground-muted">Published projects</dt>
+              <dd className="font-semibold text-foreground">{stats.publishedProjects}</dd>
             </div>
-            <div className="flex gap-2 flex-wrap">
-              {filters.map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setActiveFilter(filter.toLowerCase())}
-                  className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-                    activeFilter === filter.toLowerCase()
-                      ? 'bg-green-500 text-white'
-                      : 'bg-white text-gray-700 border border-gray-300 hover:bg-green-500 hover:text-white'
-                  }`}
-                >
-                  {filter}
-                </button>
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-foreground-muted">Contributors engaged</dt>
+              <dd className="font-semibold text-foreground">{stats.totalContributorsEngaged}</dd>
+            </div>
+            <div className="flex items-baseline gap-1.5">
+              <dt className="text-foreground-muted">Contributions verified</dt>
+              <dd className="font-semibold text-foreground">{stats.totalContributionsCompleted}</dd>
+            </div>
+          </dl>
+        )}
+      </section>
+
+      {/* Core loop */}
+      <section className="border-y border-border bg-surface-subtle/40">
+        <div className="mx-auto grid max-w-[1280px] grid-cols-1 gap-8 px-4 py-10 sm:grid-cols-2 sm:px-6 lg:grid-cols-4 lg:gap-0 lg:px-8 lg:py-12">
+          {CORE_LOOP.map((step, i) => (
+            <div
+              key={step.index}
+              className={`pr-6 ${i > 0 ? "lg:border-l lg:border-border lg:pl-6" : ""}`}
+            >
+              <span className="font-mono text-xs text-foreground-disabled">{step.index}</span>
+              <h3 className="mt-1.5 text-[15px] font-semibold text-foreground">{step.title}</h3>
+              <p className="mt-1 text-sm leading-relaxed text-foreground-muted">
+                {step.description}
+              </p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Featured projects */}
+      <section className="mx-auto max-w-[1280px] px-4 py-14 sm:px-6 lg:px-8">
+        <div className="mb-6 flex items-end justify-between gap-4">
+          <div>
+            <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
+              Featured projects
+            </h2>
+            <p className="mt-1 text-sm text-foreground-muted">
+              Active South African open-source projects on Code Masters.
+            </p>
+          </div>
+          <Button href="/projects" variant="ghost" size="sm" className="hidden sm:inline-flex">
+            View all →
+          </Button>
+        </div>
+
+        {error && (
+          <EmptyState
+            title="We couldn't load projects"
+            description="The platform may be temporarily unavailable. Please try again shortly."
+          />
+        )}
+
+        {!error && projects.length === 0 && (
+          <EmptyState
+            title="No published projects yet"
+            description="Check back soon — approved South African projects will appear here."
+          />
+        )}
+
+        {!error && projects.length > 0 && (
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        )}
+
+        <Button href="/projects" variant="secondary" size="sm" className="mt-6 w-full sm:hidden">
+          View all projects
+        </Button>
+      </section>
+
+      {/* Contribution opportunities */}
+      {opportunities.length > 0 && (
+        <section className="border-t border-border">
+          <div className="mx-auto max-w-[1280px] px-4 py-14 sm:px-6 lg:px-8">
+            <div className="mb-2">
+              <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">
+                Contribution opportunities
+              </h2>
+              <p className="mt-1 text-sm text-foreground-muted">
+                Real, beginner-friendly issues open right now.
+              </p>
+            </div>
+
+            <div className="mx-auto max-w-[760px]">
+              {opportunities.map(({ issue, project }) => (
+                <IssueRow key={issue.id} issue={issue} projectName={project.name} />
               ))}
             </div>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {projects.map((project) => (
-              <div
-                key={project.id}
-                className={`rounded-lg p-6 border transition-all cursor-pointer ${
-                  project.featured
-                    ? 'bg-gradient-to-br from-green-500 to-green-600 text-white border-none'
-                    : 'bg-white border-gray-200 hover:shadow-lg hover:border-green-500'
-                }`}
-              >
-                <div className="flex items-start gap-4 mb-4">
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center font-bold text-lg ${
-                    project.featured ? 'bg-white/30' : 'bg-gradient-to-br from-green-500 to-green-600 text-white'
-                  }`}>
-                    {project.avatar}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-lg">{project.title}</h4>
-                    <p className={`text-sm ${project.featured ? 'text-white/90' : 'text-gray-600'}`}>
-                      {project.subtitle}
-                    </p>
-                  </div>
-                </div>
-
-                <p className={`text-sm leading-relaxed mb-4 ${project.featured ? 'text-white/90' : 'text-gray-600'}`}>
-                  {project.description}
-                </p>
-
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {project.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className={`text-xs px-3 py-1 rounded-full font-medium ${
-                        project.featured ? 'bg-white/20 text-white' : 'bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-
-                <div className={`flex justify-between text-sm pt-4 border-t ${
-                  project.featured ? 'border-white/20 text-white/80' : 'border-gray-200 text-gray-600'
-                }`}>
-                  <span>⭐ {project.stars} stars</span>
-                  <span>{project.updated}</span>
-                </div>
-              </div>
-            ))}
-          </div>
         </section>
+      )}
 
-        {/* More Projects Section */}
-        <section>
-          <div className="flex items-center justify-between mb-6 flex-wrap gap-4">
-            <h3 className="text-lg font-bold">
-              Explore More <span className="text-gray-600 font-normal text-sm">495+ projects</span>
-            </h3>
-            <a
-              href="/projects"
-              className="px-4 py-2 bg-white text-gray-700 border border-gray-300 rounded-full text-sm font-medium hover:bg-green-500 hover:text-white transition-all"
-            >
-              View All →
-            </a>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {moreProjects.map((project) => (
-              <div
-                key={project.id}
-                className="bg-white rounded-lg p-6 border border-gray-200 transition-all hover:shadow-lg hover:border-green-500 cursor-pointer"
-              >
-                <div className="flex items-start gap-4 mb-4">
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-green-500 to-green-600 text-white flex items-center justify-center font-bold text-lg">
-                    {project.avatar}
-                  </div>
-                  <div className="flex-1">
-                    <h4 className="font-bold text-lg text-gray-900">{project.title}</h4>
-                    <p className="text-sm text-gray-600">{project.subtitle}</p>
-                  </div>
-                </div>
-
-                <p className="text-sm text-gray-600 leading-relaxed mb-4">{project.description}</p>
-
-                <div className="flex flex-wrap gap-2 mb-4">
-                  {project.tags.map((tag) => (
-                    <span key={tag} className="text-xs px-3 py-1 bg-gray-100 text-gray-700 rounded-full font-medium">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="flex justify-between text-sm pt-4 border-t border-gray-200 text-gray-600">
-                  <span>⭐ {project.stars} stars</span>
-                  <span>{project.updated}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </div>
-    </div>
+      <Footer />
+    </main>
   );
 }

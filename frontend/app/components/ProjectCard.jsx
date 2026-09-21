@@ -1,247 +1,114 @@
 import Link from "next/link";
-import styles from "./ProjectCard.module.css";
+import { Star, Users, CircleDot, Sparkles } from "lucide-react";
+import ConnectionBadge from "./ui/ConnectionBadge";
+import Badge from "./ui/Badge";
+import { LANGUAGE_COLORS, formatRelativeTime, formatCount } from "../../lib/format";
 
-const LANGUAGE_COLORS = {
-  JavaScript: "#eab308",
-  TypeScript: "#3b82f6",
-  Python: "#22c55e",
-  Go: "#06b6d4",
-  Rust: "#f97316",
-  Java: "#f43f5e",
-  "C++": "#a855f7",
-  Ruby: "#dc2626",
-};
-
-const CONNECTION_META = {
-  south_african: {
-    label: "South African",
-    className: styles.connSouthAfrican,
-  },
-  community_verified: {
-    label: "Community Verified",
-    className: styles.connCommunityVerified,
-  },
-};
-
-function formatRelativeTime(isoString) {
-  if (!isoString) return "unknown";
-
-  const date = new Date(isoString);
-
-  if (Number.isNaN(date.getTime())) return "unknown";
-
-  const diffMs = Date.now() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-
-  if (diffDays <= 0) return "today";
-  if (diffDays === 1) return "1 day ago";
-  if (diffDays < 30) return `${diffDays} days ago`;
-
-  const diffMonths = Math.floor(diffDays / 30);
-
-  if (diffMonths < 12) {
-    return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
-  }
-
-  const diffYears = Math.floor(diffMonths / 12);
-
-  return `${diffYears} year${diffYears === 1 ? "" : "s"} ago`;
-}
-
-function formatCount(n) {
-  if (typeof n !== "number" || Number.isNaN(n)) return "0";
-
-  if (n >= 1000) {
-    return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}k`;
-  }
-
-  return String(n);
-}
-
-function ConnectionBadge({ connection }) {
-  const meta = CONNECTION_META[connection];
-
-  if (!meta) {
-    return (
-      <span className={`${styles.badge} ${styles.connUnclassified}`}>
-        Unclassified
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className={`${styles.badge} ${
-        meta.className || styles.connUnclassified
-      }`}
-      title={`connection: ${connection}`}
-    >
-      {meta.label}
-    </span>
-  );
-}
-
-function VerifiedBadge({ verified }) {
-  return (
-    <span
-      className={`${styles.badge} ${
-        verified ? styles.verifiedTrue : styles.verifiedFalse
-      }`}
-      title={
-        verified
-          ? "Issue claim confirmed"
-          : "Issue claim not confirmed"
-      }
-    >
-      <svg
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        {verified ? (
-          <path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.4 7.4a1 1 0 0 1-1.4 0L3.3 9.5a1 1 0 1 1 1.4-1.4l3.9 3.9 6.7-6.7a1 1 0 0 1 1.4 0z" />
-        ) : (
-          <circle cx="10" cy="10" r="4" />
-        )}
-      </svg>
-
-      {verified ? "Verified" : "Unverified"}
-    </span>
-  );
-}
-
-function BeginnerBadge({ hasBeginnerFriendlyIssues }) {
-  return (
-    <span
-      className={`${styles.badge} ${
-        hasBeginnerFriendlyIssues
-          ? styles.beginnerTrue
-          : styles.beginnerFalse
-      }`}
-      title={
-        hasBeginnerFriendlyIssues
-          ? "Has open beginner-friendly issues"
-          : "No beginner-friendly issues right now"
-      }
-    >
-      <svg
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path d="M10 2l2.2 4.9 5.3.6-4 3.7 1.1 5.3L10 13.9l-4.6 2.6 1.1-5.3-4-3.7 5.3-.6L10 2z" />
-      </svg>
-
-      {hasBeginnerFriendlyIssues
-        ? "Beginner friendly"
-        : "No beginner issues"}
-    </span>
-  );
-}
-
+/**
+ * Project discovery card (design brief §37). Title first, description
+ * second, technology third, metrics last — one card definition reused
+ * everywhere a project is listed (homepage, /projects), per §34's "do not
+ * create separate visually inconsistent versions of the same component."
+ */
 export default function ProjectCard({ project }) {
   const {
     id,
     name = "Untitled project",
     description = "",
     primaryLanguage,
+    languages = [],
     category,
     tags = [],
     stars = 0,
     contributors = 0,
+    openIssues = 0,
     lastActivityAt,
     connection,
-    verified = false,
     hasBeginnerFriendlyIssues = false,
+    acceptingContributions = true,
   } = project || {};
 
-  const languageColor =
-    LANGUAGE_COLORS[primaryLanguage] || "#94a3b8";
+  const languageColor = LANGUAGE_COLORS[primaryLanguage] || "#94a3b8";
+  const techBadges = [primaryLanguage, ...languages.filter((l) => l !== primaryLanguage)]
+    .filter(Boolean)
+    .slice(0, 3);
+  const activity = formatRelativeTime(lastActivityAt);
 
   return (
     <Link
       href={`/projects/${id}`}
-      className={styles.card}
+      className="group flex h-full flex-col gap-3 rounded-[10px] border border-border bg-surface p-5 transition-colors hover:border-border-strong hover:bg-surface-subtle/40"
     >
-      <div className={styles.header}>
-        <h3 className={styles.name}>{name}</h3>
-
-        <div className={styles.badgeColumn}>
-          <ConnectionBadge connection={connection} />
-          <VerifiedBadge verified={verified} />
-        </div>
-      </div>
-
-      <div className={styles.meta}>
-        {category && <span>{category}</span>}
-
-        {primaryLanguage && (
-          <span className={styles.languageLabel}>
-            <span
-              className={styles.languageDot}
-              style={{ backgroundColor: languageColor }}
-              aria-hidden="true"
-            />
-            {primaryLanguage}
-          </span>
-        )}
+      <div className="flex items-start justify-between gap-3">
+        <h3 className="text-[17px] font-semibold leading-tight text-foreground group-hover:text-primary">
+          {name}
+        </h3>
+        <ConnectionBadge connection={connection} />
       </div>
 
       {description && (
-        <p className={styles.description}>{description}</p>
+        <p className="line-clamp-2 text-sm leading-relaxed text-foreground-secondary">
+          {description}
+        </p>
       )}
 
-      {tags.length > 0 && (
-        <div className={styles.tags}>
-          {tags.map((tag) => (
-            <span key={tag} className={styles.tag}>
-              {tag}
+      {(techBadges.length > 0 || category) && (
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[13px] text-foreground-muted">
+          {category && <span>{category}</span>}
+          {techBadges.map((lang) => (
+            <span key={lang} className="inline-flex items-center gap-1.5">
+              <span
+                className="h-2 w-2 rounded-full"
+                style={{ backgroundColor: LANGUAGE_COLORS[lang] || languageColor }}
+                aria-hidden="true"
+              />
+              {lang}
             </span>
           ))}
         </div>
       )}
 
-      <div className={styles.footerSection}>
-        <div className={styles.beginnerRow}>
-          <BeginnerBadge
-            hasBeginnerFriendlyIssues={
-              hasBeginnerFriendlyIssues
-            }
-          />
+      {tags.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {tags.slice(0, 4).map((tag) => (
+            <Badge key={tag} tone="neutral">
+              {tag}
+            </Badge>
+          ))}
         </div>
+      )}
 
-        <div className={styles.footer}>
-          <div className={styles.stats}>
-            <span className={styles.stat} title="Stars">
-              <svg
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M10 2l2.2 4.9 5.3.6-4 3.7 1.1 5.3L10 13.9l-4.6 2.6 1.1-5.3-4-3.7 5.3-.6L10 2z" />
-              </svg>
+      <div className="mt-auto flex flex-col gap-2 border-t border-border pt-3">
+        {hasBeginnerFriendlyIssues && (
+          <span className="inline-flex w-fit items-center gap-1 text-[13px] font-medium text-success">
+            <Sparkles size={13} strokeWidth={2} aria-hidden="true" />
+            Beginner-friendly issues open
+          </span>
+        )}
 
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[13px] text-foreground-muted">
+          <div className="flex items-center gap-3.5 tabular-nums">
+            <span className="inline-flex items-center gap-1" title="Stars">
+              <Star size={14} strokeWidth={1.75} aria-hidden="true" />
               {formatCount(stars)}
             </span>
-
-            <span
-              className={styles.stat}
-              title="Contributors"
-            >
-              <svg
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M10 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3.5 17a6.5 6.5 0 0 1 13 0 1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
-              </svg>
-
+            <span className="inline-flex items-center gap-1" title="Contributors">
+              <Users size={14} strokeWidth={1.75} aria-hidden="true" />
               {formatCount(contributors)}
             </span>
+            <span className="inline-flex items-center gap-1" title="Open issues">
+              <CircleDot size={14} strokeWidth={1.75} aria-hidden="true" />
+              {formatCount(openIssues)} open
+            </span>
           </div>
-
-          <span>{formatRelativeTime(lastActivityAt)}</span>
+          {activity && <span>{activity}</span>}
         </div>
+
+        {!acceptingContributions && (
+          <p className="text-[13px] text-foreground-muted">
+            Maintainer has paused new contributors for now.
+          </p>
+        )}
       </div>
     </Link>
   );

@@ -1,20 +1,17 @@
 "use client";
 
 import { useState } from "react";
+import { X } from "lucide-react";
 import { inviteMaintainer, removeMaintainer } from "../../lib/api";
+import Button from "./ui/Button";
+import Input from "./ui/Input";
+import Avatar from "./ui/Avatar";
 
 /**
- * MaintainersPanel: Invite and remove maintainers for a project.
- * 
- * Only visible to project owners/maintainers. Shows:
- * - List of current maintainers with remove buttons
- * - Form to invite new maintainers by username
- * 
- * @param {Object} props
- * @param {Object} project - The project object (with id and maintainers)
- * @param {boolean} isMaintainer - Whether current user is a maintainer
- * @param {Function} onMaintainerAdded - Callback when a maintainer is added
- * @param {Function} onMaintainerRemoved - Callback when a maintainer is removed
+ * Maintainer management — only ever rendered to authorized maintainers
+ * (design brief §14: "show them separately and only to authorized users"),
+ * so it carries its own bordered card rather than blending into the
+ * read-only maintainer list next to it.
  */
 export default function MaintainersPanel({
   project,
@@ -27,7 +24,6 @@ export default function MaintainersPanel({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // Only show this to maintainers
   if (!isMaintainer || !project) {
     return null;
   }
@@ -45,24 +41,18 @@ export default function MaintainersPanel({
     setLoading(true);
     try {
       const result = await inviteMaintainer(project.id, usernameInput);
-      setSuccess(`Added ${usernameInput} as maintainer!`);
+      setSuccess(`Added ${usernameInput} as maintainer.`);
       setUsernameInput("");
-      if (onMaintainerAdded) {
-        onMaintainerAdded(result);
-      }
+      if (onMaintainerAdded) onMaintainerAdded(result);
     } catch (err) {
-      setError(
-        err.message || "Failed to add maintainer. Check the username and try again."
-      );
+      setError(err.message || "Failed to add maintainer. Check the username and try again.");
     } finally {
       setLoading(false);
     }
   };
 
   const handleRemove = async (userId) => {
-    if (!confirm("Are you sure you want to remove this maintainer?")) {
-      return;
-    }
+    if (!confirm("Remove this maintainer?")) return;
 
     setError("");
     setSuccess("");
@@ -71,9 +61,7 @@ export default function MaintainersPanel({
     try {
       await removeMaintainer(project.id, userId);
       setSuccess("Maintainer removed.");
-      if (onMaintainerRemoved) {
-        onMaintainerRemoved(userId);
-      }
+      if (onMaintainerRemoved) onMaintainerRemoved(userId);
     } catch (err) {
       setError(err.message || "Failed to remove maintainer.");
     } finally {
@@ -82,113 +70,67 @@ export default function MaintainersPanel({
   };
 
   return (
-    <section style={{ marginTop: "2rem", padding: "1rem", border: "1px solid #ccc" }}>
-      <h2>Maintainers (Admin)</h2>
+    <div className="rounded-[10px] border border-border bg-surface p-5">
+      <h2 className="mb-4 text-[13px] font-semibold uppercase tracking-wide text-foreground-muted">
+        Manage maintainers
+      </h2>
 
-      {/* Current maintainers list */}
-      <div style={{ marginBottom: "1.5rem" }}>
-        <h3>Current maintainers</h3>
-        {project.maintainers?.length > 0 ? (
-          <ul>
-            {project.maintainers.map((maint) => {
-              const username = maint.user?.username || maint.user?.login || "Unknown";
-              const userId = maint.user?.id;
+      {project.maintainers?.length > 0 && (
+        <ul className="mb-4 flex flex-col gap-2.5">
+          {project.maintainers.map((maint) => {
+            const username = maint.user?.username || maint.user?.login || "Unknown";
+            const userId = maint.user?.id;
 
-              return (
-                <li
-                  key={userId}
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    padding: "0.5rem 0",
-                  }}
+            return (
+              <li key={userId} className="flex items-center justify-between gap-2">
+                <span className="flex min-w-0 items-center gap-2">
+                  <Avatar user={maint.user} size="sm" />
+                  <span className="truncate text-sm text-foreground-secondary">{username}</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleRemove(userId)}
+                  disabled={loading}
+                  aria-label={`Remove ${username} as maintainer`}
+                  className="flex-shrink-0 rounded-md p-1 text-foreground-disabled transition-colors hover:bg-surface-subtle hover:text-danger disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <span>{username}</span>
-                  <button
-                    onClick={() => handleRemove(userId)}
-                    disabled={loading}
-                    style={{ color: "#d9534f", cursor: "pointer" }}
-                  >
-                    Remove
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : (
-          <p>No maintainers yet.</p>
-        )}
-      </div>
+                  <X size={14} strokeWidth={1.75} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
 
-      {/* Invite form */}
-      <form onSubmit={handleInvite} style={{ marginBottom: "1rem" }}>
-        <h3>Invite a maintainer</h3>
-        <div style={{ marginBottom: "0.5rem" }}>
-          <label htmlFor="username-input">GitHub username:</label>
-          <br />
-          <input
+      <form onSubmit={handleInvite} className="flex flex-col gap-2 border-t border-border pt-4">
+        <label htmlFor="username-input" className="text-[13px] font-medium text-foreground-secondary">
+          Invite by GitHub username
+        </label>
+        <div className="flex gap-2">
+          <Input
             id="username-input"
             type="text"
             value={usernameInput}
             onChange={(e) => setUsernameInput(e.target.value)}
-            placeholder="e.g., octocat"
+            placeholder="octocat"
             disabled={loading}
-            style={{
-              padding: "0.5rem",
-              marginTop: "0.25rem",
-              width: "100%",
-              maxWidth: "300px",
-            }}
           />
+          <Button type="submit" variant="secondary" size="sm" disabled={loading} className="flex-shrink-0">
+            {loading ? "Adding…" : "Add"}
+          </Button>
         </div>
-
-        <button
-          type="submit"
-          disabled={loading}
-          style={{
-            padding: "0.5rem 1rem",
-            backgroundColor: "#5cb85c",
-            color: "white",
-            border: "none",
-            cursor: loading ? "not-allowed" : "pointer",
-            opacity: loading ? 0.6 : 1,
-          }}
-        >
-          {loading ? "Adding..." : "Add maintainer"}
-        </button>
       </form>
 
-      {/* Messages */}
       {error && (
-        <div
-          style={{
-            padding: "0.75rem",
-            backgroundColor: "#f2dede",
-            color: "#a94442",
-            marginBottom: "0.5rem",
-            borderRadius: "4px",
-          }}
-          role="alert"
-        >
+        <p role="alert" className="mt-3 text-[13px] text-danger">
           {error}
-        </div>
+        </p>
       )}
-
       {success && (
-        <div
-          style={{
-            padding: "0.75rem",
-            backgroundColor: "#dff0d8",
-            color: "#3c763d",
-            marginBottom: "0.5rem",
-            borderRadius: "4px",
-          }}
-          role="status"
-        >
+        <p role="status" className="mt-3 text-[13px] text-success">
           {success}
-        </div>
+        </p>
       )}
-    </section>
+    </div>
   );
 }

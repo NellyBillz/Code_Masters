@@ -169,6 +169,24 @@ function getProject(projectId) {
 }
 
 /**
+ * List and filter a project's contribution opportunities (issues).
+ * Backs the project issues tab and any "featured issues from this
+ * project" preview elsewhere (e.g. the homepage).
+ *
+ * @param {number|string} projectId
+ * @param {Object} [params]
+ * @param {number} [params.page] Zero-based page index. Default 0.
+ * @param {number} [params.size] Page size, 1-50. Default 20.
+ * @param {'beginner'|'intermediate'|'advanced'|'unknown'} [params.difficulty]
+ * @param {string} [params.label]
+ * @param {'open'|'claimed'|'closed'} [params.status]
+ * @returns {Promise<Object>} PagedIssues
+ */
+function listProjectIssues(projectId, params) {
+  return apiFetch(`/projects/${projectId}/issues${buildQuery(params)}`);
+}
+
+/**
  * Invite a maintainer to a project by username. Owner-only.
  *
  * @param {number|string} projectId
@@ -239,6 +257,16 @@ function getIssueComments(issueId, params) {
  * @param {string} body
  * @returns {Promise<Object>}
  */
+/**
+ * Public, non-personal platform impact metrics (published projects,
+ * contributors engaged, verified completed contributions, ...).
+ *
+ * @returns {Promise<Object>} PlatformStats
+ */
+function getStats() {
+  return apiFetch('/stats');
+}
+
 function getCsrfToken() {
   if (typeof document === 'undefined') return null;
 
@@ -337,6 +365,8 @@ function updateIssueClassification(issueId, update) {
 module.exports = {
   listProjects,
   getProject,
+  listProjectIssues,
+  getStats,
   getIssue,
   getIssueComments,
   postComment,

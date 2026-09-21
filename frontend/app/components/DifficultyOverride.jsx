@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import { updateIssueClassification } from "../../lib/api";
+import Button from "./ui/Button";
+import Select from "./ui/Select";
+import Checkbox from "./ui/Checkbox";
 
 export default function DifficultyOverride({
   issueId,
@@ -10,12 +13,8 @@ export default function DifficultyOverride({
   isMaintainer,
   onUpdate,
 }) {
-  const [difficulty, setDifficulty] = useState(
-    currentDifficulty?.toLowerCase() || ""
-  );
-  const [isBeginnerFriendly, setIsBeginnerFriendly] = useState(
-    currentIsBeginnerFriendly ?? false
-  );
+  const [difficulty, setDifficulty] = useState(currentDifficulty?.toLowerCase() || "");
+  const [isBeginnerFriendly, setIsBeginnerFriendly] = useState(currentIsBeginnerFriendly ?? false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -34,12 +33,8 @@ export default function DifficultyOverride({
         difficulty: difficulty || null,
         isBeginnerFriendly,
       });
-
-      setSuccess("Issue classification updated.");
-
-      if (onUpdate) {
-        onUpdate(result);
-      }
+      setSuccess("Classification updated.");
+      if (onUpdate) onUpdate(result);
     } catch (err) {
       setError(err.message || "Failed to update issue classification.");
     } finally {
@@ -48,58 +43,48 @@ export default function DifficultyOverride({
   };
 
   return (
-    <section style={{ marginTop: "2rem" }}>
-      <h2>Difficulty Override</h2>
+    <div className="rounded-[10px] border border-border bg-surface p-5">
+      <h2 className="mb-4 text-[13px] font-semibold uppercase tracking-wide text-foreground-muted">
+        Maintainer controls
+      </h2>
 
-      <label htmlFor="difficulty-select">Difficulty:</label>
-      <select
+      <label htmlFor="difficulty-select" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
+        Difficulty
+      </label>
+      <Select
         id="difficulty-select"
         value={difficulty}
         onChange={(e) => setDifficulty(e.target.value)}
         disabled={loading}
-        style={{ display: "block", marginTop: "0.5rem", padding: "0.5rem" }}
       >
-        <option value="">Unknown</option>
+        <option value="">Unclassified</option>
         <option value="beginner">Beginner</option>
         <option value="intermediate">Intermediate</option>
         <option value="advanced">Advanced</option>
-      </select>
+      </Select>
 
-      <label
-        htmlFor="beginner-friendly-checkbox"
-        style={{ display: "block", marginTop: "1rem" }}
-      >
-        <input
-          id="beginner-friendly-checkbox"
-          type="checkbox"
-          checked={isBeginnerFriendly}
-          onChange={(e) => setIsBeginnerFriendly(e.target.checked)}
-          disabled={loading}
-          style={{ marginRight: "0.5rem" }}
-        />
-        Mark as beginner-friendly
-      </label>
-
-      <button
-        type="button"
-        onClick={handleApply}
+      <Checkbox
+        label="Beginner-friendly"
+        checked={isBeginnerFriendly}
+        onChange={(e) => setIsBeginnerFriendly(e.target.checked)}
         disabled={loading}
-        style={{ marginTop: "1rem", padding: "0.5rem 1rem" }}
-      >
-        {loading ? "Updating..." : "Apply changes"}
-      </button>
+        className="mt-3.5"
+      />
+
+      <Button variant="secondary" size="sm" onClick={handleApply} disabled={loading} className="mt-4 w-full">
+        {loading ? "Updating…" : "Apply changes"}
+      </Button>
 
       {error && (
-        <p role="alert" style={{ marginTop: "1rem" }}>
+        <p role="alert" className="mt-3 text-[13px] text-danger">
           {error}
         </p>
       )}
-
       {success && (
-        <p role="status" style={{ marginTop: "1rem" }}>
+        <p role="status" className="mt-3 text-[13px] text-success">
           {success}
         </p>
       )}
-    </section>
+    </div>
   );
 }
