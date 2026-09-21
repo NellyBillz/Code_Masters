@@ -2,6 +2,7 @@ import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 import AuthStatus from "./components/AuthStatus";
 import AdminNavLink from "./components/AdminNavLink";
+import MaintainerActivityNavLink from "./components/MaintainerActivityNavLink";
 
 export const metadata = {
 title: "Code Masters — African Open Source Discovery",
@@ -25,6 +26,7 @@ return (
             }}
           >
             <AdminNavLink />
+            <MaintainerActivityNavLink />
             <AuthStatus />
           </header>
           {children}

@@ -315,6 +315,32 @@ function postComment(issueId, body) {
   }
 
   /**
+   * A developer's verified contribution history (FE-03.5): only `completed`
+   * claims, most recent first. Public — no auth required.
+   *
+   * @param {string} username
+   * @param {Object} [params]
+   * @param {number} [params.page]
+   * @param {number} [params.size]
+   * @returns {Promise<Object>} PagedContributions
+   */
+  function getContributions(username, params) {
+    return apiFetch(`/users/${username}/contributions${buildQuery(params)}`);
+  }
+
+  /**
+   * The maintainer-sanity activity rollup (FE-03.6): per project the caller
+   * maintains, its active claims, claims awaiting review, and recent
+   * comments, in one call. Session-authenticated; a user maintaining zero
+   * projects gets `{ projects: [] }`, not an error.
+   *
+   * @returns {Promise<Object>} MaintainerActivitySummary
+   */
+  function getMaintainerActivity() {
+    return apiFetch('/users/me/maintainer-activity');
+  }
+
+  /**
    * Log out the current session. Hits /auth/logout directly (not under
    * /api/v1, same as the /auth/github login link — see next.config.js's
    * rewrite for /auth/:path*), clearing the session and CSRF cookies.
@@ -435,6 +461,8 @@ module.exports = {
   ApiError,
   getIssueClaims,
   getCurrentUser,
+  getContributions,
+  getMaintainerActivity,
   postClaim,
   deleteClaim,
   attachPullRequest,

@@ -20,6 +20,62 @@ function isInFlight(claim) {
     return status === "active" || status === "changes_requested";
 }
 
+const STATUS_META = {
+    active: { label: "Active", background: "#e0f2fe", color: "#075985" },
+    changes_requested: {
+        label: "Changes requested",
+        background: "#fff3cd",
+        color: "#8a6100",
+    },
+    completed: { label: "Completed", background: "#dcfce7", color: "#166534" },
+    released: { label: "Released", background: "#f1f5f9", color: "#475569" },
+};
+
+function StatusBadge({ status }) {
+    const meta = STATUS_META[status] || STATUS_META.active;
+
+    return (
+        <span
+            style={{
+                marginLeft: "0.5rem",
+                fontSize: "0.75rem",
+                fontWeight: 600,
+                color: meta.color,
+                background: meta.background,
+                padding: "0.1rem 0.5rem",
+                borderRadius: "999px",
+            }}
+        >
+            {meta.label}
+        </span>
+    );
+}
+
+function CompletionNote({ claim }) {
+    const verifiedViaGitHub = claim.completionSource === "github_verified";
+    const confirmedByMaintainer = claim.completionSource === "maintainer_confirmed";
+
+    let label = "Completed";
+    if (verifiedViaGitHub) label = "Verified via GitHub";
+    else if (confirmedByMaintainer) label = "Confirmed by maintainer";
+
+    return (
+        <p
+            style={{
+                marginTop: "0.5rem",
+                fontSize: "0.85rem",
+                fontWeight: 600,
+                color: "#166534",
+            }}
+        >
+            ✓ {label}
+            {claim.completedAt
+                ? ` · ${new Date(claim.completedAt).toLocaleDateString()}`
+                : ""}
+        </p>
+    );
+}
+
 function PullRequestField({ issueId, claim, onUpdated }) {
     const [url, setUrl] = useState(claim.pullRequestUrl || "");
     const [busy, setBusy] = useState(false);
@@ -190,14 +246,14 @@ function ClaimReviewControls({ issueId, claim, onReviewed }) {
 
 export default function ClaimPanel({ issueId, projectId, initialClaims = [] }) {
     const { user: me, loading: authLoading } = useAuth();
-    const [claims, setClaims] = useState(initialClaims.filter(isInFlight));
+    const [claims, setClaims] = useState(initialClaims);
     const [project, setProject] = useState(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
     async function refresh() {
         const list = await getIssueClaims(issueId);
-        setClaims((Array.isArray(list) ? list : []).filter(isInFlight));
+        setClaims(Array.isArray(list) ? list : []);
     }
 
     useEffect(() => {
@@ -221,20 +277,39 @@ export default function ClaimPanel({ issueId, projectId, initialClaims = [] }) {
             )
     );
 
-    const myClaim = me ? claims.find((c) => c.user?.id === me.id) : null;
-    const myClaimIsActive = myClaim && normalizedStatus(myClaim) === "active";
+    // The toggle button and the "attach a PR" field only ever care about the
+    // caller's current, still-open claim — a user may also have older
+    // completed/released claims on this same issue, which are display-only.
+    const myInFlightClaim = me
+        ? claims.find((c) => c.user?.id === me.id && isInFlight(c))
+        : null;
+    const myClaimIsActive =
+        myInFlightClaim && normalizedStatus(myInFlightClaim) === "active";
     // A claim/release toggle only makes sense when there's nothing to
-    // toggle from (no claim yet) or the claim is still "active" — the
-    // backend only releases active claims, and a changes_requested claim
+    // toggle from (no in-flight claim yet) or the claim is still "active" —
+    // the backend only releases active claims, and a changes_requested claim
     // has no toggle action of its own (it just gets a PR field below).
-    const showClaimToggle = !myClaim || myClaimIsActive;
+    const showClaimToggle = !myInFlightClaim || myClaimIsActive;
+
+    const statusCounts = claims.reduce((counts, claim) => {
+        const status = normalizedStatus(claim);
+        counts[status] = (counts[status] || 0) + 1;
+        return counts;
+    }, {});
+    const summaryParts = [
+        statusCounts.active && `${statusCounts.active} active`,
+        statusCounts.changes_requested &&
+            `${statusCounts.changes_requested} awaiting changes`,
+        statusCounts.completed && `${statusCounts.completed} completed`,
+        statusCounts.released && `${statusCounts.released} released`,
+    ].filter(Boolean);
     const count = claims.length;
 
     async function handleToggle() {
         setBusy(true);
         setError("");
         try {
-            if (myClaim) {
+            if (myInFlightClaim) {
                 await deleteClaim(issueId);
             } else {
                 await postClaim(issueId);
@@ -255,7 +330,7 @@ export default function ClaimPanel({ issueId, projectId, initialClaims = [] }) {
             <p>
                 {count === 0
                     ? "No one has said they're working on this yet."
-                    : `${count} contributor${count === 1 ? " has" : "s have"} said they're working on this.`}
+                    : summaryParts.join(" · ")}
             </p>
             <p style={{ fontSize: "0.9rem", color: "#555" }}>
                 Claims are a signal of intent. Several people can claim the
@@ -275,7 +350,7 @@ export default function ClaimPanel({ issueId, projectId, initialClaims = [] }) {
                     >
                         {busy
                             ? "Working..."
-                            : myClaim
+                            : myInFlightClaim
                               ? "Release my claim"
                               : "Claim this issue"}
                     </button>
@@ -294,8 +369,11 @@ export default function ClaimPanel({ issueId, projectId, initialClaims = [] }) {
                     {claims.map((claim) => {
                         const isMe = Boolean(me && claim.user?.id === me.id);
                         const status = normalizedStatus(claim);
+                        const inFlight = isInFlight(claim);
                         const canReview =
-                            isMaintainer && Boolean(claim.pullRequestUrl);
+                            isMaintainer &&
+                            inFlight &&
+                            Boolean(claim.pullRequestUrl);
 
                         return (
                             <li key={claim.id} style={{ marginBottom: "1rem" }}>
@@ -308,24 +386,14 @@ export default function ClaimPanel({ issueId, projectId, initialClaims = [] }) {
                                 {claim.createdAt
                                     ? ` · ${new Date(claim.createdAt).toLocaleDateString()}`
                                     : ""}
-                                {status === "changes_requested" && (
-                                    <span
-                                        style={{
-                                            marginLeft: "0.5rem",
-                                            fontSize: "0.75rem",
-                                            fontWeight: 600,
-                                            color: "#8a6100",
-                                            background: "#fff3cd",
-                                            padding: "0.1rem 0.5rem",
-                                            borderRadius: "999px",
-                                        }}
-                                    >
-                                        Changes requested
-                                    </span>
-                                )}
+                                <StatusBadge status={status} />
                                 {claim.note ? (
                                     <div style={{ color: "#555" }}>{claim.note}</div>
                                 ) : null}
+
+                                {status === "completed" && (
+                                    <CompletionNote claim={claim} />
+                                )}
 
                                 {claim.pullRequestUrl && (
                                     <div style={{ marginTop: "0.35rem" }}>
@@ -353,7 +421,7 @@ export default function ClaimPanel({ issueId, projectId, initialClaims = [] }) {
                                     </div>
                                 )}
 
-                                {isMe && (
+                                {isMe && inFlight && (
                                     <PullRequestField
                                         issueId={issueId}
                                         claim={claim}
