@@ -36,12 +36,15 @@ public class ClaimService {
     private final ClaimRepository claimRepository;
     private final IssueRepository issueRepository;
     private final ProjectMaintainerRepository projectMaintainerRepository;
+    private final RateLimitService rateLimitService;
 
     public ClaimService(ClaimRepository claimRepository, IssueRepository issueRepository,
-                         ProjectMaintainerRepository projectMaintainerRepository) {
+                         ProjectMaintainerRepository projectMaintainerRepository,
+                         RateLimitService rateLimitService) {
         this.claimRepository = claimRepository;
         this.issueRepository = issueRepository;
         this.projectMaintainerRepository = projectMaintainerRepository;
+        this.rateLimitService = rateLimitService;
     }
 
     /**
@@ -57,12 +60,16 @@ public class ClaimService {
      * @param note    an optional short note (already length-validated by {@code @Valid} on the request DTO)
      * @param caller  the authenticated caller, injected via {@code @AuthenticatedUser}
      * @return the created claim, in API shape
-     * @throws ApiException with code {@code ISSUE_NOT_FOUND} (404) if the issue doesn't exist, or
+     * @throws ApiException with code {@code RATE_LIMITED} (429, API-03.10) if the caller has claimed
+     *                       too many issues in the last hour,
+     *                       {@code ISSUE_NOT_FOUND} (404) if the issue doesn't exist, or
      *                       {@code CLAIM_ALREADY_ACTIVE} (409) if the caller already holds an active
      *                       claim on this issue
      */
     @Transactional
     public ClaimDto createClaim(Long issueId, String note, User caller) {
+        rateLimitService.checkClaimLimit(caller.getId());
+
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ApiException(
                         "ISSUE_NOT_FOUND", "No issue exists with id " + issueId, HttpStatus.NOT_FOUND));

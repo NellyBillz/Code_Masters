@@ -42,17 +42,20 @@ public class CommentService {
     private final IssueRepository issueRepository;
     private final ProjectMaintainerRepository projectMaintainerRepository;
     private final ClaimRepository claimRepository;
+    private final RateLimitService rateLimitService;
 
     public CommentService(CommentRepository commentRepository,
                            ProjectRepository projectRepository,
                            IssueRepository issueRepository,
                            ProjectMaintainerRepository projectMaintainerRepository,
-                           ClaimRepository claimRepository) {
+                           ClaimRepository claimRepository,
+                           RateLimitService rateLimitService) {
         this.commentRepository = commentRepository;
         this.projectRepository = projectRepository;
         this.issueRepository = issueRepository;
         this.projectMaintainerRepository = projectMaintainerRepository;
         this.claimRepository = claimRepository;
+        this.rateLimitService = rateLimitService;
     }
 
     /**
@@ -62,10 +65,14 @@ public class CommentService {
      * @param body      the comment text, already length-validated by {@code @Valid} on the request DTO
      * @param author    the authenticated caller, injected via {@code @AuthenticatedUser}
      * @return the created comment, in API shape
-     * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if the project doesn't exist
+     * @throws ApiException with code {@code RATE_LIMITED} (429, API-03.10) if the caller has posted
+     *                       too many comments in the last hour, or
+     *                       {@code PROJECT_NOT_FOUND} (404) if the project doesn't exist
      */
     @Transactional
     public CommentDto createProjectComment(Long projectId, String body, User author) {
+        rateLimitService.checkCommentLimit(author.getId());
+
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new ApiException(
                         "PROJECT_NOT_FOUND", "No project exists with id " + projectId, HttpStatus.NOT_FOUND));
@@ -85,10 +92,14 @@ public class CommentService {
      * @param body    the comment text, already length-validated by {@code @Valid} on the request DTO
      * @param author  the authenticated caller, injected via {@code @AuthenticatedUser}
      * @return the created comment, in API shape
-     * @throws ApiException with code {@code ISSUE_NOT_FOUND} (404) if the issue doesn't exist
+     * @throws ApiException with code {@code RATE_LIMITED} (429, API-03.10) if the caller has posted
+     *                       too many comments in the last hour, or
+     *                       {@code ISSUE_NOT_FOUND} (404) if the issue doesn't exist
      */
     @Transactional
     public CommentDto createIssueComment(Long issueId, String body, User author) {
+        rateLimitService.checkCommentLimit(author.getId());
+
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ApiException(
                         "ISSUE_NOT_FOUND", "No issue exists with id " + issueId, HttpStatus.NOT_FOUND));

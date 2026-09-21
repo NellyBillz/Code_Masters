@@ -6,6 +6,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import za.codemaster.backend.dto.issue.Difficulty;
 import za.codemaster.backend.dto.issue.IssueStatus;
+import za.codemaster.backend.dto.report.ReportStatus;
 import za.codemaster.backend.dto.search.SearchType;
 import za.codemaster.backend.security.AuthenticatedUserArgumentResolver;
 import za.codemaster.backend.security.OptionalAuthenticatedUserArgumentResolver;
@@ -46,5 +47,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
         registry.addConverter(String.class, Difficulty.class, s -> WireValueMatcher.match(Difficulty.class, s));
         registry.addConverter(String.class, IssueStatus.class, s -> WireValueMatcher.match(IssueStatus.class, s));
         registry.addConverter(String.class, SearchType.class, s -> WireValueMatcher.match(SearchType.class, s));
+        registry.addConverter(String.class, ReportStatus.class, s -> WireValueMatcher.match(ReportStatus.class, s));
     }
 }
