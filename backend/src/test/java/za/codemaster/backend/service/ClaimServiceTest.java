@@ -75,7 +75,9 @@ class ClaimServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository);
+        // A generous limit — this class isn't testing API-03.10's rate limiting.
+        service = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository,
+                new RateLimitService(1_000_000, 1_000_000, 1_000_000));
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         claimant = userRepository.save(User.builder()
                 .githubId(System.nanoTime())

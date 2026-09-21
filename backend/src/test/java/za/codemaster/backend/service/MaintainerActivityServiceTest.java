@@ -79,8 +79,11 @@ class MaintainerActivityServiceTest {
     @BeforeEach
     void setUp() {
         projectQueryService = new ProjectQueryService(projectRepository, issueRepository, claimRepository, projectMaintainerRepository);
-        claimService = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository);
-        commentService = new CommentService(commentRepository, projectRepository, issueRepository, projectMaintainerRepository, claimRepository);
+        // A generous limit — this class isn't testing API-03.10's rate limiting.
+        RateLimitService unlimitedRateLimitService = new RateLimitService(1_000_000, 1_000_000, 1_000_000);
+        claimService = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository, unlimitedRateLimitService);
+        commentService = new CommentService(commentRepository, projectRepository, issueRepository, projectMaintainerRepository,
+                claimRepository, unlimitedRateLimitService);
         service = new MaintainerActivityService(
                 projectMaintainerRepository, claimRepository, commentRepository, projectQueryService, claimService, commentService);
     }
