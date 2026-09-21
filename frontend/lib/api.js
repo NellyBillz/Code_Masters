@@ -256,6 +256,20 @@ function postComment(issueId, body) {
     return apiFetch('/users/me');
   }
 
+  /**
+   * Log out the current session. Hits /auth/logout directly (not under
+   * /api/v1, same as the /auth/github login link — see next.config.js's
+   * rewrite for /auth/:path*), clearing the session and CSRF cookies.
+   */
+  function logout() {
+    const csrfToken = getCsrfToken();
+
+    return fetch('/auth/logout', {
+      method: 'POST',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+  }
+
   function postClaim(issueId, note) {
     const csrfToken = getCsrfToken();
 
@@ -289,10 +303,7 @@ module.exports = {
   getCurrentUser,
   postClaim,
   deleteClaim,
-  getIssueClaims, 
-  getCurrentUser,
-   postClaim,
-    deleteClaim,
+  logout,
   inviteMaintainer,
   removeMaintainer,
   updateIssueClassification,
