@@ -104,7 +104,7 @@ public class DevSeedDataIntegrationTest {
         );
 
         assertEquals(4, projectCount, "Expected 4 seeded projects");
-        assertTrue(connections.size() >= 2, "Must contain at least 2 distinct connections (e.g., south_african, africa_led)");
+        assertTrue(connections.size() >= 2, "Must contain at least 2 distinct connections (e.g., south_african, community_verified)");
         assertTrue(languages.size() >= 2, "Must contain at least 2 distinct primary languages (e.g., Java, Python)");
     }
 

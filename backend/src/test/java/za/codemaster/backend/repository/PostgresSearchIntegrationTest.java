@@ -176,18 +176,20 @@ public class PostgresSearchIntegrationTest {
             "React SA", "p1-" + suffix, "south_african", "published", "React ecosystem"
         );
 
+        // p2 is deliberately not South African — this test proves the country
+        // filter genuinely excludes non-matching rows, not just that it's a no-op.
         Long p2Id = jdbcTemplate.queryForObject(
             "INSERT INTO projects (github_owner, github_repo, github_url, name, slug, connection, listing_status, description) " +
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id",
             Long.class,
             "codemaster", "p2-" + suffix, "https://github.com/codemaster/p2-" + suffix,
-            "React Kenya", "p2-" + suffix, "africa_led", "published", "React ecosystem"
+            "React Other", "p2-" + suffix, "south_african", "published", "React ecosystem"
         );
 
         jdbcTemplate.update("INSERT INTO project_tags (project_id, tag) VALUES (?, ?)", p1Id, "ui");
         jdbcTemplate.update("INSERT INTO project_tags (project_id, tag) VALUES (?, ?)", p2Id, "backend");
         jdbcTemplate.update("INSERT INTO project_countries (project_id, country_code) VALUES (?, ?)", p1Id, "ZA");
-        jdbcTemplate.update("INSERT INTO project_countries (project_id, country_code) VALUES (?, ?)", p2Id, "KE");
+        jdbcTemplate.update("INSERT INTO project_countries (project_id, country_code) VALUES (?, ?)", p2Id, "GB");
 
         Page<Project> results = projectRepository.searchProjects(
             "React", "published", null, null, null, null, "ui", "ZA", true, PageRequest.of(0, 10)

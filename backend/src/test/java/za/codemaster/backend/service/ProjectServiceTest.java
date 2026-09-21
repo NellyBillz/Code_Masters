@@ -105,7 +105,7 @@ class ProjectServiceTest {
     @Test
     void createdProjectSubmitterAppearsAsOwnerInMaintainerList() {
         CreateProjectRequest request = new CreateProjectRequest(
-                uniqueGithubUrl(), ProjectConnection.AFRICA_LED, "Data", null, null);
+                uniqueGithubUrl(), ProjectConnection.SOUTH_AFRICAN, "Data", null, null);
 
         ProjectDto created = service.createProject(request, submitter);
 
@@ -162,13 +162,13 @@ class ProjectServiceTest {
         ProjectDto created = service.createProject(createRequest, submitter);
 
         UpdateProjectRequest updateRequest = new UpdateProjectRequest(
-                "Fintech", List.of("payments"), ProjectConnection.AFRICA_FOCUSED, List.of("KE"), null);
+                "Fintech", List.of("payments"), ProjectConnection.COMMUNITY_VERIFIED, List.of("ZA"), null);
         ProjectDto updated = service.updateProject(created.id(), updateRequest, submitter);
 
         assertEquals("Fintech", updated.category());
         assertEquals(List.of("payments"), updated.tags());
-        assertEquals(ProjectConnection.AFRICA_FOCUSED, updated.connection());
-        assertEquals(List.of("KE"), updated.countryCodes());
+        assertEquals(ProjectConnection.COMMUNITY_VERIFIED, updated.connection());
+        assertEquals(List.of("ZA"), updated.countryCodes());
     }
 
     @Test

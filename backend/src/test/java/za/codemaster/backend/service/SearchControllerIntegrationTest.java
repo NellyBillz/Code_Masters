@@ -79,7 +79,7 @@ class SearchControllerIntegrationTest {
     @Test
     @DisplayName("type=all (or omitted) merges both project and issue results")
     void typeAllMergesBothResultTypes() throws Exception {
-        // "CLI" matches Naija DevTools' description and its issue title
+        // "CLI" matches Mzansi DevTools' description and its issue title
         // ("Fix flag parsing edge case in CLI") — one query, both resultTypes.
         mockMvc.perform(get("/api/v1/search").param("q", "CLI"))
                 .andExpect(status().isOk())

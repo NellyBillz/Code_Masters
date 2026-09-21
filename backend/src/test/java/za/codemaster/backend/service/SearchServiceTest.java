@@ -135,7 +135,7 @@ class SearchServiceTest {
 
     @Test
     void typeAllMergesBothResultTypesWhenQueryMatchesBoth() {
-        // "CLI" matches Naija DevTools' description and its issue title
+        // "CLI" matches Mzansi DevTools' description and its issue title
         // ("Fix flag parsing edge case in CLI") — one query, both resultTypes.
         PagedSearchResults results = service.search(params("CLI", SearchType.ALL, null, null, null));
 

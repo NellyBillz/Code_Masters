@@ -19,7 +19,6 @@ public record PlatformStats(
         long totalContributorsEngaged,
         long totalActiveClaims,
         long totalContributionsCompleted,
-        long countriesRepresented,
         OffsetDateTime generatedAt
 ) {
 }

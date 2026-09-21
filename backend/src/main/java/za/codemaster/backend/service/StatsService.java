@@ -38,7 +38,6 @@ public class StatsService {
         long totalContributorsEngaged = claimRepository.countDistinctUsers();
         long totalActiveClaims = claimRepository.countByStatus(ClaimStatus.ACTIVE);
         long totalContributionsCompleted = claimRepository.countByStatus(ClaimStatus.COMPLETED);
-        long countriesRepresented = projectRepository.countDistinctCountryCodesByListingStatus(ListingStatus.PUBLISHED);
 
         return new PlatformStats(
                 publishedProjects,
@@ -46,7 +45,6 @@ public class StatsService {
                 totalContributorsEngaged,
                 totalActiveClaims,
                 totalContributionsCompleted,
-                countriesRepresented,
                 OffsetDateTime.now()
         );
     }

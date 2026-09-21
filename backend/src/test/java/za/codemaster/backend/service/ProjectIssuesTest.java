@@ -89,10 +89,10 @@ class ProjectIssuesTest {
 
     @Test
     void filtersByStatus() {
-        // Naija DevTools (fixture index 1) has one CLAIMED and one OPEN issue.
-        Long naijaDevTools = fixtures.projectId(1);
+        // Mzansi DevTools (fixture index 1) has one CLAIMED and one OPEN issue.
+        Long mzansiDevTools = fixtures.projectId(1);
 
-        PagedIssues filtered = service.getProjectIssues(naijaDevTools,
+        PagedIssues filtered = service.getProjectIssues(mzansiDevTools,
                 new ProjectIssuesSearchParams(null, null, null, null, IssueStatus.CLAIMED));
 
         assertTrue(filtered.items().size() > 0);

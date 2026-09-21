@@ -47,14 +47,6 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     long countByListingStatusAndAcceptingContributions(ListingStatus listingStatus, boolean acceptingContributions);
 
     /**
-     * Counts distinct country codes across every {@code published} project's
-     * {@code countryCodes}. Backs {@code PlatformStats.countriesRepresented}
-     * (API-03.12) — a single aggregate query, not a per-project in-memory scan.
-     */
-    @Query("SELECT COUNT(DISTINCT cc) FROM Project p JOIN p.countryCodes cc WHERE p.listingStatus = :status")
-    long countDistinctCountryCodesByListingStatus(@Param("status") ListingStatus status);
-
-    /**
      * Preserved legacy JPQL filter method to maintain backwards compatibility with existing tests.
      */
     @Query("""

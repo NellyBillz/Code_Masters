@@ -138,14 +138,13 @@ class StatsServiceTest {
     void aPendingProjectCountsTowardNothing() {
         PlatformStats before = service.getStats();
 
-        // A pending project with a country code no other published project has,
-        // and acceptingContributions true — none of it should move the needle.
-        newProject(ListingStatus.PENDING, true, List.of("ZZ"));
+        // A pending project, acceptingContributions true — none of it should
+        // move the needle.
+        newProject(ListingStatus.PENDING, true, List.of("ZA"));
 
         PlatformStats after = service.getStats();
         assertEquals(before.publishedProjects(), after.publishedProjects());
         assertEquals(before.activeProjectsAcceptingContributions(), after.activeProjectsAcceptingContributions());
-        assertEquals(before.countriesRepresented(), after.countriesRepresented());
     }
 
     @Test
@@ -159,18 +158,6 @@ class StatsServiceTest {
         newProject(ListingStatus.PUBLISHED, true, List.of("ZA"));
         assertEquals(before.activeProjectsAcceptingContributions() + 1,
                 service.getStats().activeProjectsAcceptingContributions());
-    }
-
-    @Test
-    void countriesRepresentedOnlyCountsPublishedProjectsCountryCodes() {
-        PlatformStats before = service.getStats();
-
-        newProject(ListingStatus.PENDING, true, List.of("QQ"));
-        assertEquals(before.countriesRepresented(), service.getStats().countriesRepresented(),
-                "a country code that only exists on a pending project must not count");
-
-        newProject(ListingStatus.PUBLISHED, true, List.of("QQ"));
-        assertEquals(before.countriesRepresented() + 1, service.getStats().countriesRepresented());
     }
 
     @Test

@@ -54,28 +54,28 @@ final class ProjectQueryServiceFixtures {
                 List.of("education", "lms"), List.of("ZA"),
                 "south_african", "MIT", 120, 15, 8, 12, true, true));
 
-        Project naijaDevTools = projectRepository.save(project(
-                "Naija DevTools", "naija-devtools-" + suffix,
-                "CLI tooling for Nigerian developers",
-                "naija-devs", "naija-devtools-" + suffix,
+        Project mzansiDevTools = projectRepository.save(project(
+                "Mzansi DevTools", "mzansi-devtools-" + suffix,
+                "CLI tooling for South African developers",
+                "sa-devs", "mzansi-devtools-" + suffix,
                 "Go", new String[]{"Go"}, "Developer Tools",
-                List.of("cli", "tooling"), List.of("NG"),
-                "africa_led", "Apache-2.0", 340, 40, 25, 30, true, false));
+                List.of("cli", "tooling"), List.of("ZA"),
+                "south_african", "Apache-2.0", 340, 40, 25, 30, true, false));
 
-        Project panAfricaDataHub = projectRepository.save(project(
-                "PanAfrica Data Hub", "panafrica-data-hub-" + suffix,
-                "Open datasets curated across Africa",
-                "panafrica-org", "data-hub-" + suffix,
+        Project saOpenDataHub = projectRepository.save(project(
+                "SA Open Data Hub", "sa-open-data-hub-" + suffix,
+                "Open datasets curated across South Africa",
+                "sa-data-collective", "data-hub-" + suffix,
                 "Python", new String[]{"Python", "SQL"}, "Data",
-                List.of("data", "opendata"), List.of("KE", "GH", "ZA"),
-                "africa_focused", "MIT", 560, 80, 45, 60, false, true));
+                List.of("data", "opendata"), List.of("ZA"),
+                "community_verified", "MIT", 560, 80, 45, 60, false, true));
 
         Project communityHealthTracker = projectRepository.save(project(
                 "Community Health Tracker", "community-health-tracker-" + suffix,
                 "Health reporting tool used by community volunteers",
                 "healthtrack-community", "tracker-" + suffix,
                 "JavaScript", new String[]{"JavaScript", "TypeScript"}, "Health",
-                List.of("health", "community"), List.of("ZA", "ZW"),
+                List.of("health", "community"), List.of("ZA"),
                 "community_verified", "GPL-3.0", 90, 10, 5, 8, true, true));
 
         Project eduBridge = projectRepository.save(project(
@@ -87,7 +87,7 @@ final class ProjectQueryServiceFixtures {
                 "south_african", "MIT", 45, 6, 3, 4, false, false));
 
         List<Project> projects = List.of(
-                openLearnSa, naijaDevTools, panAfricaDataHub, communityHealthTracker, eduBridge);
+                openLearnSa, mzansiDevTools, saOpenDataHub, communityHealthTracker, eduBridge);
 
         List<Issue> issues = List.of(
                 issueRepository.save(issue(openLearnSa, 12,
@@ -98,19 +98,19 @@ final class ProjectQueryServiceFixtures {
                         "Migrate build to Gradle 9",
                         "Our current build is on an old Gradle version...",
                         "open", new String[]{"build"}, "advanced", false)),
-                issueRepository.save(issue(naijaDevTools, 8,
+                issueRepository.save(issue(mzansiDevTools, 8,
                         "Fix flag parsing edge case in CLI",
                         "Passing --flag=value with an equals sign breaks parsing...",
                         "claimed", new String[]{"bug", "good-first-issue"}, "beginner", true)),
-                issueRepository.save(issue(naijaDevTools, 20,
+                issueRepository.save(issue(mzansiDevTools, 20,
                         "Add shell completion scripts",
                         "Would be great to have bash/zsh completions...",
                         "open", new String[]{"enhancement"}, "intermediate", false)),
-                issueRepository.save(issue(panAfricaDataHub, 33,
+                issueRepository.save(issue(saOpenDataHub, 33,
                         "Normalize inconsistent date formats across datasets",
                         "Some datasets use DD/MM/YYYY, others ISO-8601...",
                         "open", new String[]{"data-quality"}, "intermediate", false)),
-                issueRepository.save(issue(panAfricaDataHub, 40,
+                issueRepository.save(issue(saOpenDataHub, 40,
                         "Investigate flaky ETL pipeline test",
                         "The nightly ETL test fails intermittently...",
                         "closed", new String[]{"bug"}, "unknown", false)),

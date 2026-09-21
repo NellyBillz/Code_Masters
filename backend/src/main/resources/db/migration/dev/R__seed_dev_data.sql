@@ -5,7 +5,7 @@ DELETE FROM claims WHERE note LIKE '[dev-seed]%';
 DELETE FROM comments WHERE body LIKE '[dev-seed]%';
 DELETE FROM issues WHERE github_url LIKE 'https://github.com/codemaster/%';
 DELETE FROM project_tags WHERE tag IN ('spring-boot', 'react', 'python', 'django', 'ai', 'postgres');
-DELETE FROM project_countries WHERE country_code IN ('ZA', 'KE', 'NG');
+DELETE FROM project_countries WHERE country_code = 'ZA';
 DELETE FROM project_maintainers WHERE role IN ('owner', 'maintainer') AND project_id IN (
     SELECT id FROM projects WHERE github_owner = 'codemaster'
 );
@@ -23,7 +23,7 @@ ON CONFLICT (id) DO NOTHING;
 SELECT setval('users_id_seq', (SELECT GREATEST(MAX(id), 1002) FROM users));
 
 -- 2. Seed 4 Projects
--- Spanning 2 connections ('south_african', 'africa_led') and 2 primary languages ('Java', 'Python')
+-- Spanning 2 connections ('south_african', 'community_verified') and 2 primary languages ('Java', 'Python')
 INSERT INTO projects (
     id, github_owner, github_repo, github_url, name, slug, description,
     primary_language, languages, category, connection, license, stars, forks, open_issues, verified,
@@ -37,8 +37,8 @@ VALUES
     ),
     (
         2002, 'codemaster', 'afri-lang-nlp', 'https://github.com/codemaster/afri-lang-nlp',
-        'Afri-Lang NLP', 'afri-lang-nlp', 'Natural Language Processing models for African indigenous languages.',
-        'Python', ARRAY['Python', 'Shell'], 'Machine Learning', 'africa_led', 'Apache-2.0', 142, 29, 4, true, 'published'
+        'Afri-Lang NLP', 'afri-lang-nlp', 'Natural Language Processing models for South African indigenous languages.',
+        'Python', ARRAY['Python', 'Shell'], 'Machine Learning', 'community_verified', 'Apache-2.0', 142, 29, 4, true, 'published'
     ),
     (
         2003, 'codemaster', 'sa-tax-calculator', 'https://github.com/codemaster/sa-tax-calculator',
@@ -48,7 +48,7 @@ VALUES
     (
         2004, 'codemaster', 'agri-pulse-africa', 'https://github.com/codemaster/agri-pulse-africa',
         'Agri Pulse Africa', 'agri-pulse-africa', 'Crop disease forecasting and soil analytics dashboard.',
-        'Python', ARRAY['Python', 'JavaScript'], 'AgriTech', 'africa_led', 'MIT', 67, 12, 2, true, 'published'
+        'Python', ARRAY['Python', 'JavaScript'], 'AgriTech', 'south_african', 'MIT', 67, 12, 2, true, 'published'
     )
 ON CONFLICT (id) DO NOTHING;
 
@@ -65,9 +65,9 @@ ON CONFLICT (project_id, tag) DO NOTHING;
 -- Populate project_countries (composite PK: project_id, country_code)
 INSERT INTO project_countries (project_id, country_code) VALUES
     (2001, 'ZA'),
-    (2002, 'ZA'), (2002, 'KE'), (2002, 'NG'),
+    (2002, 'ZA'),
     (2003, 'ZA'),
-    (2004, 'KE'), (2004, 'ZA')
+    (2004, 'ZA')
 ON CONFLICT (project_id, country_code) DO NOTHING;
 
 -- Populate maintainers
