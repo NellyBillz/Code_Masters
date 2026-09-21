@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Search, SlidersHorizontal, X } from "lucide-react";
+import { Search } from "lucide-react";
 import { listProjects } from "../../lib/api";
 import ProjectCard from "../components/ProjectCard";
 import Button from "../components/ui/Button";
@@ -25,68 +25,6 @@ const DEFAULT_FILTERS = {
   sort: "relevance",
 };
 
-function FilterFields({ filters, updateFilter }) {
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <label htmlFor="language" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
-          Language
-        </label>
-        <Select id="language" value={filters.language} onChange={(e) => updateFilter("language", e.target.value)}>
-          <option value="">All languages</option>
-          {LANGUAGES.map((lang) => (
-            <option key={lang} value={lang}>
-              {lang}
-            </option>
-          ))}
-        </Select>
-      </div>
-
-      <div>
-        <label htmlFor="category" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
-          Category
-        </label>
-        <Select id="category" value={filters.category} onChange={(e) => updateFilter("category", e.target.value)}>
-          <option value="">All categories</option>
-          {CATEGORIES.map((cat) => (
-            <option key={cat} value={cat}>
-              {cat}
-            </option>
-          ))}
-        </Select>
-      </div>
-
-      <div>
-        <p className="mb-2 text-[13px] font-medium text-foreground-secondary">Contribution</p>
-        <div className="flex flex-col gap-2.5">
-          <Checkbox
-            label="Has beginner-friendly issues"
-            checked={filters.hasBeginnerIssues}
-            onChange={(e) => updateFilter("hasBeginnerIssues", e.target.checked)}
-          />
-          <Checkbox
-            label="Has contributing guide"
-            checked={filters.hasContributingGuide}
-            onChange={(e) => updateFilter("hasContributingGuide", e.target.checked)}
-          />
-        </div>
-      </div>
-
-      <div>
-        <label htmlFor="sort" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
-          Sort
-        </label>
-        <Select id="sort" value={filters.sort} onChange={(e) => updateFilter("sort", e.target.value)}>
-          <option value="relevance">Relevance</option>
-          <option value="recent">Recently active</option>
-          <option value="stars">Stars</option>
-          <option value="contributors">Contributors</option>
-        </Select>
-      </div>
-    </div>
-  );
-}
-
 export default function Projects() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [projects, setProjects] = useState([]);
@@ -94,7 +32,6 @@ export default function Projects() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [retryNonce, setRetryNonce] = useState(0);
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   const updateFilter = (key, value) => {
     setFilters((current) => ({ ...current, [key]: value }));
@@ -167,82 +104,114 @@ export default function Projects() {
   return (
     <main className="mx-auto w-full max-w-[1280px] px-4 py-10 sm:px-6 sm:py-12 lg:px-8">
       <header className="max-w-2xl">
+        <p className="mb-1.5 text-sm font-medium text-primary">Open-source discovery</p>
         <h1 className="font-display text-[2rem] font-extrabold tracking-tight text-foreground sm:text-[2.25rem]">Projects</h1>
         <p className="mt-2 text-[15px] leading-relaxed text-foreground-secondary">
           Discover South African open-source projects and find opportunities to contribute.
         </p>
       </header>
 
-      <div className="relative mt-8 max-w-2xl">
-        <Search
-          size={16}
-          strokeWidth={1.75}
-          aria-hidden="true"
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground-disabled"
-        />
-        <Input
-          type="text"
-          placeholder="Search projects by name, description, owner or topic"
-          value={filters.q}
-          onChange={(e) => updateFilter("q", e.target.value)}
-          className="pl-9"
-          aria-label="Search projects"
-        />
+      {/* Horizontal filter panel — one bordered surface holding search, the
+          three selects in a row, and the contribution checkboxes below,
+          matching main's real /projects page rather than a left sidebar. */}
+      <div className="mt-8 flex flex-col gap-5 rounded-[10px] border border-border bg-surface p-5 sm:p-6">
+        <div>
+          <label htmlFor="q" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
+            Search projects
+          </label>
+          <div className="relative">
+            <Search
+              size={16}
+              strokeWidth={1.75}
+              aria-hidden="true"
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-foreground-disabled"
+            />
+            <Input
+              id="q"
+              type="text"
+              placeholder="Search by project name, description, owner or topic"
+              value={filters.q}
+              onChange={(e) => updateFilter("q", e.target.value)}
+              className="pl-9"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label htmlFor="language" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
+              Language
+            </label>
+            <Select id="language" value={filters.language} onChange={(e) => updateFilter("language", e.target.value)}>
+              <option value="">All languages</option>
+              {LANGUAGES.map((lang) => (
+                <option key={lang} value={lang}>
+                  {lang}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="category" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
+              Category
+            </label>
+            <Select id="category" value={filters.category} onChange={(e) => updateFilter("category", e.target.value)}>
+              <option value="">All categories</option>
+              {CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="sort" className="mb-1.5 block text-[13px] font-medium text-foreground-secondary">
+              Sort by
+            </label>
+            <Select id="sort" value={filters.sort} onChange={(e) => updateFilter("sort", e.target.value)}>
+              <option value="relevance">Relevance</option>
+              <option value="recent">Recently active</option>
+              <option value="stars">Stars</option>
+              <option value="contributors">Contributors</option>
+            </Select>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-4 border-t border-border pt-4">
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <Checkbox
+              label="Has beginner-friendly issues"
+              checked={filters.hasBeginnerIssues}
+              onChange={(e) => updateFilter("hasBeginnerIssues", e.target.checked)}
+            />
+            <Checkbox
+              label="Has contributing guide"
+              checked={filters.hasContributingGuide}
+              onChange={(e) => updateFilter("hasContributingGuide", e.target.checked)}
+            />
+          </div>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          )}
+        </div>
       </div>
 
-      <button
-        type="button"
-        onClick={() => setMobileFiltersOpen((v) => !v)}
-        className="mt-4 inline-flex items-center gap-2 rounded-md border border-border-strong bg-surface px-3 py-2 text-sm font-medium text-foreground-secondary lg:hidden"
-        aria-expanded={mobileFiltersOpen}
-      >
-        <SlidersHorizontal size={15} strokeWidth={1.75} aria-hidden="true" />
-        Filters
-        {hasActiveFilters && <span className="h-1.5 w-1.5 rounded-full bg-primary" aria-hidden="true" />}
-      </button>
-
-      {mobileFiltersOpen && (
-        <div className="mt-4 rounded-[10px] border border-border bg-surface p-5 lg:hidden">
-          <div className="mb-4 flex items-center justify-between">
-            <p className="text-[13px] font-semibold uppercase tracking-wide text-foreground-muted">Filters</p>
-            <button
-              type="button"
-              onClick={() => setMobileFiltersOpen(false)}
-              aria-label="Close filters"
-              className="text-foreground-muted hover:text-foreground"
-            >
-              <X size={16} strokeWidth={1.75} />
-            </button>
-          </div>
-          <FilterFields filters={filters} updateFilter={updateFilter} />
-        </div>
-      )}
-
-      <div className="mt-8 grid grid-cols-1 gap-10 lg:grid-cols-[240px_1fr] lg:gap-8">
-        <aside className="hidden lg:block">
-          <div className="sticky top-24">
-            <p className="mb-4 text-[13px] font-semibold uppercase tracking-wide text-foreground-muted">Filters</p>
-            <FilterFields filters={filters} updateFilter={updateFilter} />
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters} className="mt-6 w-full">
-                Clear filters
-              </Button>
+      <section aria-labelledby="projects-heading" className="mt-10">
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <p id="projects-heading" className="text-sm text-foreground-muted" aria-live="polite">
+            {!loading && !error && (
+              <>
+                {meta.total} {meta.total === 1 ? "project" : "projects"} found
+              </>
             )}
-          </div>
-        </aside>
+          </p>
+        </div>
 
-        <section aria-labelledby="projects-heading">
-          <div className="mb-5 flex items-center justify-between gap-4">
-            <p id="projects-heading" className="text-sm text-foreground-muted" aria-live="polite">
-              {!loading && !error && (
-                <>
-                  {meta.total} {meta.total === 1 ? "project" : "projects"} found
-                </>
-              )}
-            </p>
-          </div>
-
-          {loading && (
+        {loading && (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
               {Array.from({ length: 6 }).map((_, i) => (
                 <ProjectCardSkeleton key={i} />
@@ -310,8 +279,7 @@ export default function Projects() {
               </Button>
             </nav>
           )}
-        </section>
-      </div>
+      </section>
     </main>
   );
 }

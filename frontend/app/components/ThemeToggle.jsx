@@ -67,7 +67,7 @@ export default function ThemeToggle() {
         aria-haspopup="menu"
         aria-expanded={open}
         aria-label={`Theme: ${current.label}. Change theme`}
-        className="flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-chrome-fg-muted transition-colors hover:border-chrome-border hover:bg-chrome-hover hover:text-chrome-fg"
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-transparent text-foreground-muted transition-colors hover:border-border hover:bg-surface-subtle hover:text-foreground"
       >
         <CurrentIcon size={18} strokeWidth={1.75} aria-hidden="true" />
       </button>

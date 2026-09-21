@@ -37,7 +37,7 @@ export default function ProjectCard({ project }) {
   return (
     <Link
       href={`/projects/${id}`}
-      className="group flex h-full flex-col gap-3 rounded-[10px] border border-border bg-surface p-5 transition-colors hover:border-border-strong hover:bg-surface-subtle/40"
+      className="group flex h-full flex-col gap-3 rounded-[10px] border border-border bg-surface p-5 transition-colors hover:border-border-strong hover:bg-surface-subtle"
     >
       <div className="flex items-start justify-between gap-3">
         <h3 className="text-[17px] font-semibold leading-tight text-foreground group-hover:text-primary">

@@ -8,57 +8,58 @@
  */
 
 :root {
-  /* Backgrounds — warm neutral paper tone, not the ubiquitous cool "slate-50" */
-  --background: #f6f6f3;
+  /* Backgrounds — cool slate, matching the palette already shipping on
+     main's project detail page (07932d5) rather than this branch's earlier
+     warm-neutral choice. */
+  --background: #f8fafc;
   --surface: #ffffff;
-  --surface-subtle: #efefec;
+  --surface-subtle: #f1f5f9;
   --surface-raised: #ffffff;
 
   /* Text */
-  --foreground: #16181c;
-  --foreground-secondary: #464b52;
-  --foreground-muted: #6b7078;
-  --foreground-disabled: #9ba0a6;
+  --foreground: #0f172a;
+  --foreground-secondary: #334155;
+  --foreground-muted: #64748b;
+  --foreground-disabled: #94a3b8;
 
   /* Borders */
-  --border: #e3e3df;
-  --border-strong: #cbcbc5;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
 
-  /* Primary / brand — one confident, high-saturation coral doing double duty
-     as both the main action color and the South African identity marker
-     (protea / rooibos / Karoo-sunset warmth, not flag colors), instead of
-     the blue/teal/purple every dev-tool competitor already uses. Picked
-     for hackathon visibility: it needs to read as "this product" within a
-     couple of seconds, not just be tastefully restrained. */
-  --primary: #d93a16;
-  --primary-hover: #b82f10;
-  --primary-subtle: #fdece4;
+  /* Primary / brand — the blue already in use on main's project detail
+     page (blue-600/blue-700/blue-50), adopted here as the one token every
+     component already reads from, instead of maintaining two competing
+     brand colors across branches. */
+  --primary: #2563eb;
+  --primary-hover: #1d4ed8;
+  --primary-subtle: #eff6ff;
   --primary-foreground: #ffffff;
 
-  /* `accent` is a semantic alias of `primary` (kept as a separate token so
-     existing "this is South African context" usages read intentionally,
-     not because it's a different hue). */
-  --accent: var(--primary);
-  --accent-hover: var(--primary-hover);
-  --accent-subtle: var(--primary-subtle);
-  --accent-foreground: var(--primary-foreground);
+  /* `accent` — the green main's connection badge already uses for South
+     African context (green-600/green-700/green-50), kept as its own hue
+     (not a `primary` alias) so brand color and "this is South African
+     context" stay visually distinct, matching how main actually uses them. */
+  --accent: #16a34a;
+  --accent-hover: #15803d;
+  --accent-subtle: #f0fdf4;
+  --accent-foreground: #ffffff;
 
   /* Persistent dark chrome (top nav) — AWS Console / GitHub convention of a
      structural dark bar that stays dark in both light and dark theme, so it
-     reads as serious technical chrome rather than "light SaaS navbar." */
-  --chrome-bg: #12161c;
-  --chrome-hover: #1c222b;
-  --chrome-border: #262b33;
-  --chrome-fg: #f3f4f5;
-  --chrome-fg-muted: #9aa3ad;
+     reads as serious technical chrome rather than "light SaaS navbar."
+     Slate-900-based to match the rest of the palette. */
+  --chrome-bg: #0f172a;
+  --chrome-hover: #1e293b;
+  --chrome-border: #1e293b;
+  --chrome-fg: #f8fafc;
+  --chrome-fg-muted: #94a3b8;
 
-  /* Semantic — danger/warning deliberately pulled away from primary's
-     red-orange hue (a pure red and a golden amber) so status colors never
-     get mistaken for the brand accent. */
+  /* Semantic — danger/warning/info kept distinct from primary blue and
+     accent green so status colors never get mistaken for brand color. */
   --success: #15803d;
   --warning: #a16207;
   --danger: #dc2626;
-  --info: #3562c9;
+  --info: #0284c7;
 
   /* Radii */
   --radius-sm: 6px;
@@ -75,66 +76,66 @@
 }
 
 :root[data-theme="dark"] {
-  --background: #0b0d10;
-  --surface: #11151a;
-  --surface-subtle: #171c22;
-  --surface-raised: #1b222a;
+  --background: #0b1220;
+  --surface: #0f172a;
+  --surface-subtle: #1e293b;
+  --surface-raised: #1e293b;
 
-  --foreground: #f3f4f6;
-  --foreground-secondary: #aab4c0;
-  --foreground-muted: #7d8997;
-  --foreground-disabled: #596574;
+  --foreground: #f1f5f9;
+  --foreground-secondary: #cbd5e1;
+  --foreground-muted: #94a3b8;
+  --foreground-disabled: #64748b;
 
-  --border: #252d36;
-  --border-strong: #35404c;
+  --border: #334155;
+  --border-strong: #475569;
 
-  --primary: #ff7a52;
-  --primary-hover: #ff9670;
-  --primary-subtle: #3a160c;
-  --primary-foreground: #2a0d04;
+  --primary: #60a5fa;
+  --primary-hover: #93c5fd;
+  --primary-subtle: #1e3a5f;
+  --primary-foreground: #071630;
 
-  --accent: var(--primary);
-  --accent-hover: var(--primary-hover);
-  --accent-subtle: var(--primary-subtle);
-  --accent-foreground: var(--primary-foreground);
+  --accent: #4ade80;
+  --accent-hover: #86efac;
+  --accent-subtle: #14291d;
+  --accent-foreground: #052e12;
 
-  --success: #3fb669;
-  --warning: #e3a23d;
+  --success: #4ade80;
+  --warning: #fbbf24;
   --danger: #f87171;
-  --info: #6b9ff0;
+  --info: #38bdf8;
 
   color-scheme: dark;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --background: #0b0d10;
-    --surface: #11151a;
-    --surface-subtle: #171c22;
-    --surface-raised: #1b222a;
+    --background: #0b1220;
+    --surface: #0f172a;
+    --surface-subtle: #1e293b;
+    --surface-raised: #1e293b;
 
-    --foreground: #f3f4f6;
-    --foreground-secondary: #aab4c0;
-    --foreground-muted: #7d8997;
-    --foreground-disabled: #596574;
+    --foreground: #f1f5f9;
+    --foreground-secondary: #cbd5e1;
+    --foreground-muted: #94a3b8;
+    --foreground-disabled: #64748b;
 
-    --border: #252d36;
-    --border-strong: #35404c;
+    --border: #334155;
+    --border-strong: #475569;
 
-    --primary: #ff7a52;
-    --primary-hover: #ff9670;
-    --primary-subtle: #3a160c;
-    --primary-foreground: #2a0d04;
+    --primary: #60a5fa;
+    --primary-hover: #93c5fd;
+    --primary-subtle: #1e3a5f;
+    --primary-foreground: #071630;
 
-    --accent: var(--primary);
-    --accent-hover: var(--primary-hover);
-    --accent-subtle: var(--primary-subtle);
-    --accent-foreground: var(--primary-foreground);
+    --accent: #4ade80;
+    --accent-hover: #86efac;
+    --accent-subtle: #14291d;
+    --accent-foreground: #052e12;
 
-    --success: #3fb669;
-    --warning: #e3a23d;
+    --success: #4ade80;
+    --warning: #fbbf24;
     --danger: #f87171;
-    --info: #6b9ff0;
+    --info: #38bdf8;
 
     color-scheme: dark;
   }

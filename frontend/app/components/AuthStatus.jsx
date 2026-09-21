@@ -5,17 +5,16 @@ import Button from "./ui/Button";
 import GitHubMark from "./icons/GitHubMark";
 
 /**
- * Lives on the persistent dark header chrome (see Header.jsx), so every
- * color here is a chrome-* token or the theme-adaptive `primary` — never
- * `foreground`/`surface`, which are tuned for the page body and would lose
- * contrast against the header in dark theme.
+ * Lives in the header (see Header.jsx), which now follows the page theme
+ * (light in light mode, dark in dark mode) rather than staying permanently
+ * dark — so this uses the same theme-adaptive tokens as the rest of the app.
  */
 export default function AuthStatus() {
   const { user, loading, logout } = useAuth();
 
   if (loading) {
     return (
-      <span className="whitespace-nowrap text-sm text-chrome-fg-muted" aria-live="polite">
+      <span className="whitespace-nowrap text-sm text-foreground-muted" aria-live="polite">
         <span className="hidden sm:inline">Checking session…</span>
         <span className="sm:hidden">Checking…</span>
       </span>
@@ -47,12 +46,12 @@ export default function AuthStatus() {
         ) : (
           <span
             aria-hidden="true"
-            className="flex h-6 w-6 items-center justify-center rounded-full bg-chrome-hover text-[11px] font-semibold text-chrome-fg"
+            className="flex h-6 w-6 items-center justify-center rounded-full bg-surface-subtle text-[11px] font-semibold text-foreground"
           >
             {(user.displayName || user.username || "?").charAt(0).toUpperCase()}
           </span>
         )}
-        <span className="text-sm font-medium text-chrome-fg">
+        <span className="text-sm font-medium text-foreground">
           {user.displayName || user.username}
         </span>
       </div>
@@ -60,7 +59,7 @@ export default function AuthStatus() {
       <button
         type="button"
         onClick={logout}
-        className="rounded-md border border-chrome-border px-2.5 py-1 text-[13px] font-medium text-chrome-fg-muted transition-colors hover:bg-chrome-hover hover:text-chrome-fg"
+        className="rounded-md border border-border px-2.5 py-1 text-[13px] font-medium text-foreground-muted transition-colors hover:bg-surface-subtle hover:text-foreground"
       >
         Sign out
       </button>
