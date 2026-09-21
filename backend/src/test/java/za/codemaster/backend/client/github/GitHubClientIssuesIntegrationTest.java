@@ -102,16 +102,16 @@ class GitHubClientIssuesIntegrationTest {
             }
 
             assertEquals(expected.get("number").asInt(), actual.issueNumber());
-            assertEquals(expected.get("title").asText(), actual.title());
+            assertEquals(expected.get("title").asString(), actual.title());
             assertEquals(
-                    expected.get("body").isNull() ? null : expected.get("body").asText(),
+                    expected.get("body").isNull() ? null : expected.get("body").asString(),
                     actual.body());
-            assertEquals(expected.get("html_url").asText(), actual.htmlUrl());
-            assertEquals(OffsetDateTime.parse(expected.get("created_at").asText()), actual.createdAt());
-            assertEquals(OffsetDateTime.parse(expected.get("updated_at").asText()), actual.updatedAt());
+            assertEquals(expected.get("html_url").asString(), actual.htmlUrl());
+            assertEquals(OffsetDateTime.parse(expected.get("created_at").asString()), actual.createdAt());
+            assertEquals(OffsetDateTime.parse(expected.get("updated_at").asString()), actual.updatedAt());
 
             List<String> expectedLabels = StreamSupport.stream(expected.get("labels").spliterator(), false)
-                    .map(label -> label.get("name").asText())
+                    .map(label -> label.get("name").asString())
                     .toList();
             assertEquals(expectedLabels, actual.labels());
 

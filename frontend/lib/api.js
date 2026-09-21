@@ -132,7 +132,9 @@ async function apiFetch(path, init) {
     throw new ApiError(res.status, body);
   }
 
-  return res.json();
+  // DELETE (and some POSTs) may legitimately return no body (204).
+  const text = await res.text();
+  return text ? JSON.parse(text) : null;
 }
 
 /**
@@ -164,6 +166,31 @@ function listProjects(params) {
  */
 function getProject(projectId) {
   return apiFetch(`/projects/${projectId}`);
+}
+
+function inviteMaintainer(projectId, username) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}/maintainers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({
+      username,
+      role: 'maintainer',
+    }),
+  });
+}
+
+function removeMaintainer(projectId, userId) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}/maintainers/${userId}`, {
+    method: 'DELETE',
+    headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+  });
 }
 
 /**
@@ -220,6 +247,37 @@ function postComment(issueId, body) {
   });
 }
 
+
+  function getIssueClaims(issueId) {
+    return apiFetch(`/issues/${issueId}/claims`);
+  }
+
+  function getCurrentUser() {
+    return apiFetch('/users/me');
+  }
+
+  function postClaim(issueId, note) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/issues/${issueId}/claim`, {
+      method: 'POST',
+      headers: {
+        ...(note ? { 'Content-Type': 'application/json' } : {}),
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      },
+      body: note ? JSON.stringify({ note }) : undefined,
+    });
+  }
+
+  function deleteClaim(issueId) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/issues/${issueId}/claim`, {
+      method: 'DELETE',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+  }
+
 module.exports = {
   listProjects,
   getProject,
@@ -227,4 +285,90 @@ module.exports = {
   getIssueComments,
   postComment,
   ApiError,
+    getIssueClaims,
+  getCurrentUser,
+  postClaim,
+  deleteClaim,
+  getIssueClaims, 
+  getCurrentUser,
+   postClaim,
+    deleteClaim,
+  inviteMaintainer,
+  removeMaintainer,
+  updateIssueClassification,
+
 };
+
+/**
+ * Add these methods to frontend/lib/api.js (after the existing deleteClaim function)
+ */
+
+/**
+ * Invite a maintainer to a project by username.
+ * Owner-only. Returns the newly-created ProjectMaintainerDto.
+ *
+ * @param {number|string} projectId
+ * @param {string} username
+ * @returns {Promise<Object>} ProjectMaintainerDto
+ */
+function addMaintainer(projectId, username) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}/maintainers`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ username }),
+  });
+}
+
+/**
+ * Remove a maintainer from a project.
+ * Owner-only; refuses to remove the last remaining owner.
+ *
+ * @param {number|string} projectId
+ * @param {number|string} userId
+ * @returns {Promise<null>}
+ */
+function removeMaintainer(projectId, userId) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}/maintainers/${userId}`, {
+    method: 'DELETE',
+    headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+  });
+}
+
+/**
+ * Update an issue's difficulty and/or beginner-friendly status.
+ * Maintainer-only. Only provided fields are changed.
+ *
+ * @param {number|string} issueId
+ * @param {Object} update
+ * @param {string} [update.difficulty] One of: TRIVIAL, EASY, MODERATE, HARD, VERY_HARD
+ * @param {boolean} [update.isBeginnerFriendly]
+ * @returns {Promise<Object>} Updated IssueDto
+ */
+function updateIssueClassification(issueId, update) {
+  const csrfToken = getCsrfToken();
+  const payload = {};
+
+  if (update.difficulty !== undefined) payload.difficulty = update.difficulty;
+  if (update.isBeginnerFriendly !== undefined) payload.isBeginnerFriendly = update.isBeginnerFriendly;
+
+  return apiFetch(`/issues/${issueId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+// Add these to the module.exports at the end:
+// addMaintainer,
+// removeMaintainer,
+// updateIssueClassification,v

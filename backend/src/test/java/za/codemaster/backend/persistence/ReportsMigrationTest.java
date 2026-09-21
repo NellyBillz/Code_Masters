@@ -11,7 +11,6 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.domain.model.Report;
 import za.codemaster.backend.domain.model.User;

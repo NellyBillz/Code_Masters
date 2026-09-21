@@ -18,7 +18,6 @@ import za.codemaster.backend.domain.model.SyncJob;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
-import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.SyncJobRepository;
 import za.codemaster.backend.repository.UserRepository;
@@ -59,9 +58,6 @@ public class EntityRoundTripDataJpaTest {
 
     @Autowired
     private SyncJobRepository syncJobRepository;
-
-    @Autowired
-    private ProjectMaintainerRepository projectMaintainerRepository;
 
     @Autowired
     private EntityManager entityManager;

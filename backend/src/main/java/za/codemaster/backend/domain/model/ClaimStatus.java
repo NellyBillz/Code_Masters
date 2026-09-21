@@ -1,8 +1,5 @@
 package za.codemaster.backend.domain.model;
 
-import jakarta.persistence.AttributeConverter;
-import jakarta.persistence.Converter;
-
 /**
  * Valid states for an issue claim matching the DB check constraint:
  * {@code CHECK (status IN ('active', 'released', 'completed', 'changes_requested'))}.
