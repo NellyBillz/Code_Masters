@@ -258,8 +258,12 @@ public class CommentService {
         return new PagedComments(items, new PageMeta(result.getNumber(), result.getSize(), (int) result.getTotalElements()));
     }
 
-    /** Maps a persisted comment row to the API's {@link CommentDto} shape. */
-    private CommentDto toDto(Comment entity) {
+    /**
+     * Maps a persisted comment row to the API's {@link CommentDto} shape.
+     * Public: reused by {@code MaintainerActivityService} (API-03.7) rather
+     * than duplicating this mapping there.
+     */
+    public CommentDto toDto(Comment entity) {
         return new CommentDto(
                 entity.getId(),
                 toPublicProfile(entity.getUser()),

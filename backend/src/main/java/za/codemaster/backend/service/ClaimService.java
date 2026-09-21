@@ -256,8 +256,12 @@ public class ClaimService {
                 .toList();
     }
 
-    /** Maps a persisted claim row to the API's {@link ClaimDto} shape. */
-    private ClaimDto toDto(Claim entity) {
+    /**
+     * Maps a persisted claim row to the API's {@link ClaimDto} shape.
+     * Public: reused by {@code MaintainerActivityService} (API-03.7) rather
+     * than duplicating this mapping there.
+     */
+    public ClaimDto toDto(Claim entity) {
         return new ClaimDto(
                 entity.getId(),
                 entity.getIssue().getId(),

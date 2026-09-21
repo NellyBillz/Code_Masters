@@ -1,9 +1,12 @@
 package za.codemaster.backend.repository;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 import za.codemaster.backend.domain.model.Claim;
 import za.codemaster.backend.domain.model.ClaimStatus;
+import za.codemaster.backend.domain.model.PullRequestState;
 
 import java.util.Collection;
 import java.util.List;
@@ -69,4 +72,28 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
      * contributions only, i.e. status {@code completed} — not a raw claim count.
      */
     long countByUserIdAndStatus(Long userId, ClaimStatus status);
+
+    /**
+     * Finds a user's claims in a given status, most recent {@code completedAt}
+     * first, paginated. Backs {@code GET /users/{username}/contributions}
+     * (API-03.6) — always called with {@code ClaimStatus.COMPLETED}.
+     */
+    Page<Claim> findByUserIdAndStatusOrderByCompletedAtDesc(Long userId, ClaimStatus status, Pageable pageable);
+
+    /**
+     * Finds a project's claims in a given status (via {@code claim.issue.project}).
+     * Backs {@code activeClaims} in {@code GET /users/me/maintainer-activity} (API-03.7).
+     */
+    List<Claim> findByIssueProjectIdAndStatus(Long projectId, ClaimStatus status);
+
+    /**
+     * Finds a project's claims in a given status with a given pull-request state.
+     * Backs {@code claimsAwaitingReview} in {@code GET /users/me/maintainer-activity}
+     * (API-03.7): a PR is attached ({@code pullRequestState: open}) and the claim
+     * hasn't been reviewed yet ({@code status: active}) — once reviewed, the claim
+     * moves to {@code changes_requested}/{@code completed} and drops out of this
+     * specific query, even though it still appears elsewhere.
+     */
+    List<Claim> findByIssueProjectIdAndStatusAndPullRequestState(
+            Long projectId, ClaimStatus status, PullRequestState pullRequestState);
 }

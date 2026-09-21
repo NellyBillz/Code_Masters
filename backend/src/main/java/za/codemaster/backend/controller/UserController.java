@@ -5,8 +5,10 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import za.codemaster.backend.domain.model.User;
+import za.codemaster.backend.dto.user.PagedContributions;
 import za.codemaster.backend.dto.user.PublicUserProfile;
 import za.codemaster.backend.dto.user.UpdateUserRequest;
 import za.codemaster.backend.dto.user.UserProfile;
@@ -47,6 +49,20 @@ public class UserController {
     @GetMapping("/api/v1/users/{username}")
     public PublicUserProfile getPublicProfile(@PathVariable String username) {
         return userService.getPublicProfile(username);
+    }
+
+    /**
+     * {@code GET /api/v1/users/{username}/contributions}: a developer's verified
+     * contribution history (API-03.6) — only {@code completed} claims, most
+     * recent first. Throws {@code USER_NOT_FOUND} (404) via GlobalExceptionHandler
+     * if the username doesn't exist.
+     */
+    @GetMapping("/api/v1/users/{username}/contributions")
+    public PagedContributions getContributions(
+            @PathVariable String username,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer size) {
+        return userService.getContributions(username, page, size);
     }
 
     /**

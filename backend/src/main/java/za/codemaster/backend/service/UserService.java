@@ -1,10 +1,18 @@
 package za.codemaster.backend.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import za.codemaster.backend.domain.model.Claim;
 import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.User;
+import za.codemaster.backend.dto.claim.ClaimCompletionSourceDto;
+import za.codemaster.backend.dto.claim.ClaimStatusDto;
+import za.codemaster.backend.dto.common.PageMeta;
+import za.codemaster.backend.dto.user.Contribution;
+import za.codemaster.backend.dto.user.PagedContributions;
 import za.codemaster.backend.dto.user.PublicUserProfile;
 import za.codemaster.backend.dto.user.UpdateUserRequest;
 import za.codemaster.backend.dto.user.UserProfile;
@@ -22,12 +30,19 @@ import java.util.List;
 @Service
 public class UserService {
 
+    private static final int DEFAULT_PAGE = 0;
+    private static final int DEFAULT_SIZE = 20;
+    private static final int MAX_SIZE = 50;
+
     private final UserRepository userRepository;
     private final ClaimRepository claimRepository;
+    private final ProjectQueryService projectQueryService;
 
-    public UserService(UserRepository userRepository, ClaimRepository claimRepository) {
+    public UserService(UserRepository userRepository, ClaimRepository claimRepository,
+                        ProjectQueryService projectQueryService) {
         this.userRepository = userRepository;
         this.claimRepository = claimRepository;
+        this.projectQueryService = projectQueryService;
     }
 
     /**
@@ -95,6 +110,65 @@ public class UserService {
 
         User saved = userRepository.save(user);
         return new UserProfile(toPublicProfile(saved), saved.getEmail(), true);
+    }
+
+    /**
+     * A developer's verified contribution history (API-03.6): only claims with
+     * status {@code completed} — active/changes_requested/released claims never
+     * appear here — most recent {@code completedAt} first. This is the "did
+     * this person actually ship something" record (product doc Feature 9),
+     * distinct from raw claim activity.
+     *
+     * @param username the username from the path
+     * @param page     zero-based page number, defaults to 0
+     * @param size     page size, defaults to 20, clamped to a max of 50
+     * @return one page of the user's verified contributions
+     * @throws ApiException with code {@code USER_NOT_FOUND} (404) if no user has that username
+     */
+    @Transactional(readOnly = true)
+    public PagedContributions getContributions(String username, Integer page, Integer size) {
+        User user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new ApiException(
+                        "USER_NOT_FOUND", "No user exists with username " + username, HttpStatus.NOT_FOUND));
+
+        int resolvedPage = clampPage(page);
+        int resolvedSize = clampSize(size);
+
+        Page<Claim> result = claimRepository.findByUserIdAndStatusOrderByCompletedAtDesc(
+                user.getId(), ClaimStatus.COMPLETED, PageRequest.of(resolvedPage, resolvedSize));
+
+        List<Contribution> items = result.getContent().stream().map(this::toContribution).toList();
+        return new PagedContributions(items, new PageMeta(resolvedPage, resolvedSize, (int) result.getTotalElements()));
+    }
+
+    /** Maps a completed claim to the API's {@link Contribution} shape. */
+    private Contribution toContribution(Claim claim) {
+        return new Contribution(
+                projectQueryService.toDto(claim.getIssue()),
+                projectQueryService.toDto(claim.getIssue().getProject()),
+                ClaimStatusDto.valueOf(claim.getStatus().name()),
+                claim.getPullRequestUrl(),
+                claim.getCompletionSource() == null
+                        ? null
+                        : ClaimCompletionSourceDto.valueOf(claim.getCompletionSource().name()),
+                claim.getCompletedAt()
+        );
+    }
+
+    /** Clamps {@code size} to the spec's max of 50; defaults to 20 if not provided. */
+    private int clampSize(Integer size) {
+        if (size == null) {
+            return DEFAULT_SIZE;
+        }
+        return Math.max(1, Math.min(size, MAX_SIZE));
+    }
+
+    /** Defaults to page 0 if not provided or negative. */
+    private int clampPage(Integer page) {
+        if (page == null || page < 0) {
+            return DEFAULT_PAGE;
+        }
+        return page;
     }
 
     /**

@@ -230,6 +230,7 @@ public class ProjectQueryService {
                 Boolean.TRUE.equals(entity.getHasBeginnerFriendlyIssues()),
                 entity.getLastActivityAt(),
                 ProjectListingStatus.valueOf(entity.getListingStatus().name()),
+                entity.isAcceptingContributions(),
                 Boolean.TRUE.equals(entity.getVerified()),
                 entity.getVerifiedAt(),
                 entity.getCreatedAt(),

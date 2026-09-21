@@ -186,6 +186,35 @@ class ProjectControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("Toggling acceptingContributions is reflected on the next GET; listingStatus in the same body has no effect")
+    void togglingAcceptingContributionsIsReflectedButListingStatusIsIgnored() throws Exception {
+        Session session = createActiveSession();
+        String response = mockMvc.perform(post("/api/v1/projects")
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
+                        .header(CSRF_HEADER, session.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createProjectJson(uniqueGithubUrl())))
+                .andExpect(jsonPath("$.acceptingContributions").value(true))
+                .andReturn().getResponse().getContentAsString();
+        Long projectId = extractId(response);
+
+        mockMvc.perform(patch("/api/v1/projects/{projectId}", projectId)
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
+                        .header(CSRF_HEADER, session.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"acceptingContributions\":false,\"listingStatus\":\"published\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.acceptingContributions").value(false))
+                .andExpect(jsonPath("$.listingStatus").value("pending"));
+
+        mockMvc.perform(get("/api/v1/projects/{projectId}", projectId)
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.acceptingContributions").value(false))
+                .andExpect(jsonPath("$.listingStatus").value("pending"));
+    }
+
+    @Test
     @DisplayName("A non-maintainer attempting to PATCH -> 403")
     void nonMaintainerUpdateIsForbidden() throws Exception {
         Session owner = createActiveSession();

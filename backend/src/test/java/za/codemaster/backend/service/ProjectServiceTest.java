@@ -162,7 +162,7 @@ class ProjectServiceTest {
         ProjectDto created = service.createProject(createRequest, submitter);
 
         UpdateProjectRequest updateRequest = new UpdateProjectRequest(
-                "Fintech", List.of("payments"), ProjectConnection.AFRICA_FOCUSED, List.of("KE"));
+                "Fintech", List.of("payments"), ProjectConnection.AFRICA_FOCUSED, List.of("KE"), null);
         ProjectDto updated = service.updateProject(created.id(), updateRequest, submitter);
 
         assertEquals("Fintech", updated.category());
@@ -172,12 +172,37 @@ class ProjectServiceTest {
     }
 
     @Test
+    void maintainerCanToggleAcceptingContributionsOff() {
+        CreateProjectRequest createRequest = new CreateProjectRequest(
+                uniqueGithubUrl(), ProjectConnection.SOUTH_AFRICAN, "Education", null, null);
+        ProjectDto created = service.createProject(createRequest, submitter);
+        assertTrue(created.acceptingContributions(), "new projects default to accepting contributions");
+
+        UpdateProjectRequest updateRequest = new UpdateProjectRequest(null, null, null, null, false);
+        ProjectDto updated = service.updateProject(created.id(), updateRequest, submitter);
+
+        assertFalse(updated.acceptingContributions());
+    }
+
+    @Test
+    void notProvidingAcceptingContributionsLeavesItUnchanged() {
+        CreateProjectRequest createRequest = new CreateProjectRequest(
+                uniqueGithubUrl(), ProjectConnection.SOUTH_AFRICAN, "Education", null, null);
+        ProjectDto created = service.createProject(createRequest, submitter);
+
+        UpdateProjectRequest updateRequest = new UpdateProjectRequest("NewCategory", null, null, null, null);
+        ProjectDto updated = service.updateProject(created.id(), updateRequest, submitter);
+
+        assertTrue(updated.acceptingContributions(), "acceptingContributions wasn't provided, should be untouched");
+    }
+
+    @Test
     void updateOnlyChangesProvidedFields() {
         CreateProjectRequest createRequest = new CreateProjectRequest(
                 uniqueGithubUrl(), ProjectConnection.SOUTH_AFRICAN, "Education", List.of("original"), List.of("ZA"));
         ProjectDto created = service.createProject(createRequest, submitter);
 
-        UpdateProjectRequest updateRequest = new UpdateProjectRequest("UpdatedCategory", null, null, null);
+        UpdateProjectRequest updateRequest = new UpdateProjectRequest("UpdatedCategory", null, null, null, null);
         ProjectDto updated = service.updateProject(created.id(), updateRequest, submitter);
 
         assertEquals("UpdatedCategory", updated.category());
@@ -197,7 +222,7 @@ class ProjectServiceTest {
                 .displayName("Stranger")
                 .build());
 
-        UpdateProjectRequest updateRequest = new UpdateProjectRequest("Hijacked", null, null, null);
+        UpdateProjectRequest updateRequest = new UpdateProjectRequest("Hijacked", null, null, null, null);
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.updateProject(created.id(), updateRequest, stranger));
 
@@ -207,7 +232,7 @@ class ProjectServiceTest {
 
     @Test
     void updateOnMissingProjectThrowsProjectNotFound() {
-        UpdateProjectRequest updateRequest = new UpdateProjectRequest("X", null, null, null);
+        UpdateProjectRequest updateRequest = new UpdateProjectRequest("X", null, null, null, null);
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.updateProject(-999L, updateRequest, submitter));

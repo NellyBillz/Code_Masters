@@ -117,6 +117,10 @@ public class ProjectService {
      * Updates a project's Code-Masters-specific metadata. Maintainer-only (any role).
      * Only fields present (non-null) on the request are changed; GitHub-derived fields
      * (stars, description, etc.) aren't accepted here at all — that's sync's job.
+     * {@code acceptingContributions} (API-03.8) lets a maintainer pause new
+     * contributor intake without unpublishing the project — independent of
+     * {@code listingStatus}, which isn't a recognized field on this request at
+     * all (API-03.1) and so is silently ignored if a client sends it.
      *
      * @param projectId the project id from the path
      * @param request   the fields to change; all optional
@@ -147,6 +151,9 @@ public class ProjectService {
         }
         if (request.countryCodes() != null) {
             project.setCountryCodes(new ArrayList<>(request.countryCodes()));
+        }
+        if (request.acceptingContributions() != null) {
+            project.setAcceptingContributions(request.acceptingContributions());
         }
 
         Project saved = projectRepository.save(project);

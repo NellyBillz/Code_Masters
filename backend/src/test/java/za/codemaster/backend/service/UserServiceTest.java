@@ -20,6 +20,7 @@ import za.codemaster.backend.dto.user.UserProfile;
 import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.UserRepository;
 
@@ -59,11 +60,16 @@ class UserServiceTest {
     @Autowired
     private ProjectRepository projectRepository;
 
+    @Autowired
+    private ProjectMaintainerRepository projectMaintainerRepository;
+
     private UserService service;
 
     @BeforeEach
     void setUp() {
-        service = new UserService(userRepository, claimRepository);
+        ProjectQueryService projectQueryService =
+                new ProjectQueryService(projectRepository, issueRepository, claimRepository, projectMaintainerRepository);
+        service = new UserService(userRepository, claimRepository, projectQueryService);
     }
 
     private User createUser(String username, String email) {
@@ -169,6 +175,93 @@ class UserServiceTest {
         claim(issue, user, ClaimStatus.ACTIVE);
 
         assertEquals(0, service.getPublicProfile(user.getUsername()).contributionsCount());
+    }
+
+    private Claim completedClaim(Issue issue, User user, java.time.OffsetDateTime completedAt) {
+        Claim claim = new Claim();
+        claim.setIssue(issue);
+        claim.setUser(user);
+        claim.setStatus(ClaimStatus.COMPLETED);
+        claim.setCompletionSource(za.codemaster.backend.domain.model.CompletionSource.MAINTAINER_CONFIRMED);
+        claim.setCompletedAt(completedAt);
+        return claimRepository.save(claim);
+    }
+
+    @Test
+    void contributionsShowsExactlyTheCompletedClaimsAmongAMixOfStatuses() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("history_" + suffix, "history_" + suffix + "@example.com");
+        java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+
+        completedClaim(seedIssue(), user, now.minusDays(2));
+        completedClaim(seedIssue(), user, now.minusDays(1));
+        claim(seedIssue(), user, ClaimStatus.ACTIVE);
+        claim(seedIssue(), user, ClaimStatus.RELEASED);
+
+        za.codemaster.backend.dto.user.PagedContributions contributions =
+                service.getContributions(user.getUsername(), null, null);
+
+        assertEquals(2, contributions.items().size(),
+                "only the 2 completed claims should appear, not the active or released ones");
+        assertTrue(contributions.items().stream()
+                .allMatch(c -> c.status() == za.codemaster.backend.dto.claim.ClaimStatusDto.COMPLETED));
+        assertEquals(2, contributions.meta().total());
+    }
+
+    @Test
+    void contributionsAreOrderedMostRecentCompletedAtFirst() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("order_" + suffix, "order_" + suffix + "@example.com");
+        java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+
+        Claim older = completedClaim(seedIssue(), user, now.minusDays(5));
+        Claim newer = completedClaim(seedIssue(), user, now.minusDays(1));
+
+        za.codemaster.backend.dto.user.PagedContributions contributions =
+                service.getContributions(user.getUsername(), null, null);
+
+        assertEquals(newer.getCompletedAt(), contributions.items().get(0).completedAt());
+        assertEquals(older.getCompletedAt(), contributions.items().get(1).completedAt());
+    }
+
+    @Test
+    void contributionShapeIncludesIssueProjectAndVerificationDetails() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("shape_" + suffix, "shape_" + suffix + "@example.com");
+        Issue issue = seedIssue();
+        Claim completed = completedClaim(issue, user, java.time.OffsetDateTime.now());
+        completed.setPullRequestUrl("https://github.com/example-org/repo/pull/42");
+        claimRepository.save(completed);
+
+        za.codemaster.backend.dto.user.Contribution contribution =
+                service.getContributions(user.getUsername(), null, null).items().get(0);
+
+        assertEquals(issue.getId(), contribution.issue().id());
+        assertEquals(issue.getProject().getId(), contribution.project().id());
+        assertEquals("https://github.com/example-org/repo/pull/42", contribution.pullRequestUrl());
+        assertEquals(za.codemaster.backend.dto.claim.ClaimCompletionSourceDto.MAINTAINER_CONFIRMED,
+                contribution.completionSource());
+    }
+
+    @Test
+    void contributionsForUnknownUsernameThrowsUserNotFound() {
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.getContributions("no-such-user-xyz", null, null));
+
+        assertEquals("USER_NOT_FOUND", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatus());
+    }
+
+    @Test
+    void contributionsForAUserWithNoneIsAnEmptyList() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("empty_" + suffix, "empty_" + suffix + "@example.com");
+
+        za.codemaster.backend.dto.user.PagedContributions contributions =
+                service.getContributions(user.getUsername(), null, null);
+
+        assertTrue(contributions.items().isEmpty());
+        assertEquals(0, contributions.meta().total());
     }
 
     @Test
