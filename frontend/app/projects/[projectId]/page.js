@@ -3,26 +3,27 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { getProject, getCurrentUser } from "../../../lib/api";
+import { getProject } from "../../../lib/api";
+import { useAuth } from "../../context/AuthContext";
 import MaintainersPanel from "../../components/MaintainersPanel";
 
 export default function ProjectDetail() {
   const params = useParams();
   const projectId = params?.projectId;
+  const { user: currentUser } = useAuth();
 
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [currentUser, setCurrentUser] = useState(null);
-  const [isMaintainer, setIsMaintainer] = useState(false);
 
-  // Check if current user is a maintainer
-  const checkMaintainerStatus = (projectData, user) => {
-    if (!user || !projectData?.maintainers) return false;
-    return projectData.maintainers.some(
-      (maint) => maint.user?.id === user.id || maint.user?.username === user.username
-    );
-  };
+  const isMaintainer = Boolean(
+    currentUser &&
+      project?.maintainers?.some(
+        (maint) =>
+          maint.user?.id === currentUser.id ||
+          maint.user?.username === currentUser.username
+      )
+  );
 
   useEffect(() => {
     if (!projectId) return;
@@ -34,16 +35,10 @@ export default function ProjectDetail() {
       setError("");
 
       try {
-        // Load project and current user in parallel
-        const [projectResult, userResult] = await Promise.all([
-          getProject(projectId),
-          getCurrentUser().catch(() => null), // User might not be logged in
-        ]);
+        const projectResult = await getProject(projectId);
 
         if (!cancelled) {
           setProject(projectResult);
-          setCurrentUser(userResult);
-          setIsMaintainer(checkMaintainerStatus(projectResult, userResult));
         }
       } catch (err) {
         if (!cancelled) {

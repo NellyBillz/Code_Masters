@@ -2,14 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { getIssueComments, postComment } from "../../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 export default function IssueComments({ issueId }) {
+    const { user, loading: authLoading } = useAuth();
     const [comments, setComments] = useState([]);
     const [body, setBody] = useState("");
     const [loading, setLoading] = useState(true);
     const [posting, setPosting] = useState(false);
     const [error, setError] = useState("");
-    const [loggedIn, setLoggedIn] = useState(false);
 
     async function loadComments() {
         try {
@@ -27,12 +28,6 @@ export default function IssueComments({ issueId }) {
     }
 
     useEffect(() => {
-        setLoggedIn(
-            document.cookie
-                .split("; ")
-                .some((cookie) => cookie.startsWith("CODEMASTERS_CSRF="))
-        );
-
         loadComments();
     }, [issueId]);
 
@@ -41,7 +36,7 @@ export default function IssueComments({ issueId }) {
 
         const trimmedBody = body.trim();
 
-        if (!trimmedBody || !loggedIn) {
+        if (!trimmedBody || !user) {
             return;
         }
 
@@ -65,7 +60,11 @@ export default function IssueComments({ issueId }) {
         <section style={{ marginTop: "2rem" }}>
             <h2>Comments</h2>
 
-            {loggedIn ? (
+            {authLoading ? (
+                <p style={{ fontSize: "0.9rem", color: "#777" }}>
+                    Checking session...
+                </p>
+            ) : user ? (
                 <form
                     onSubmit={handleSubmit}
                     style={{ marginBottom: "2rem" }}

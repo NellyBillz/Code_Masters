@@ -1,18 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getCurrentUser, getProject } from "../../lib/api";
+import { getProject } from "../../lib/api";
+import { useAuth } from "../context/AuthContext";
 import DifficultyOverride from "./DifficultyOverride";
 
 export default function IssueMaintainerOverride({ issue }) {
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user: currentUser } = useAuth();
   const [project, setProject] = useState(null);
-
-  useEffect(() => {
-    getCurrentUser()
-      .then(setCurrentUser)
-      .catch(() => setCurrentUser(null));
-  }, []);
 
   useEffect(() => {
     if (!issue?.project?.id) {

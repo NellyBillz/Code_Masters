@@ -1,21 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-    getCurrentUser,
-    getIssueClaims,
-    postClaim,
-    deleteClaim,
-} from "../../lib/api";
+import { getIssueClaims, postClaim, deleteClaim } from "../../lib/api";
+import { useAuth } from "../context/AuthContext";
 
 function isActive(claim) {
     return !claim.status || String(claim.status).toLowerCase() === "active";
 }
 
 export default function ClaimPanel({ issueId, initialClaims = [] }) {
+    const { user: me, loading: authLoading } = useAuth();
     const [claims, setClaims] = useState(initialClaims.filter(isActive));
-    const [me, setMe] = useState(null);
-    const [hasSession, setHasSession] = useState(false);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
 
@@ -25,26 +20,7 @@ export default function ClaimPanel({ issueId, initialClaims = [] }) {
     }
 
     useEffect(() => {
-        let cancelled = false;
-
-        const session = document.cookie
-            .split("; ")
-            .some((cookie) => cookie.startsWith("CODEMASTERS_CSRF="));
-        setHasSession(session);
-
         refresh().catch(() => {});
-
-        if (session) {
-            getCurrentUser()
-                .then((user) => {
-                    if (!cancelled) setMe(user);
-                })
-                .catch(() => {});
-        }
-
-        return () => {
-            cancelled = true;
-        };
     }, [issueId]);
 
     const myClaim = me ? claims.find((c) => c.user?.id === me.id) : null;
@@ -82,11 +58,15 @@ export default function ClaimPanel({ issueId, initialClaims = [] }) {
                 same issue.
             </p>
 
-            {hasSession ? (
+            {authLoading ? (
+                <p style={{ fontSize: "0.9rem", color: "#777" }}>
+                    Checking session...
+                </p>
+            ) : me ? (
                 <button
                     type="button"
                     onClick={handleToggle}
-                    disabled={busy || !me}
+                    disabled={busy}
                 >
                     {busy
                         ? "Working..."

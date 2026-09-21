@@ -168,6 +168,13 @@ function getProject(projectId) {
   return apiFetch(`/projects/${projectId}`);
 }
 
+/**
+ * Invite a maintainer to a project by username. Owner-only.
+ *
+ * @param {number|string} projectId
+ * @param {string} username
+ * @returns {Promise<Object>} ProjectMaintainerDto
+ */
 function inviteMaintainer(projectId, username) {
   const csrfToken = getCsrfToken();
 
@@ -184,6 +191,14 @@ function inviteMaintainer(projectId, username) {
   });
 }
 
+/**
+ * Remove a maintainer from a project.
+ * Owner-only; refuses to remove the last remaining owner.
+ *
+ * @param {number|string} projectId
+ * @param {number|string} userId
+ * @returns {Promise<null>}
+ */
 function removeMaintainer(projectId, userId) {
   const csrfToken = getCsrfToken();
 
@@ -292,73 +307,13 @@ function postComment(issueId, body) {
     });
   }
 
-module.exports = {
-  listProjects,
-  getProject,
-  getIssue,
-  getIssueComments,
-  postComment,
-  ApiError,
-    getIssueClaims,
-  getCurrentUser,
-  postClaim,
-  deleteClaim,
-  logout,
-  inviteMaintainer,
-  removeMaintainer,
-  updateIssueClassification,
-
-};
-
-/**
- * Add these methods to frontend/lib/api.js (after the existing deleteClaim function)
- */
-
-/**
- * Invite a maintainer to a project by username.
- * Owner-only. Returns the newly-created ProjectMaintainerDto.
- *
- * @param {number|string} projectId
- * @param {string} username
- * @returns {Promise<Object>} ProjectMaintainerDto
- */
-function addMaintainer(projectId, username) {
-  const csrfToken = getCsrfToken();
-
-  return apiFetch(`/projects/${projectId}/maintainers`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-    },
-    body: JSON.stringify({ username }),
-  });
-}
-
-/**
- * Remove a maintainer from a project.
- * Owner-only; refuses to remove the last remaining owner.
- *
- * @param {number|string} projectId
- * @param {number|string} userId
- * @returns {Promise<null>}
- */
-function removeMaintainer(projectId, userId) {
-  const csrfToken = getCsrfToken();
-
-  return apiFetch(`/projects/${projectId}/maintainers/${userId}`, {
-    method: 'DELETE',
-    headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
-  });
-}
-
 /**
  * Update an issue's difficulty and/or beginner-friendly status.
  * Maintainer-only. Only provided fields are changed.
  *
  * @param {number|string} issueId
  * @param {Object} update
- * @param {string} [update.difficulty] One of: TRIVIAL, EASY, MODERATE, HARD, VERY_HARD
+ * @param {string} [update.difficulty] One of: beginner, intermediate, advanced, unknown
  * @param {boolean} [update.isBeginnerFriendly]
  * @returns {Promise<Object>} Updated IssueDto
  */
@@ -379,7 +334,19 @@ function updateIssueClassification(issueId, update) {
   });
 }
 
-// Add these to the module.exports at the end:
-// addMaintainer,
-// removeMaintainer,
-// updateIssueClassification,v
+module.exports = {
+  listProjects,
+  getProject,
+  getIssue,
+  getIssueComments,
+  postComment,
+  ApiError,
+  getIssueClaims,
+  getCurrentUser,
+  postClaim,
+  deleteClaim,
+  logout,
+  inviteMaintainer,
+  removeMaintainer,
+  updateIssueClassification,
+};
