@@ -351,6 +351,53 @@ function postComment(issueId, body) {
   }
 
 /**
+ * Attach or update the pull request link on the caller's own claim (FE-03.3).
+ * The claim's owner only — a maintainer of the project is not exempt from
+ * this check.
+ *
+ * @param {number|string} issueId
+ * @param {number|string} claimId
+ * @param {string} pullRequestUrl
+ * @returns {Promise<Object>} The updated ClaimDto.
+ */
+function attachPullRequest(issueId, claimId, pullRequestUrl) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/issues/${issueId}/claims/${claimId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ pullRequestUrl }),
+  });
+}
+
+/**
+ * A maintainer's review decision on a claim's attached pull request
+ * (FE-03.3). Maintainer-only.
+ *
+ * @param {number|string} issueId
+ * @param {number|string} claimId
+ * @param {Object} params
+ * @param {'request_changes'|'confirm_completed'} params.decision
+ * @param {string} [params.feedback] Required when decision is `request_changes`.
+ * @returns {Promise<Object>} The updated ClaimDto.
+ */
+function reviewClaim(issueId, claimId, { decision, feedback }) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/issues/${issueId}/claims/${claimId}/review`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ decision, feedback }),
+  });
+}
+
+/**
  * Update an issue's difficulty and/or beginner-friendly status.
  * Maintainer-only. Only provided fields are changed.
  *
@@ -390,6 +437,8 @@ module.exports = {
   getCurrentUser,
   postClaim,
   deleteClaim,
+  attachPullRequest,
+  reviewClaim,
   logout,
   inviteMaintainer,
   removeMaintainer,

@@ -58,7 +58,11 @@ export default async function IssueDetailPage({ params }) {
             </section>
 
             <IssueComments issueId={issueId} />
-                           <ClaimPanel issueId={issueId} initialClaims={issue.claims || []} />
+            <ClaimPanel
+                issueId={issueId}
+                projectId={issue.project?.id}
+                initialClaims={issue.claims || []}
+            />
             <IssueMaintainerOverride issue={issue} />
         </main>
     );
