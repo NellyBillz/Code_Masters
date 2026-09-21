@@ -3,6 +3,7 @@ package za.codemaster.backend.service;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -63,28 +64,47 @@ public class ProjectQueryService {
     }
 
     /**
-     * Filters, sorts, and paginates the full project table.
+     * Filters, ranks, and paginates the published project set (API-03.13).
+     * <p>
+     * Filtering (listing status, {@code q}, language, category, tag, country,
+     * beginner-friendly) now runs in a single native query
+     * ({@link ProjectRepository#searchProjects}, DB-03.6) instead of an
+     * in-memory {@code findAll()} + Java predicate pass — the same query
+     * {@code GET /search}'s project half uses. {@code sort=relevance} (or no
+     * {@code sort} at all — historically a no-op here, and still one) now
+     * reflects the query's real {@code ts_rank}/trigram-similarity order when
+     * {@code q} is present, and falls back to {@code recent} ordering when
+     * it's absent, exactly as the spec has always documented. {@code stars}/
+     * {@code contributors}/{@code recent} sorting still happens in Java
+     * afterward — the native query only has one ranking mode (relevance),
+     * not a full sort-mode selector — over the complete matching set (fetched
+     * unpaginated), so pagination is still applied to the correctly-sorted
+     * whole, not to a single already-paginated slice.
      *
      * @param params the requested filters/sort/pagination; any field may be {@code null}
      * @return a {@link PagedProjects} containing one page of matching results
      */
     @Transactional(readOnly = true)
     public PagedProjects search(ProjectSearchParams params) {
-        List<ProjectDto> all = projectRepository.findAll().stream()
-                .map(this::toDto)
-                .toList();
+        boolean hasQuery = params.q() != null && !params.q().isBlank();
+        boolean relevanceRequested = params.sort() == null || params.sort().equals("relevance");
 
-        List<ProjectDto> filtered = all.stream()
-                .filter(p -> p.listingStatus() == ProjectListingStatus.PUBLISHED)
-                .filter(p -> matchesQuery(p, params.q()))
-                .filter(p -> matchesLanguage(p, params.language()))
-                .filter(p -> matchesCategory(p, params.category()))
-                .filter(p -> matchesTag(p, params.tag()))
-                .filter(p -> matchesCountry(p, params.country()))
-                .filter(p -> matchesHasBeginnerIssues(p, params.hasBeginnerIssues()))
-                .toList();
+        Page<za.codemaster.backend.domain.model.Project> matched = projectRepository.searchProjects(
+                params.q(),
+                ProjectListingStatus.PUBLISHED.getWireValue(),
+                params.language(),
+                params.category(),
+                null, // connection: not a GET /projects filter
+                params.hasBeginnerIssues(),
+                params.tag(),
+                params.country(),
+                relevanceRequested && hasQuery,
+                Pageable.unpaged()
+        );
 
-        List<ProjectDto> sorted = sort(filtered, params.sort());
+        List<ProjectDto> filtered = matched.getContent().stream().map(this::toDto).toList();
+
+        List<ProjectDto> sorted = sort(filtered, params.sort(), hasQuery);
 
         int size = clampSize(params.size());
         int page = clampPage(params.page());
@@ -320,65 +340,31 @@ public class ProjectQueryService {
     }
 
     /**
-     * True if {@code q} is blank/null, or found in the project's name, description, owner, or tags
-     * (case-insensitive). {@code description} is null-safe: a project submitted via
-     * {@code POST /projects} (API-02.7) has no description until sync fills one in, and this
-     * predicate runs against every row, so a single such project used to 500 any {@code q} search.
+     * {@code relevance} (or no {@code sort} at all — the historical no-op
+     * default) preserves whatever order {@code projects} arrived in when
+     * {@code q} is present — that's already the native query's real
+     * {@code ts_rank}/trigram order (API-03.13) — and falls back to
+     * {@code recent} ordering when {@code q} is absent, matching the spec's
+     * documented fallback exactly. Everything else sorts descending; newest,
+     * most stars, or most contributors first.
      */
-    private boolean matchesQuery(ProjectDto p, String q) {
-        if (q == null || q.isBlank()) {
-            return true;
+    private List<ProjectDto> sort(List<ProjectDto> projects, String sortParam, boolean hasQuery) {
+        String effectiveSort = sortParam;
+        if (effectiveSort == null || effectiveSort.equals("relevance")) {
+            if (hasQuery) {
+                return projects;
+            }
+            effectiveSort = "recent";
         }
-        String needle = q.toLowerCase(Locale.ROOT);
-        return containsIgnoreCase(p.name(), needle)
-                || containsIgnoreCase(p.description(), needle)
-                || containsIgnoreCase(p.owner(), needle)
-                || p.tags().stream().anyMatch(t -> containsIgnoreCase(t, needle));
-    }
-
-    private boolean containsIgnoreCase(String haystack, String needle) {
-        return haystack != null && haystack.toLowerCase(Locale.ROOT).contains(needle);
-    }
-
-    /** True if {@code language} is null, or matches the project's primaryLanguage (case-insensitive). */
-    private boolean matchesLanguage(ProjectDto p, String language) {
-        return language == null || p.primaryLanguage().equalsIgnoreCase(language);
-    }
-
-    /** True if {@code category} is null, or matches the project's category (case-insensitive). */
-    private boolean matchesCategory(ProjectDto p, String category) {
-        return category == null || p.category().equalsIgnoreCase(category);
-    }
-
-    /** True if {@code tag} is null, or found among the project's tags (case-insensitive). */
-    private boolean matchesTag(ProjectDto p, String tag) {
-        return tag == null || p.tags().stream().anyMatch(t -> t.equalsIgnoreCase(tag));
-    }
-
-    /** True if {@code country} is null, or found among the project's countryCodes (case-insensitive). */
-    private boolean matchesCountry(ProjectDto p, String country) {
-        return country == null || p.countryCodes().stream().anyMatch(c -> c.equalsIgnoreCase(country));
-    }
-
-    /** True if {@code hasBeginnerIssues} is null, or equals the project's hasBeginnerFriendlyIssues flag. */
-    private boolean matchesHasBeginnerIssues(ProjectDto p, Boolean hasBeginnerIssues) {
-        return hasBeginnerIssues == null || p.hasBeginnerFriendlyIssues() == hasBeginnerIssues;
-    }
-
-    /**
-     * "relevance" has no real scoring yet (Phase 2 territory, design doc §9)
-     * so it's a no-op that preserves the filtered order. Everything else
-     * sorts descending; newest, most stars, or most contributors first.
-     */
-    private List<ProjectDto> sort(List<ProjectDto> projects, String sortParam) {
-        if (sortParam == null || sortParam.equals("relevance")) {
-            return projects;
-        }
-        Comparator<ProjectDto> comparator = switch (sortParam) {
-            case "recent" -> Comparator.comparing(ProjectDto::lastActivityAt).reversed();
+        Comparator<ProjectDto> comparator = switch (effectiveSort) {
+            // Null-safe: lastActivityAt is a sync-populated column (GH-02.3) and
+            // stays null for a project that's never been synced — a real state,
+            // not a fixture-only edge case — so it must sort last, not NPE.
+            case "recent" -> Comparator.comparing(
+                    ProjectDto::lastActivityAt, Comparator.nullsLast(Comparator.reverseOrder()));
             case "stars" -> Comparator.comparing(ProjectDto::stars).reversed();
             case "contributors" -> Comparator.comparing(ProjectDto::contributors).reversed();
-            default -> throw new IllegalArgumentException("Unknown sort value: " + sortParam);
+            default -> throw new IllegalArgumentException("Unknown sort value: " + effectiveSort);
         };
         return projects.stream().sorted(comparator).toList();
     }

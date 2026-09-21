@@ -1,5 +1,7 @@
 package za.codemaster.backend.service;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,16 +20,20 @@ import za.codemaster.backend.repository.ProjectRepository;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
 
 /**
  * Unified cross-resource search (API-02.11, product doc Feature 17): one
  * {@code q} returning both projects and issues in a single ranked, paginated list.
  * <p>
- * Loads and filters projects/issues in Java, same reasoning as {@link ProjectQueryService#search}
- * ("project counts are small enough for a hackathon MVP that this is not a real
- * bottleneck") — merging two different tables into one paginated list isn't a
- * plain SQL query anyway, so there's no simpler DB-level alternative here.
+ * Each half now sources from its own real ranked native query (API-03.13:
+ * {@link ProjectRepository#searchProjects}/{@link IssueRepository#searchIssues},
+ * DB-03.6) instead of an in-memory {@code findAll()} + Java substring filter.
+ * {@code q} is always present here (validated below), so both halves always
+ * rank by relevance. Merging the two ranked lists is still a simple
+ * project-results-then-issue-results concatenation, unchanged from before —
+ * neither result type's score is comparable across types, so there's no
+ * meaningful single ranking to interleave them by; this ticket's contract is
+ * "no response shape change," not a redesign of the merge strategy.
  * <p>
  * {@code language}/{@code country} only narrow project results (issues have
  * neither field); {@code difficulty} only narrows issue results (projects have
@@ -71,14 +77,14 @@ public class SearchService {
         }
 
         SearchType type = params.type() == null ? SearchType.ALL : params.type();
-        String needle = params.q().trim().toLowerCase(Locale.ROOT);
+        String q = params.q().trim();
 
         List<SearchResultItem> results = new ArrayList<>();
         if (type == SearchType.ALL || type == SearchType.PROJECTS) {
-            results.addAll(searchProjects(needle, params));
+            results.addAll(searchProjects(q, params));
         }
         if (type == SearchType.ALL || type == SearchType.ISSUES) {
-            results.addAll(searchIssues(needle, params));
+            results.addAll(searchIssues(q, params));
         }
 
         int size = clampSize(params.size());
@@ -88,48 +94,55 @@ public class SearchService {
         return new PagedSearchResults(pageItems, new PageMeta(page, size, results.size()));
     }
 
-    private List<SearchResultItem> searchProjects(String needle, SearchParams params) {
-        return projectRepository.findAll().stream()
-                .filter(p -> p.getListingStatus() == ListingStatus.PUBLISHED)
-                .filter(p -> matchesProjectQuery(p, needle))
-                .filter(p -> params.language() == null || params.language().equalsIgnoreCase(p.getPrimaryLanguage()))
-                .filter(p -> matchesCountry(p, params.country()))
+    /**
+     * Ranked project half of {@code GET /search} (API-03.13) — the same native
+     * query {@code GET /projects} uses, always ranked by relevance since
+     * {@code q} is guaranteed present here. {@code category}/{@code connection}/
+     * {@code tag}/{@code hasBeginnerFriendlyIssues} aren't {@code /search}
+     * parameters, so {@code null} is passed for those — matching the query's
+     * existing "null means unfiltered" convention.
+     */
+    private List<SearchResultItem> searchProjects(String q, SearchParams params) {
+        Page<Project> matched = projectRepository.searchProjects(
+                q,
+                ListingStatus.PUBLISHED.getValue(),
+                params.language(),
+                null,
+                null,
+                null,
+                null,
+                params.country(),
+                true,
+                Pageable.unpaged()
+        );
+        return matched.getContent().stream()
                 .map(projectQueryService::toDto)
                 .map(dto -> (SearchResultItem) new ProjectSearchResult(dto))
                 .toList();
     }
 
-    private List<SearchResultItem> searchIssues(String needle, SearchParams params) {
-        return issueRepository.findAll().stream()
-                .filter(i -> matchesIssueQuery(i, needle))
-                .filter(i -> params.difficulty() == null
-                        || params.difficulty().getWireValue().equalsIgnoreCase(i.getDifficulty()))
+    /**
+     * Ranked issue half of {@code GET /search} (API-03.13) — the same native
+     * query pattern as {@link #searchProjects}, always ranked by relevance.
+     * {@code projectId}/{@code status}/{@code isBeginnerFriendly}/{@code label}
+     * aren't {@code /search} parameters, so {@code null} is passed for those.
+     */
+    private List<SearchResultItem> searchIssues(String q, SearchParams params) {
+        String difficulty = params.difficulty() == null ? null : params.difficulty().getWireValue();
+        Page<Issue> matched = issueRepository.searchIssues(
+                q,
+                null,
+                null,
+                difficulty,
+                null,
+                null,
+                true,
+                Pageable.unpaged()
+        );
+        return matched.getContent().stream()
                 .map(projectQueryService::toDto)
                 .map(dto -> (SearchResultItem) new IssueSearchResult(dto))
                 .toList();
-    }
-
-    /** True if {@code needle} is found in the project's name, description, owner, or tags. */
-    private boolean matchesProjectQuery(Project project, String needle) {
-        return containsIgnoreCase(project.getName(), needle)
-                || containsIgnoreCase(project.getDescription(), needle)
-                || containsIgnoreCase(project.getGithubOwner(), needle)
-                || (project.getTags() != null && project.getTags().stream().anyMatch(tag -> containsIgnoreCase(tag, needle)));
-    }
-
-    /** True if {@code needle} is found in the issue's title or body excerpt. */
-    private boolean matchesIssueQuery(Issue issue, String needle) {
-        return containsIgnoreCase(issue.getTitle(), needle) || containsIgnoreCase(issue.getBodyExcerpt(), needle);
-    }
-
-    private boolean matchesCountry(Project project, String country) {
-        return country == null
-                || (project.getCountryCodes() != null
-                        && project.getCountryCodes().stream().anyMatch(c -> c.equalsIgnoreCase(country)));
-    }
-
-    private boolean containsIgnoreCase(String haystack, String needle) {
-        return haystack != null && haystack.toLowerCase(Locale.ROOT).contains(needle);
     }
 
     /** Clamps {@code size} to the spec's max of 50; defaults to 20 if not provided. */

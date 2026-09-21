@@ -113,6 +113,41 @@ public class UserService {
     }
 
     /**
+     * {@code DELETE /users/me} (API-03.11): anonymizes the caller's account rather
+     * than hard-deleting it (design doc §14 — a deliberate policy, not a missing
+     * feature: comments, claims, and completed contributions stay attached to the
+     * anonymized row so other people's discussion threads and the platform's own
+     * impact figures stay intact). Deleting the caller's session is the controller's
+     * job (it owns the session cookie), not this method's.
+     * <p>
+     * {@code githubId} can't simply be set to {@code null} — the column is
+     * {@code NOT NULL} and unique — so it's replaced with a negative sentinel
+     * derived from the user's own id. Real GitHub ids are always positive, so this
+     * can never collide with one; a future login with the same GitHub account
+     * won't match this row via {@code ON CONFLICT (github_id)} and will correctly
+     * create a fresh identity instead of "reactivating" the anonymized one.
+     *
+     * @param currentUser the authenticated caller, injected via {@code @AuthenticatedUser}
+     */
+    @Transactional
+    public void deleteCurrentUser(User currentUser) {
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new ApiException(
+                        "USER_NOT_FOUND", "No user exists with id " + currentUser.getId(), HttpStatus.NOT_FOUND));
+
+        user.setUsername("deleted-user-" + user.getId());
+        user.setDisplayName(null);
+        user.setAvatarUrl(null);
+        user.setBio(null);
+        user.setLocation(null);
+        user.setSkills(null);
+        user.setEmail(null);
+        user.setGithubId(-user.getId());
+
+        userRepository.save(user);
+    }
+
+    /**
      * A developer's verified contribution history (API-03.6): only claims with
      * status {@code completed} — active/changes_requested/released claims never
      * appear here — most recent {@code completedAt} first. This is the "did

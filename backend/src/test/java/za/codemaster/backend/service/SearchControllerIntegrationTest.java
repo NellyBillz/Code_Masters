@@ -79,7 +79,9 @@ class SearchControllerIntegrationTest {
     @Test
     @DisplayName("type=all (or omitted) merges both project and issue results")
     void typeAllMergesBothResultTypes() throws Exception {
-        mockMvc.perform(get("/api/v1/search").param("q", "in"))
+        // "CLI" matches Naija DevTools' description and its issue title
+        // ("Fix flag parsing edge case in CLI") — one query, both resultTypes.
+        mockMvc.perform(get("/api/v1/search").param("q", "CLI"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.items[*].resultType",
                         org.hamcrest.Matchers.hasItem("project")))
