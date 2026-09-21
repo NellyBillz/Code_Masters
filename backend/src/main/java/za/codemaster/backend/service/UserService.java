@@ -57,7 +57,7 @@ public class UserService {
         // Every account is created via GitHub OAuth (GH-02.1 finds-or-creates a User
         // row keyed on github_id) — there is no other signup path — so githubAccess
         // is unconditionally true for any User row that exists at all.
-        return new UserProfile(toPublicProfile(currentUser), currentUser.getEmail(), true);
+        return new UserProfile(toPublicProfile(currentUser), currentUser.getEmail(), true, currentUser.isSiteAdmin());
     }
 
     /**
@@ -109,7 +109,7 @@ public class UserService {
         }
 
         User saved = userRepository.save(user);
-        return new UserProfile(toPublicProfile(saved), saved.getEmail(), true);
+        return new UserProfile(toPublicProfile(saved), saved.getEmail(), true, saved.isSiteAdmin());
     }
 
     /**

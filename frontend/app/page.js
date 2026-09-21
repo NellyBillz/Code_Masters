@@ -11,7 +11,7 @@ export default function CodeMastersHome() {
       id: 1,
       title: 'Code Masters API',
       subtitle: 'Platform Foundation',
-      description: 'RESTful API powering African open-source discovery. Built with Node.js and PostgreSQL.',
+      description: 'RESTful API powering South African open-source discovery. Built with Node.js and PostgreSQL.',
       avatar: 'CM',
       tags: ['Node.js', 'API', 'Open Source'],
       stars: '2.3K',
@@ -20,10 +20,10 @@ export default function CodeMastersHome() {
     },
     {
       id: 2,
-      title: 'African Vision',
+      title: 'SA Vision',
       subtitle: 'Computer Vision Library',
-      description: 'Open-source ML toolkit for African-specific computer vision applications.',
-      avatar: 'AV',
+      description: 'Open-source ML toolkit for South African-specific computer vision applications.',
+      avatar: 'SV',
       tags: ['Python', 'ML', 'CV'],
       stars: '1.8K',
       updated: '2 days ago',
@@ -42,7 +42,7 @@ export default function CodeMastersHome() {
       id: 4,
       title: 'Weave Design',
       subtitle: 'UI Component Library',
-      description: 'Modern React components designed for African tech products and applications.',
+      description: 'Modern React components designed for South African tech products and applications.',
       avatar: 'WD',
       tags: ['React', 'UI', 'Design System'],
       stars: '956',
@@ -50,9 +50,9 @@ export default function CodeMastersHome() {
     },
     {
       id: 5,
-      title: 'LangServe Africa',
+      title: 'LangServe SA',
       subtitle: 'Language Processing',
-      description: 'NLP tools optimized for African languages including Swahili, Amharic, and Yoruba.',
+      description: 'NLP tools optimized for South African languages including Zulu, Xhosa, and Afrikaans.',
       avatar: 'LS',
       tags: ['NLP', 'Languages', 'ML'],
       stars: '745',
@@ -65,7 +65,7 @@ export default function CodeMastersHome() {
       id: 6,
       title: 'MobileBase',
       subtitle: 'Mobile Backend',
-      description: 'Backend-as-a-service platform for mobile apps across Africa.',
+      description: 'Backend-as-a-service platform for mobile apps across South Africa.',
       avatar: 'MB',
       tags: ['Backend', 'Mobile'],
       stars: '523',
@@ -75,7 +75,7 @@ export default function CodeMastersHome() {
       id: 7,
       title: 'FinConnect',
       subtitle: 'Fintech Library',
-      description: 'Open-source fintech integration library for African payment systems.',
+      description: 'Open-source fintech integration library for South African payment systems.',
       avatar: 'FC',
       tags: ['Fintech', 'Payments'],
       stars: '412',
@@ -85,7 +85,7 @@ export default function CodeMastersHome() {
       id: 8,
       title: 'EduHub',
       subtitle: 'Education Platform',
-      description: 'Open learning management system designed for African schools and universities.',
+      description: 'Open learning management system designed for South African schools and universities.',
       avatar: 'EH',
       tags: ['Education', 'LMS'],
       stars: '387',
@@ -119,10 +119,10 @@ export default function CodeMastersHome() {
         {/* Hero Section */}
         <section className="bg-white rounded-lg p-12 mb-12 border border-gray-200">
           <h1 className="text-5xl font-bold leading-tight mb-4">
-            The front door to African <span className="text-green-500">open-source</span> discovery
+            The front door to South African <span className="text-green-500">open-source</span> discovery
           </h1>
           <p className="text-lg text-gray-600 mb-6 leading-relaxed max-w-2xl">
-            Explore projects, connect with developers, and discover the innovation happening across Africa&apos;s open-source communities.
+            Explore projects, connect with developers, and discover the innovation happening across South Africa&apos;s open-source communities.
           </p>
           <a
             href="/projects"
@@ -144,10 +144,6 @@ export default function CodeMastersHome() {
             <div className="text-center">
               <div className="text-3xl font-bold text-gray-900">15K+</div>
               <div className="text-xs text-gray-600 font-semibold uppercase tracking-wider">Developers</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-yellow-500">50+</div>
-              <div className="text-xs text-gray-600 font-semibold uppercase tracking-wider">Countries</div>
             </div>
           </div>
         </div>

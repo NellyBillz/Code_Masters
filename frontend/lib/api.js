@@ -169,6 +169,41 @@ function getProject(projectId) {
 }
 
 /**
+ * List projects awaiting moderation, oldest first (FE-03.1). Site-admin only
+ * — throws a 403 `ApiError` (code `FORBIDDEN`) for anyone else.
+ *
+ * @param {Object} [params]
+ * @param {number} [params.page]
+ * @param {number} [params.size]
+ * @returns {Promise<PagedProjects>}
+ */
+function getPendingProjects(params) {
+  return apiFetch(`/admin/projects/pending${buildQuery(params)}`);
+}
+
+/**
+ * Approve or reject a pending project submission. Site-admin only.
+ *
+ * @param {number|string} projectId
+ * @param {Object} params
+ * @param {'approve'|'reject'} params.decision
+ * @param {string} [params.reason]
+ * @returns {Promise<Project>} The project, with its updated `listingStatus`.
+ */
+function moderateProject(projectId, { decision, reason }) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/admin/projects/${projectId}/moderation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ decision, reason }),
+  });
+}
+
+/**
  * Invite a maintainer to a project by username. Owner-only.
  *
  * @param {number|string} projectId
@@ -337,6 +372,8 @@ function updateIssueClassification(issueId, update) {
 module.exports = {
   listProjects,
   getProject,
+  getPendingProjects,
+  moderateProject,
   getIssue,
   getIssueComments,
   postComment,
