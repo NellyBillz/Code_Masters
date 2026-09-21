@@ -9,10 +9,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import za.codemaster.backend.client.github.dto.GitHubFetchResult;
+import za.codemaster.backend.client.github.dto.ClosingPullRequestResult;
 import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
 import za.codemaster.backend.client.github.dto.GitHubIssueResponse;
 import za.codemaster.backend.client.github.dto.GitHubProjectMetadata;
+import za.codemaster.backend.client.github.dto.GitHubPullRequestResponse;
 import za.codemaster.backend.client.github.dto.GitHubRepositoryResponse;
+import za.codemaster.backend.client.github.dto.GitHubTimelineEventResponse;
 
 import java.net.URI;
 import java.time.OffsetDateTime;
@@ -350,6 +353,97 @@ public class GitHubClient {
     }
 
     /**
+     * Finds the merged pull request that closed an issue via a closing keyword.
+     * GitHub represents that relationship as a {@code closed} timeline event
+     * with the closing commit SHA plus a {@code cross-referenced} event whose
+     * source is the pull request. Matching the PR's merge SHA prevents an
+     * unrelated PR that merely mentioned the issue from being misidentified.
+     */
+    public ClosingPullRequestResult fetchClosingPullRequest(
+            String owner, String repo, int issueNumber) {
+        requireToken();
+
+        List<GitHubTimelineEventResponse> events = new ArrayList<>();
+        String nextLink = "/repos/" + owner + "/" + repo + "/issues/"
+                + issueNumber + "/timeline?per_page=100";
+
+        while (nextLink != null) {
+            String requestUri = nextLink;
+            TimelinePage page = restClient.get()
+                    .uri(requestUri)
+                    .headers(this::attachAuthHeaders)
+                    .exchange((request, response) -> {
+                        int status = response.getStatusCode().value();
+                        if (status != 200) {
+                            throw new IllegalStateException(
+                                    "GitHub issue timeline request returned unexpected status " + status);
+                        }
+                        List<GitHubTimelineEventResponse> body = response.bodyTo(
+                                new ParameterizedTypeReference<List<GitHubTimelineEventResponse>>() {});
+                        return new TimelinePage(
+                                body == null ? List.of() : body,
+                                extractNextLink(response.getHeaders().getFirst(HttpHeaders.LINK)));
+                    });
+            events.addAll(page.events());
+            nextLink = page.nextLink();
+        }
+
+        List<String> closingCommitShas = events.stream()
+                .filter(event -> "closed".equals(event.event()))
+                .map(GitHubTimelineEventResponse::commitId)
+                .filter(sha -> sha != null && !sha.isBlank())
+                .toList();
+        if (closingCommitShas.isEmpty()) {
+            return new ClosingPullRequestResult.NotFound();
+        }
+
+        for (GitHubTimelineEventResponse event : events) {
+            if (!"cross-referenced".equals(event.event())
+                    || event.source() == null
+                    || event.source().issue() == null
+                    || event.source().issue().pullRequest() == null
+                    || event.source().issue().pullRequest().url() == null) {
+                continue;
+            }
+
+            GitHubPullRequestResponse pullRequest = fetchPullRequest(
+                    URI.create(event.source().issue().pullRequest().url()));
+            if (pullRequest.mergeCommitSha() == null
+                    || !closingCommitShas.contains(pullRequest.mergeCommitSha())) {
+                continue;
+            }
+            if (pullRequest.number() == null || pullRequest.merged() == null
+                    || pullRequest.user() == null || pullRequest.user().login() == null
+                    || pullRequest.user().id() == null) {
+                throw new IllegalStateException("GitHub returned an incomplete closing pull request");
+            }
+            return new ClosingPullRequestResult.Found(
+                    pullRequest.number(), pullRequest.merged(),
+                    pullRequest.user().login(), pullRequest.user().id());
+        }
+
+        return new ClosingPullRequestResult.NotFound();
+    }
+
+    private GitHubPullRequestResponse fetchPullRequest(URI pullRequestUrl) {
+        return restClient.get()
+                .uri(pullRequestUrl)
+                .headers(this::attachAuthHeaders)
+                .exchange((request, response) -> {
+                    int status = response.getStatusCode().value();
+                    if (status != 200) {
+                        throw new IllegalStateException(
+                                "GitHub pull request request returned unexpected status " + status);
+                    }
+                    GitHubPullRequestResponse body = response.bodyTo(GitHubPullRequestResponse.class);
+                    if (body == null) {
+                        throw new IllegalStateException("GitHub returned an empty pull request body");
+                    }
+                    return body;
+                });
+    }
+
+    /**
      * The first page of a {@code fetchIssues} call, before pull-request
      * filtering and before mapping to {@link GitHubIssueMetadata} - just
      * enough to (a) know the ETag and ability to short-circuit on 304, and
@@ -357,6 +451,9 @@ public class GitHubClient {
      * already established, once we know the first page was a real 200.
      */
     private record FirstIssuesPage(List<GitHubIssueResponse> issues, String nextLink) {
+    }
+
+    private record TimelinePage(List<GitHubTimelineEventResponse> events, String nextLink) {
     }
 
     /**
