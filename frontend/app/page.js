@@ -107,6 +107,9 @@ export default function CodeMastersHome() {
         <a href="/projects" className="bg-white text-gray-900 px-4 py-2 rounded-full text-sm font-semibold hover:bg-green-500 hover:text-white transition-all">
           Browse Projects
         </a>
+        <a href="/impact" className="text-white/90 px-4 py-2 rounded-full text-sm font-semibold hover:bg-white/10 transition-all">
+          Impact
+        </a>
       </nav>
 
       {/* Sidebar Toggle */}

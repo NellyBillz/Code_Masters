@@ -45,6 +45,9 @@
  * @property {number} [openIssues]
  * @property {number} [contributors]
  * @property {boolean} [hasBeginnerFriendlyIssues]
+ * @property {boolean} [hasContributingGuide] From GitHub's community-profile
+ *   endpoint (GH-03.3) — a plain onboarding-readiness fact, not a score.
+ * @property {boolean} [hasCodeOfConduct] Same source as hasContributingGuide.
  * @property {string} [lastActivityAt] ISO date-time
  * @property {ProjectListingStatus} [listingStatus] `pending` until a site
  *   admin approves it (FE-03.1/.2); only `published` projects are publicly
@@ -90,6 +93,26 @@ class ApiError extends Error {
     this.code = body && body.code;
     this.body = body;
   }
+}
+
+const RATE_LIMIT_MESSAGE =
+  "You're doing that a lot — please wait a bit before trying again.";
+
+/**
+ * A clear, friendly message for a failed write (FE-03.8) — specifically,
+ * one that never surfaces a raw `RATE_LIMITED` error straight from the API.
+ * Every write action's catch block should route its error through this
+ * instead of showing `err.message` directly.
+ *
+ * @param {unknown} err
+ * @param {string} fallback Used for any error that isn't a rate limit.
+ * @returns {string}
+ */
+function friendlyErrorMessage(err, fallback) {
+  if (err instanceof ApiError && err.code === 'RATE_LIMITED') {
+    return RATE_LIMIT_MESSAGE;
+  }
+  return (err && err.message) || fallback;
 }
 
 const isServer = typeof window === 'undefined';
@@ -166,6 +189,18 @@ function listProjects(params) {
 }
 
 /**
+ * Public, non-personal, aggregate platform-impact metrics (FE-03.9) — no
+ * auth required.
+ *
+ * @returns {Promise<Object>} PlatformStats: { publishedProjects,
+ *   activeProjectsAcceptingContributions, totalContributorsEngaged,
+ *   totalActiveClaims, totalContributionsCompleted, generatedAt }
+ */
+function getStats() {
+  return apiFetch('/stats');
+}
+
+/**
  * Get a single project's details, including maintainers, featured issues,
  * and recent comments.
  *
@@ -208,6 +243,77 @@ function moderateProject(projectId, { decision, reason }) {
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
     body: JSON.stringify({ decision, reason }),
+  });
+}
+
+/**
+ * Update a project's Code-Masters-specific metadata (FE-03.7 uses this for
+ * `acceptingContributions`; the same partial-update endpoint also accepts
+ * `category`/`tags`/`connection`/`countryCodes`). Maintainer-only (any
+ * role); only the fields provided are changed.
+ *
+ * @param {number|string} projectId
+ * @param {Object} updates
+ * @param {boolean} [updates.acceptingContributions]
+ * @param {string} [updates.category]
+ * @param {string[]} [updates.tags]
+ * @param {ProjectConnection} [updates.connection]
+ * @returns {Promise<Project>} The updated project.
+ */
+function updateProject(projectId, updates) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify(updates),
+  });
+}
+
+/**
+ * Report a comment for a site admin to review (FE-03.7). Authenticated,
+ * once per user per comment — a repeat attempt throws a 409 `ApiError` with
+ * code `REPORT_ALREADY_EXISTS`.
+ *
+ * @param {number|string} commentId
+ * @param {string} reason 3-500 characters.
+ * @returns {Promise<Object>} The created ReportDto.
+ */
+function reportComment(commentId, reason) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/comments/${commentId}/reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/**
+ * Report a project listing for a site admin to review (FE-03.7).
+ * Authenticated, once per user per project — a repeat attempt throws a 409
+ * `ApiError` with code `REPORT_ALREADY_EXISTS`.
+ *
+ * @param {number|string} projectId
+ * @param {string} reason 3-500 characters.
+ * @returns {Promise<Object>} The created ReportDto.
+ */
+function reportProject(projectId, reason) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}/reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ reason }),
   });
 }
 
@@ -312,6 +418,25 @@ function postComment(issueId, body) {
 
   function getCurrentUser() {
     return apiFetch('/users/me');
+  }
+
+  /**
+   * Anonymize the caller's account (FE-03.8): clears username/displayName/
+   * avatarUrl/bio/location/skills/email and unlinks the GitHub identity, but
+   * leaves past comments and completed contributions attached to the
+   * now-anonymized row untouched. Deletes the session server-side, which
+   * clears both cookies via this response's Set-Cookie headers — no
+   * separate logout() call needed after this succeeds.
+   *
+   * @returns {Promise<null>}
+   */
+  function deleteAccount() {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch('/users/me', {
+      method: 'DELETE',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
   }
 
   /**
@@ -452,15 +577,21 @@ function updateIssueClassification(issueId, update) {
 
 module.exports = {
   listProjects,
+  getStats,
   getProject,
+  updateProject,
   getPendingProjects,
   moderateProject,
+  reportComment,
+  reportProject,
   getIssue,
   getIssueComments,
   postComment,
   ApiError,
+  friendlyErrorMessage,
   getIssueClaims,
   getCurrentUser,
+  deleteAccount,
   getContributions,
   getMaintainerActivity,
   postClaim,

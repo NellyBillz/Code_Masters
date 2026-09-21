@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { getProject } from "../../../lib/api";
+import { getProject, updateProject, reportProject } from "../../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import MaintainersPanel from "../../components/MaintainersPanel";
+import ReportButton from "../../components/ReportButton";
 
 export default function ProjectDetail() {
   const params = useParams();
@@ -15,6 +16,8 @@ export default function ProjectDetail() {
   const [project, setProject] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [togglingIntake, setTogglingIntake] = useState(false);
+  const [intakeError, setIntakeError] = useState("");
 
   const isMaintainer = Boolean(
     currentUser &&
@@ -69,6 +72,27 @@ export default function ProjectDetail() {
       ...prev,
       maintainers: prev.maintainers.filter((m) => m.user?.id !== userId),
     }));
+  };
+
+  const handleToggleIntake = async () => {
+    if (!project) return;
+
+    setTogglingIntake(true);
+    setIntakeError("");
+
+    try {
+      const updated = await updateProject(projectId, {
+        acceptingContributions: !project.acceptingContributions,
+      });
+      setProject((prev) => ({
+        ...prev,
+        acceptingContributions: updated.acceptingContributions,
+      }));
+    } catch (err) {
+      setIntakeError(err.message || "Failed to update contribution intake.");
+    } finally {
+      setTogglingIntake(false);
+    }
   };
 
   if (loading) {
@@ -167,6 +191,12 @@ export default function ProjectDetail() {
               {project.connection}
             </span>
           )}
+
+          {project.hasContributingGuide && (
+            <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
+              Has contributing guide
+            </span>
+          )}
         </div>
 
         <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
@@ -190,6 +220,48 @@ export default function ProjectDetail() {
               View GitHub repository
             </a>
           </div>
+        )}
+
+        <div className="mt-6 flex flex-wrap items-center gap-4 border-t border-slate-100 pt-6">
+          <span
+            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+              project.acceptingContributions
+                ? "bg-green-50 text-green-700"
+                : "bg-slate-100 text-slate-600"
+            }`}
+          >
+            {project.acceptingContributions
+              ? "Accepting contributions"
+              : "Not currently accepting contributions"}
+          </span>
+
+          {isMaintainer && (
+            <button
+              type="button"
+              onClick={handleToggleIntake}
+              disabled={togglingIntake}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {togglingIntake
+                ? "Saving..."
+                : project.acceptingContributions
+                  ? "Pause new contributions"
+                  : "Resume accepting contributions"}
+            </button>
+          )}
+
+          {currentUser && (
+            <ReportButton
+              label="Report this project"
+              onSubmit={(reason) => reportProject(projectId, reason)}
+            />
+          )}
+        </div>
+
+        {intakeError && (
+          <p role="alert" className="mt-2 text-sm text-red-700">
+            {intakeError}
+          </p>
         )}
       </header>
 

@@ -139,6 +139,25 @@ function BeginnerBadge({ hasBeginnerFriendlyIssues }) {
   );
 }
 
+function ContributingGuideBadge() {
+  return (
+    <span
+      className={`${styles.badge} ${styles.contributingGuide}`}
+      title="Has a CONTRIBUTING guide on GitHub"
+    >
+      <svg
+        viewBox="0 0 20 20"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path d="M4 3a1 1 0 0 1 1-1h7.5L16 5.5V17a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3zm7 4V3.5L14.5 7H11z" />
+      </svg>
+
+      Has contributing guide
+    </span>
+  );
+}
+
 export default function ProjectCard({ project }) {
   const {
     id,
@@ -153,6 +172,7 @@ export default function ProjectCard({ project }) {
     connection,
     verified = false,
     hasBeginnerFriendlyIssues = false,
+    hasContributingGuide = false,
   } = project || {};
 
   const languageColor =
@@ -208,6 +228,7 @@ export default function ProjectCard({ project }) {
               hasBeginnerFriendlyIssues
             }
           />
+          {hasContributingGuide && <ContributingGuideBadge />}
         </div>
 
         <div className={styles.footer}>

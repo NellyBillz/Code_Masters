@@ -248,6 +248,8 @@ public class ProjectQueryService {
                 entity.getOpenIssues(),
                 entity.getContributors(),
                 Boolean.TRUE.equals(entity.getHasBeginnerFriendlyIssues()),
+                entity.isHasContributingGuide(),
+                entity.isHasCodeOfConduct(),
                 entity.getLastActivityAt(),
                 ProjectListingStatus.valueOf(entity.getListingStatus().name()),
                 entity.isAcceptingContributions(),

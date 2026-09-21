@@ -61,6 +61,10 @@
 .beginnerTrue  { background: #fef9c3; color: #854d0e; }
 .beginnerFalse { background: #f1f5f9; color: #64748b; }
 
+/* onboarding facts (GH-03.3) — deliberately its own color, distinct from
+   the beginner-friendly badge above, so the two signals aren't conflated */
+.contributingGuide { background: #e0f2fe; color: #075985; }
+
 .meta {
   display: flex;
   flex-wrap: wrap;
@@ -96,7 +100,7 @@
   padding-top: 0.75rem;
   border-top: 1px solid #f1f5f9;
 }
-.beginnerRow { display: flex; }
+.beginnerRow { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 
 .footer {
   display: flex;

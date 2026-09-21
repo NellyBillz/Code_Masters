@@ -1,8 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getIssueComments, postComment } from "../../lib/api";
+import {
+    getIssueComments,
+    postComment,
+    reportComment,
+    friendlyErrorMessage,
+} from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
+import ReportButton from "./ReportButton";
 
 export default function IssueComments({ issueId }) {
     const { user, loading: authLoading } = useAuth();
@@ -50,7 +56,7 @@ export default function IssueComments({ issueId }) {
 
             await loadComments();
         } catch (err) {
-            setError(err.message || "Failed to post comment.");
+            setError(friendlyErrorMessage(err, "Failed to post comment."));
         } finally {
             setPosting(false);
         }
@@ -117,6 +123,17 @@ export default function IssueComments({ issueId }) {
                                   ).toLocaleString()
                                 : ""}
                         </small>
+
+                        {user && (
+                            <div style={{ marginTop: "0.5rem" }}>
+                                <ReportButton
+                                    label="Report"
+                                    onSubmit={(reason) =>
+                                        reportComment(comment.id, reason)
+                                    }
+                                />
+                            </div>
+                        )}
                     </article>
                 ))
             ) : (

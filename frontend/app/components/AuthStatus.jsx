@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 
 export default function AuthStatus() {
@@ -32,6 +33,10 @@ export default function AuthStatus() {
       <span style={{ fontSize: "0.9rem" }}>
         {user.displayName || user.username}
       </span>
+
+      <Link href="/profile" style={{ fontSize: "0.9rem" }}>
+        Account settings
+      </Link>
 
       <button
         type="button"

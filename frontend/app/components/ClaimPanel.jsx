@@ -8,6 +8,7 @@ import {
     attachPullRequest,
     reviewClaim,
     getProject,
+    friendlyErrorMessage,
 } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -315,7 +316,7 @@ export default function ClaimPanel({ issueId, projectId, initialClaims = [] }) {
                 await postClaim(issueId);
             }
         } catch (err) {
-            setError(err.message || "Something went wrong. Please try again.");
+            setError(friendlyErrorMessage(err, "Something went wrong. Please try again."));
         } finally {
             // Always re-read from the server so the list shows what is true.
             await refresh().catch(() => {});

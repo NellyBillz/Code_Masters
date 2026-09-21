@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * A listed open-source project.
  * <p>
- * Matches the {@code Project} schema in codemasters-api-spec.yaml v2.1.
+ * Matches the {@code Project} schema in codemasters-api-spec.yaml v3.
  * Named {@code ProjectDto} (not {@code Project}) to avoid colliding with the
  * JPA entity {@link za.codemaster.backend.domain.model.Project} of the same
  * spec name — see {@code ProjectQueryService} for the entity-to-DTO mapping.
@@ -34,6 +34,8 @@ public record ProjectDto(
         Integer openIssues,
         Integer contributors,
         boolean hasBeginnerFriendlyIssues,
+        boolean hasContributingGuide,
+        boolean hasCodeOfConduct,
         OffsetDateTime lastActivityAt,
         ProjectListingStatus listingStatus,
         boolean acceptingContributions,
