@@ -302,4 +302,79 @@ class UserServiceTest {
         User reloaded = userRepository.findById(user.getId()).orElseThrow();
         assertEquals("Persisted Name", reloaded.getDisplayName());
     }
+
+    @Test
+    void deleteAnonymizesAllPersonalFields() {
+        String suffix = String.valueOf(System.nanoTime());
+        String originalUsername = "delete_" + suffix;
+        User user = createUser(originalUsername, "delete_" + suffix + "@example.com");
+        Long originalGithubId = user.getGithubId();
+
+        service.deleteCurrentUser(user);
+
+        User reloaded = userRepository.findById(user.getId()).orElseThrow();
+        assertEquals("deleted-user-" + user.getId(), reloaded.getUsername());
+        assertNull(reloaded.getDisplayName());
+        assertNull(reloaded.getAvatarUrl());
+        assertNull(reloaded.getBio());
+        assertNull(reloaded.getLocation());
+        assertNull(reloaded.getSkills());
+        assertNull(reloaded.getEmail());
+        assertNotEquals(originalGithubId, reloaded.getGithubId());
+        assertTrue(reloaded.getGithubId() < 0, "githubId must be replaced with a sentinel a real GitHub id can never equal");
+    }
+
+    @Test
+    void deletedUsersOldUsernameNoLongerResolves() {
+        String suffix = String.valueOf(System.nanoTime());
+        String originalUsername = "gone_" + suffix;
+        User user = createUser(originalUsername, "gone_" + suffix + "@example.com");
+
+        service.deleteCurrentUser(user);
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.getPublicProfile(originalUsername));
+        assertEquals("USER_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    void deletedUsersAnonymizedProfileIsStillReachableByItsNewUsername() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("stillhere_" + suffix, "stillhere_" + suffix + "@example.com");
+
+        service.deleteCurrentUser(user);
+
+        PublicUserProfile profile = service.getPublicProfile("deleted-user-" + user.getId());
+        assertEquals("deleted-user-" + user.getId(), profile.username());
+    }
+
+    @Test
+    void deletionPreservesCompletedContributionsUnderTheAnonymizedIdentity() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("shipper_" + suffix, "shipper_" + suffix + "@example.com");
+        Issue issue = seedIssue();
+        Claim completed = completedClaim(issue, user, java.time.OffsetDateTime.now());
+
+        service.deleteCurrentUser(user);
+
+        // The claim itself is untouched — still completed, still attached to the
+        // same (now-anonymized) user row. This is the fact GET /stats (API-03.12,
+        // not yet built) will depend on to keep counting this contribution.
+        Claim reloadedClaim = claimRepository.findById(completed.getId()).orElseThrow();
+        assertEquals(ClaimStatus.COMPLETED, reloadedClaim.getStatus());
+        assertEquals(user.getId(), reloadedClaim.getUser().getId());
+
+        // Still fetchable as a contribution under the new (anonymized) username.
+        var contributions = service.getContributions("deleted-user-" + user.getId(), null, null);
+        assertEquals(1, contributions.items().size());
+    }
+
+    @Test
+    void deletingAMissingUserThrowsUserNotFound() {
+        User ghostUser = User.builder().id(-999L).githubId(-999L).username("ghost").build();
+
+        ApiException ex = assertThrows(ApiException.class, () -> service.deleteCurrentUser(ghostUser));
+
+        assertEquals("USER_NOT_FOUND", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatus());
+    }
 }

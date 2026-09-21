@@ -3,6 +3,7 @@ package za.codemaster.backend.repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import za.codemaster.backend.domain.model.Claim;
 import za.codemaster.backend.domain.model.ClaimStatus;
@@ -33,9 +34,6 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
      * Finds all active claims for a given issue.
      */
     List<Claim> findByIssueIdAndStatus(Long issueId, ClaimStatus status);
-
-    /** Claims that are still eligible for automatic GitHub verification. */
-    List<Claim> findByIssueIdAndStatusIn(Long issueId, Collection<ClaimStatus> statuses);
 
     /**
      * Finds all claims on an issue in a given status, oldest first.
@@ -99,4 +97,18 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
      */
     List<Claim> findByIssueProjectIdAndStatusAndPullRequestState(
             Long projectId, ClaimStatus status, PullRequestState pullRequestState);
+
+    /**
+     * Counts claims in a given status, platform-wide. Backs
+     * {@code PlatformStats.totalActiveClaims}/{@code totalContributionsCompleted}
+     * (API-03.12) — a plain {@code COUNT()}, not a full row load.
+     */
+    long countByStatus(ClaimStatus status);
+
+    /**
+     * Counts distinct users who have ever held a claim, in any status. Backs
+     * {@code PlatformStats.totalContributorsEngaged} (API-03.12).
+     */
+    @Query("SELECT COUNT(DISTINCT c.user.id) FROM Claim c")
+    long countDistinctUsers();
 }

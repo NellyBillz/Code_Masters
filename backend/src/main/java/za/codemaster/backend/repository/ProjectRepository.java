@@ -35,6 +35,26 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     Page<Project> findByListingStatus(ListingStatus listingStatus, Pageable pageable);
 
     /**
+     * Counts projects in a given listing status. Backs {@code PlatformStats.publishedProjects}
+     * (API-03.12) — a plain {@code COUNT()}, not a full row load.
+     */
+    long countByListingStatus(ListingStatus listingStatus);
+
+    /**
+     * Counts projects in a given listing status with a given {@code acceptingContributions}
+     * value. Backs {@code PlatformStats.activeProjectsAcceptingContributions} (API-03.12).
+     */
+    long countByListingStatusAndAcceptingContributions(ListingStatus listingStatus, boolean acceptingContributions);
+
+    /**
+     * Counts distinct country codes across every {@code published} project's
+     * {@code countryCodes}. Backs {@code PlatformStats.countriesRepresented}
+     * (API-03.12) — a single aggregate query, not a per-project in-memory scan.
+     */
+    @Query("SELECT COUNT(DISTINCT cc) FROM Project p JOIN p.countryCodes cc WHERE p.listingStatus = :status")
+    long countDistinctCountryCodesByListingStatus(@Param("status") ListingStatus status);
+
+    /**
      * Preserved legacy JPQL filter method to maintain backwards compatibility with existing tests.
      */
     @Query("""
@@ -56,6 +76,10 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      * Native PostgreSQL relevance-ranked search query.
      * Integrates ts_rank over weighted tsvector, trigram similarity fallback,
      * and in-query tag and country filtering without in-memory post-filtering.
+     * {@code q} also matches a substring of any of the project's tags — carried
+     * over from the pre-API-03.13 in-memory matcher, since {@code tsv} (name/
+     * description/owner) doesn't cover tags and a freshly submitted project
+     * (no description yet) otherwise has no field {@code q} could ever hit.
      */
     @Query(
         value = """
@@ -78,6 +102,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
                     OR similarity(p.name, :q) >= 0.2
                     OR word_similarity(:q, p.name) >= 0.25
                     OR p.name % :q
+                    OR EXISTS (SELECT 1 FROM project_tags qt WHERE qt.project_id = p.id AND qt.tag ILIKE '%' || :q || '%')
                   )
             ORDER BY
               CASE WHEN :sortByRelevance = true THEN (
@@ -105,6 +130,7 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
                     OR similarity(p.name, :q) >= 0.2
                     OR word_similarity(:q, p.name) >= 0.25
                     OR p.name % :q
+                    OR EXISTS (SELECT 1 FROM project_tags qt WHERE qt.project_id = p.id AND qt.tag ILIKE '%' || :q || '%')
                   )
         """,
         nativeQuery = true
