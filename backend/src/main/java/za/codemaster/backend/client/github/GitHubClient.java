@@ -9,6 +9,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import za.codemaster.backend.client.github.dto.GitHubFetchResult;
+import za.codemaster.backend.client.github.dto.GitHubCommunityProfile;
+import za.codemaster.backend.client.github.dto.GitHubCommunityProfileResponse;
 import za.codemaster.backend.client.github.dto.ClosingPullRequestResult;
 import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
 import za.codemaster.backend.client.github.dto.GitHubIssueResponse;
@@ -227,6 +229,45 @@ public class GitHubClient {
         );
 
         return GitHubFetchResult.modified(metadata, repositoryResult.etag());
+    }
+
+    /**
+     * Fetches the onboarding files GitHub recognizes for a repository.
+     * Missing files are represented by null fields in a successful response,
+     * so repositories without either file return two false flags.
+     */
+    public GitHubFetchResult<GitHubCommunityProfile> fetchCommunityProfile(
+            String owner, String repo) {
+        requireToken();
+
+        return restClient.get()
+                .uri("/repos/{owner}/{repo}/community/profile", owner, repo)
+                .headers(this::attachAuthHeaders)
+                .exchange((request, response) -> {
+                    int status = response.getStatusCode().value();
+                    if (isRateLimited(status)) {
+                        return GitHubFetchResult.<GitHubCommunityProfile>rateLimited(
+                                parseRetryAfter(response.getHeaders()));
+                    }
+                    if (status != 200) {
+                        throw new IllegalStateException(
+                                "GitHub community profile request returned unexpected status " + status);
+                    }
+
+                    GitHubCommunityProfileResponse body =
+                            response.bodyTo(GitHubCommunityProfileResponse.class);
+                    if (body == null) {
+                        throw new IllegalStateException(
+                                "GitHub returned an empty community profile body");
+                    }
+
+                    GitHubCommunityProfileResponse.Files files = body.files();
+                    return GitHubFetchResult.modified(
+                            new GitHubCommunityProfile(
+                                    files != null && files.contributing() != null,
+                                    files != null && files.codeOfConduct() != null),
+                            null);
+                });
     }
 
     /**

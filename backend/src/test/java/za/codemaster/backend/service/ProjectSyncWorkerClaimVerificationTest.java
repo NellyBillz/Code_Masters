@@ -7,6 +7,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import za.codemaster.backend.client.github.GitHubClient;
 import za.codemaster.backend.client.github.dto.ClosingPullRequestResult;
+import za.codemaster.backend.client.github.dto.GitHubCommunityProfile;
 import za.codemaster.backend.client.github.dto.GitHubFetchResult;
 import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
 import za.codemaster.backend.client.github.dto.GitHubProjectMetadata;
@@ -57,6 +58,9 @@ class ProjectSyncWorkerClaimVerificationTest {
                 new ProjectSyncRepository.SyncProject(1L, "owner", "repo", null, null)));
         when(github.fetchProjectMetadata("owner", "repo", null))
                 .thenReturn(GitHubFetchResult.<GitHubProjectMetadata>notModified());
+        when(github.fetchCommunityProfile("owner", "repo"))
+                .thenReturn(GitHubFetchResult.modified(
+                        new GitHubCommunityProfile(false, false), null));
         when(github.fetchIssues("owner", "repo", null))
                 .thenReturn(GitHubFetchResult.modified(List.<GitHubIssueMetadata>of(), "issues-v2"));
     }

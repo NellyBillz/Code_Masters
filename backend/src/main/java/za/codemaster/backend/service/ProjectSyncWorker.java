@@ -5,6 +5,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.client.github.GitHubClient;
 import za.codemaster.backend.client.github.dto.ClosingPullRequestResult;
+import za.codemaster.backend.client.github.dto.GitHubCommunityProfile;
 import za.codemaster.backend.client.github.dto.GitHubFetchResult;
 import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
 import za.codemaster.backend.client.github.dto.GitHubProjectMetadata;
@@ -76,6 +77,14 @@ public class ProjectSyncWorker {
                 failRate(job, metadata.retryAfter());
                 return;
             }
+
+            GitHubFetchResult<GitHubCommunityProfile> communityProfile =
+                    github.fetchCommunityProfile(project.owner(), project.repo());
+            if (communityProfile.isRateLimited()) {
+                failRate(job, communityProfile.retryAfter());
+                return;
+            }
+            projects.updateCommunityProfile(project.id(), communityProfile.data());
 
             GitHubFetchResult<List<GitHubIssueMetadata>> fetched = github.fetchIssues(
                     project.owner(), project.repo(), project.issuesEtag());
