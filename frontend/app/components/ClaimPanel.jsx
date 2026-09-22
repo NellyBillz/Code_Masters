@@ -1,447 +1,137 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-    getIssueClaims,
-    postClaim,
-    deleteClaim,
-    attachPullRequest,
-    reviewClaim,
-    getProject,
-    friendlyErrorMessage,
-} from "../../lib/api";
+import { HandHeart, AlertTriangle } from "lucide-react";
+import { getIssueClaims, postClaim, deleteClaim } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 
-function normalizedStatus(claim) {
-    return claim.status ? String(claim.status).toLowerCase() : "active";
+function isActive(claim) {
+  return !claim.status || String(claim.status).toLowerCase() === "active";
 }
 
-function isInFlight(claim) {
-    const status = normalizedStatus(claim);
-    return status === "active" || status === "changes_requested";
-}
+export default function ClaimPanel({ issueId, initialClaims = [] }) {
+  const { user: me, loading: authLoading } = useAuth();
+  const [claims, setClaims] = useState(initialClaims.filter(isActive));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-const STATUS_META = {
-    active: { label: "Active", background: "#e0f2fe", color: "#075985" },
-    changes_requested: {
-        label: "Changes requested",
-        background: "#fff3cd",
-        color: "#8a6100",
-    },
-    completed: { label: "Completed", background: "#dcfce7", color: "#166534" },
-    released: { label: "Released", background: "#f1f5f9", color: "#475569" },
-};
+  async function refresh() {
+    const list = await getIssueClaims(issueId);
+    setClaims((Array.isArray(list) ? list : []).filter(isActive));
+  }
 
-function StatusBadge({ status }) {
-    const meta = STATUS_META[status] || STATUS_META.active;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount pattern; no derived-state alternative for reading server data
+    refresh().catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh is stable for this component's lifetime
+  }, [issueId]);
 
-    return (
+  const myClaim = me ? claims.find((c) => c.user?.id === me.id) : null;
+  const count = claims.length;
+
+  async function handleToggle() {
+    setBusy(true);
+    setError("");
+    try {
+      if (myClaim) {
+        await deleteClaim(issueId);
+      } else {
+        await postClaim(issueId);
+      }
+    } catch (err) {
+      setError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      await refresh().catch(() => {});
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="cm-glass" style={{ borderRadius: "24px", padding: "20px 24px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "10px" }}>
+        <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+          Contributors working on this
+        </h2>
+
+        {/* claim endpoints aren't on the confirmed-working list yet — say so rather than let a failure look like a bug */}
         <span
-            style={{
-                marginLeft: "0.5rem",
-                fontSize: "0.75rem",
-                fontWeight: 600,
-                color: meta.color,
-                background: meta.background,
-                padding: "0.1rem 0.5rem",
-                borderRadius: "999px",
-            }}
+          title="This endpoint hasn't been confirmed working end-to-end yet"
+          style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 600, color: "var(--cm-orange-text)", background: "var(--cm-orange-soft)", padding: "3px 9px", borderRadius: "999px" }}
         >
-            {meta.label}
+          <AlertTriangle size={11} strokeWidth={2} aria-hidden="true" />
+          Rolling out
         </span>
-    );
-}
+      </div>
 
-function CompletionNote({ claim }) {
-    const verifiedViaGitHub = claim.completionSource === "github_verified";
-    const confirmedByMaintainer = claim.completionSource === "maintainer_confirmed";
+      <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: "0 0 4px" }}>
+        {count === 0
+          ? "No one has said they're working on this yet."
+          : `${count} contributor${count === 1 ? " has" : "s have"} said they're working on this.`}
+      </p>
+      <p style={{ fontSize: "12px", color: "var(--cm-text-muted)", margin: "0 0 16px" }}>
+        Claims are a signal of intent. Several people can claim the same issue.
+      </p>
 
-    let label = "Completed";
-    if (verifiedViaGitHub) label = "Verified via GitHub";
-    else if (confirmedByMaintainer) label = "Confirmed by maintainer";
-
-    return (
-        <p
-            style={{
-                marginTop: "0.5rem",
-                fontSize: "0.85rem",
-                fontWeight: 600,
-                color: "#166534",
-            }}
+      {authLoading ? (
+        <p style={{ fontSize: "12.5px", color: "var(--cm-text-muted)" }}>Checking session…</p>
+      ) : me ? (
+        <button
+          type="button"
+          onClick={handleToggle}
+          disabled={busy}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "8px",
+            borderRadius: "999px",
+            padding: "10px 20px",
+            fontSize: "13px",
+            fontWeight: 700,
+            border: "none",
+            cursor: busy ? "not-allowed" : "pointer",
+            opacity: busy ? 0.6 : 1,
+            background: myClaim ? "var(--cm-surface-alt)" : "var(--cm-lime)",
+            color: myClaim ? "var(--cm-text-primary)" : "#0A0A0A",
+          }}
         >
-            ✓ {label}
-            {claim.completedAt
-                ? ` · ${new Date(claim.completedAt).toLocaleDateString()}`
-                : ""}
+          <HandHeart size={15} strokeWidth={2} aria-hidden="true" />
+          {busy ? "Working…" : myClaim ? "Release my claim" : "Claim this issue"}
+        </button>
+      ) : (
+        <a href="/auth/github" style={{ fontSize: "13px", fontWeight: 600, color: "var(--cm-lime-text)" }}>
+          Log in with GitHub to claim this issue
+        </a>
+      )}
+
+      {error && (
+        <p role="alert" style={{ fontSize: "12.5px", color: "var(--cm-orange-text)", marginTop: "12px" }}>
+          {error}
         </p>
-    );
-}
+      )}
 
-function PullRequestField({ issueId, claim, onUpdated }) {
-    const [url, setUrl] = useState(claim.pullRequestUrl || "");
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState("");
-
-    async function handleSubmit(event) {
-        event.preventDefault();
-
-        const trimmed = url.trim();
-        if (!trimmed) {
-            setError("Enter a pull request URL.");
-            return;
-        }
-
-        setBusy(true);
-        setError("");
-        try {
-            await attachPullRequest(issueId, claim.id, trimmed);
-            await onUpdated();
-        } catch (err) {
-            setError(err.message || "Failed to save pull request link.");
-            setBusy(false);
-        }
-    }
-
-    return (
-        <form onSubmit={handleSubmit} style={{ marginTop: "0.75rem" }}>
-            <label
-                htmlFor={`pr-url-${claim.id}`}
-                style={{ display: "block", fontSize: "0.9rem", marginBottom: "0.35rem" }}
+      {count > 0 && (
+        <ul style={{ listStyle: "none", margin: "16px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
+          {claims.map((claim) => (
+            <li
+              key={claim.id}
+              style={{
+                fontSize: "12.5px",
+                color: "var(--cm-text-secondary)",
+                background: "var(--cm-surface-alt)",
+                borderRadius: "12px",
+                padding: "10px 14px",
+              }}
             >
-                {claim.pullRequestUrl
-                    ? "Update your pull request link"
-                    : "Attach your pull request"}
-            </label>
-
-            <div style={{ display: "flex", gap: "0.5rem" }}>
-                <input
-                    id={`pr-url-${claim.id}`}
-                    type="url"
-                    value={url}
-                    onChange={(event) => setUrl(event.target.value)}
-                    placeholder="https://github.com/owner/repo/pull/123"
-                    disabled={busy}
-                    style={{ flex: 1, padding: "0.4rem" }}
-                />
-
-                <button type="submit" disabled={busy}>
-                    {busy ? "Saving..." : claim.pullRequestUrl ? "Update" : "Attach"}
-                </button>
-            </div>
-
-            {error && (
-                <p role="alert" style={{ color: "#b00020", marginTop: "0.35rem" }}>
-                    {error}
-                </p>
-            )}
-        </form>
-    );
-}
-
-function ClaimReviewControls({ issueId, claim, onReviewed }) {
-    const [showFeedback, setShowFeedback] = useState(false);
-    const [feedback, setFeedback] = useState("");
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState("");
-
-    async function confirmCompleted() {
-        setBusy(true);
-        setError("");
-        try {
-            await reviewClaim(issueId, claim.id, { decision: "confirm_completed" });
-            await onReviewed();
-        } catch (err) {
-            setError(err.message || "Failed to confirm completion.");
-            setBusy(false);
-        }
-    }
-
-    async function submitRequestChanges(event) {
-        event.preventDefault();
-
-        const trimmed = feedback.trim();
-        if (!trimmed) {
-            setError("Feedback is required to request changes.");
-            return;
-        }
-
-        setBusy(true);
-        setError("");
-        try {
-            await reviewClaim(issueId, claim.id, {
-                decision: "request_changes",
-                feedback: trimmed,
-            });
-            await onReviewed();
-        } catch (err) {
-            setError(err.message || "Failed to request changes.");
-            setBusy(false);
-        }
-    }
-
-    return (
-        <div
-            style={{
-                marginTop: "0.75rem",
-                paddingTop: "0.75rem",
-                borderTop: "1px dashed #ccc",
-            }}
-        >
-            <p style={{ fontSize: "0.85rem", fontWeight: 600, marginBottom: "0.5rem" }}>
-                Maintainer review
-            </p>
-
-            {!showFeedback ? (
-                <div style={{ display: "flex", gap: "0.5rem" }}>
-                    <button type="button" onClick={confirmCompleted} disabled={busy}>
-                        {busy ? "Working..." : "Confirm complete"}
-                    </button>
-
-                    <button
-                        type="button"
-                        onClick={() => setShowFeedback(true)}
-                        disabled={busy}
-                    >
-                        Request changes
-                    </button>
-                </div>
-            ) : (
-                <form onSubmit={submitRequestChanges}>
-                    <textarea
-                        value={feedback}
-                        onChange={(event) => setFeedback(event.target.value)}
-                        placeholder="What needs to change before this can be accepted?"
-                        rows={3}
-                        disabled={busy}
-                        style={{ width: "100%", padding: "0.5rem" }}
-                    />
-
-                    <div style={{ display: "flex", gap: "0.5rem", marginTop: "0.5rem" }}>
-                        <button type="submit" disabled={busy || !feedback.trim()}>
-                            {busy ? "Sending..." : "Send request for changes"}
-                        </button>
-
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setShowFeedback(false);
-                                setFeedback("");
-                                setError("");
-                            }}
-                            disabled={busy}
-                        >
-                            Cancel
-                        </button>
-                    </div>
-                </form>
-            )}
-
-            {error && (
-                <p role="alert" style={{ color: "#b00020", marginTop: "0.5rem" }}>
-                    {error}
-                </p>
-            )}
-        </div>
-    );
-}
-
-export default function ClaimPanel({ issueId, projectId, initialClaims = [] }) {
-    const { user: me, loading: authLoading } = useAuth();
-    const [claims, setClaims] = useState(initialClaims);
-    const [project, setProject] = useState(null);
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState("");
-
-    async function refresh() {
-        const list = await getIssueClaims(issueId);
-        setClaims(Array.isArray(list) ? list : []);
-    }
-
-    useEffect(() => {
-        refresh().catch(() => {});
-    }, [issueId]);
-
-    useEffect(() => {
-        if (!projectId) return;
-
-        getProject(projectId)
-            .then(setProject)
-            .catch(() => setProject(null));
-    }, [projectId]);
-
-    const isMaintainer = Boolean(
-        me &&
-            project?.maintainers?.some(
-                (maintainer) =>
-                    maintainer.user?.id === me.id ||
-                    maintainer.user?.username === me.username
-            )
-    );
-
-    // The toggle button and the "attach a PR" field only ever care about the
-    // caller's current, still-open claim — a user may also have older
-    // completed/released claims on this same issue, which are display-only.
-    const myInFlightClaim = me
-        ? claims.find((c) => c.user?.id === me.id && isInFlight(c))
-        : null;
-    const myClaimIsActive =
-        myInFlightClaim && normalizedStatus(myInFlightClaim) === "active";
-    // A claim/release toggle only makes sense when there's nothing to
-    // toggle from (no in-flight claim yet) or the claim is still "active" —
-    // the backend only releases active claims, and a changes_requested claim
-    // has no toggle action of its own (it just gets a PR field below).
-    const showClaimToggle = !myInFlightClaim || myClaimIsActive;
-
-    const statusCounts = claims.reduce((counts, claim) => {
-        const status = normalizedStatus(claim);
-        counts[status] = (counts[status] || 0) + 1;
-        return counts;
-    }, {});
-    const summaryParts = [
-        statusCounts.active && `${statusCounts.active} active`,
-        statusCounts.changes_requested &&
-            `${statusCounts.changes_requested} awaiting changes`,
-        statusCounts.completed && `${statusCounts.completed} completed`,
-        statusCounts.released && `${statusCounts.released} released`,
-    ].filter(Boolean);
-    const count = claims.length;
-
-    async function handleToggle() {
-        setBusy(true);
-        setError("");
-        try {
-            if (myInFlightClaim) {
-                await deleteClaim(issueId);
-            } else {
-                await postClaim(issueId);
-            }
-        } catch (err) {
-            setError(friendlyErrorMessage(err, "Something went wrong. Please try again."));
-        } finally {
-            // Always re-read from the server so the list shows what is true.
-            await refresh().catch(() => {});
-            setBusy(false);
-        }
-    }
-
-    return (
-        <section style={{ marginTop: "2rem" }}>
-            <h2>Contributors working on this</h2>
-
-            <p>
-                {count === 0
-                    ? "No one has said they're working on this yet."
-                    : summaryParts.join(" · ")}
-            </p>
-            <p style={{ fontSize: "0.9rem", color: "#555" }}>
-                Claims are a signal of intent. Several people can claim the
-                same issue.
-            </p>
-
-            {authLoading ? (
-                <p style={{ fontSize: "0.9rem", color: "#777" }}>
-                    Checking session...
-                </p>
-            ) : me ? (
-                showClaimToggle && (
-                    <button
-                        type="button"
-                        onClick={handleToggle}
-                        disabled={busy}
-                    >
-                        {busy
-                            ? "Working..."
-                            : myInFlightClaim
-                              ? "Release my claim"
-                              : "Claim this issue"}
-                    </button>
-                )
-            ) : (
-                <p>
-                    <a href="/auth/github">Log in with GitHub</a> to claim this
-                    issue.
-                </p>
-            )}
-
-            {error && <p role="alert">{error}</p>}
-
-            {count > 0 && (
-                <ul style={{ marginTop: "1rem", paddingLeft: "1.25rem" }}>
-                    {claims.map((claim) => {
-                        const isMe = Boolean(me && claim.user?.id === me.id);
-                        const status = normalizedStatus(claim);
-                        const inFlight = isInFlight(claim);
-                        const canReview =
-                            isMaintainer &&
-                            inFlight &&
-                            Boolean(claim.pullRequestUrl);
-
-                        return (
-                            <li key={claim.id} style={{ marginBottom: "1rem" }}>
-                                <strong>
-                                    {claim.user?.displayName ||
-                                        claim.user?.username ||
-                                        "User"}
-                                </strong>
-                                {isMe ? " (you)" : ""}
-                                {claim.createdAt
-                                    ? ` · ${new Date(claim.createdAt).toLocaleDateString()}`
-                                    : ""}
-                                <StatusBadge status={status} />
-                                {claim.note ? (
-                                    <div style={{ color: "#555" }}>{claim.note}</div>
-                                ) : null}
-
-                                {status === "completed" && (
-                                    <CompletionNote claim={claim} />
-                                )}
-
-                                {claim.pullRequestUrl && (
-                                    <div style={{ marginTop: "0.35rem" }}>
-                                        <a
-                                            href={claim.pullRequestUrl}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                        >
-                                            View pull request →
-                                        </a>
-                                    </div>
-                                )}
-
-                                {claim.maintainerFeedback && (
-                                    <div
-                                        style={{
-                                            marginTop: "0.5rem",
-                                            padding: "0.5rem 0.75rem",
-                                            background: "#fff8e1",
-                                            borderRadius: "0.375rem",
-                                        }}
-                                    >
-                                        <strong>Maintainer feedback:</strong>{" "}
-                                        {claim.maintainerFeedback}
-                                    </div>
-                                )}
-
-                                {isMe && inFlight && (
-                                    <PullRequestField
-                                        issueId={issueId}
-                                        claim={claim}
-                                        onUpdated={refresh}
-                                    />
-                                )}
-
-                                {canReview && (
-                                    <ClaimReviewControls
-                                        issueId={issueId}
-                                        claim={claim}
-                                        onReviewed={refresh}
-                                    />
-                                )}
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-        </section>
-    );
+              <strong style={{ color: "var(--cm-text-primary)" }}>
+                {claim.user?.displayName || claim.user?.username || "User"}
+              </strong>
+              {me && claim.user?.id === me.id ? " (you)" : ""}
+              {claim.createdAt ? ` · ${new Date(claim.createdAt).toLocaleDateString()}` : ""}
+              {claim.note ? <div style={{ marginTop: "4px" }}>{claim.note}</div> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
 }

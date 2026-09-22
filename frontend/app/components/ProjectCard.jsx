@@ -1,161 +1,52 @@
 import Link from "next/link";
+import { Star, Users, ArrowUpRight, BadgeCheck } from "lucide-react";
 import styles from "./ProjectCard.module.css";
 
 const LANGUAGE_COLORS = {
-  JavaScript: "#eab308",
-  TypeScript: "#3b82f6",
-  Python: "#22c55e",
-  Go: "#06b6d4",
-  Rust: "#f97316",
-  Java: "#f43f5e",
-  "C++": "#a855f7",
-  Ruby: "#dc2626",
+  JavaScript: "#F48C3C",
+  TypeScript: "#2DD4BF",
+  Python: "#C8FF64",
+  Go: "#2DD4BF",
+  Rust: "#F48C3C",
+  Java: "#F48C3C",
+  "C++": "#2DD4BF",
+  Ruby: "#F48C3C",
 };
 
-const CONNECTION_META = {
-  south_african: {
-    label: "South African",
-    className: styles.connSouthAfrican,
-  },
-  community_verified: {
-    label: "Community Verified",
-    className: styles.connCommunityVerified,
-  },
+// connection describes *what kind* of African link a project has —
+// distinct from `verified`, which describes whether that claim has been
+// confirmed. Kept as a short label rather than a loud badge so it doesn't
+// compete visually with the verified pill.
+const CONNECTION_LABELS = {
+  south_african: "South African",
+  africa_focused: "Africa-focused",
+  africa_led: "Africa-led",
+  community_verified: "Community verified",
 };
 
 function formatRelativeTime(isoString) {
   if (!isoString) return "unknown";
 
   const date = new Date(isoString);
-
   if (Number.isNaN(date.getTime())) return "unknown";
 
-  const diffMs = Date.now() - date.getTime();
-  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor((Date.now() - date.getTime()) / (1000 * 60 * 60 * 24));
 
   if (diffDays <= 0) return "today";
   if (diffDays === 1) return "1 day ago";
   if (diffDays < 30) return `${diffDays} days ago`;
 
   const diffMonths = Math.floor(diffDays / 30);
-
-  if (diffMonths < 12) {
-    return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
-  }
+  if (diffMonths < 12) return `${diffMonths} month${diffMonths === 1 ? "" : "s"} ago`;
 
   const diffYears = Math.floor(diffMonths / 12);
-
   return `${diffYears} year${diffYears === 1 ? "" : "s"} ago`;
 }
 
 function formatCount(n) {
   if (typeof n !== "number" || Number.isNaN(n)) return "0";
-
-  if (n >= 1000) {
-    return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}k`;
-  }
-
+  if (n >= 1000) return `${(n / 1000).toFixed(n % 1000 >= 100 ? 1 : 0)}k`;
   return String(n);
-}
-
-function ConnectionBadge({ connection }) {
-  const meta = CONNECTION_META[connection];
-
-  if (!meta) {
-    return (
-      <span className={`${styles.badge} ${styles.connUnclassified}`}>
-        Unclassified
-      </span>
-    );
-  }
-
-  return (
-    <span
-      className={`${styles.badge} ${
-        meta.className || styles.connUnclassified
-      }`}
-      title={`connection: ${connection}`}
-    >
-      {meta.label}
-    </span>
-  );
-}
-
-function VerifiedBadge({ verified }) {
-  return (
-    <span
-      className={`${styles.badge} ${
-        verified ? styles.verifiedTrue : styles.verifiedFalse
-      }`}
-      title={
-        verified
-          ? "Issue claim confirmed"
-          : "Issue claim not confirmed"
-      }
-    >
-      <svg
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        {verified ? (
-          <path d="M16.7 5.3a1 1 0 0 1 0 1.4l-7.4 7.4a1 1 0 0 1-1.4 0L3.3 9.5a1 1 0 1 1 1.4-1.4l3.9 3.9 6.7-6.7a1 1 0 0 1 1.4 0z" />
-        ) : (
-          <circle cx="10" cy="10" r="4" />
-        )}
-      </svg>
-
-      {verified ? "Verified" : "Unverified"}
-    </span>
-  );
-}
-
-function BeginnerBadge({ hasBeginnerFriendlyIssues }) {
-  return (
-    <span
-      className={`${styles.badge} ${
-        hasBeginnerFriendlyIssues
-          ? styles.beginnerTrue
-          : styles.beginnerFalse
-      }`}
-      title={
-        hasBeginnerFriendlyIssues
-          ? "Has open beginner-friendly issues"
-          : "No beginner-friendly issues right now"
-      }
-    >
-      <svg
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path d="M10 2l2.2 4.9 5.3.6-4 3.7 1.1 5.3L10 13.9l-4.6 2.6 1.1-5.3-4-3.7 5.3-.6L10 2z" />
-      </svg>
-
-      {hasBeginnerFriendlyIssues
-        ? "Beginner friendly"
-        : "No beginner issues"}
-    </span>
-  );
-}
-
-function ContributingGuideBadge() {
-  return (
-    <span
-      className={`${styles.badge} ${styles.contributingGuide}`}
-      title="Has a CONTRIBUTING guide on GitHub"
-    >
-      <svg
-        viewBox="0 0 20 20"
-        fill="currentColor"
-        aria-hidden="true"
-      >
-        <path d="M4 3a1 1 0 0 1 1-1h7.5L16 5.5V17a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V3zm7 4V3.5L14.5 7H11z" />
-      </svg>
-
-      Has contributing guide
-    </span>
-  );
 }
 
 export default function ProjectCard({ project }) {
@@ -164,56 +55,49 @@ export default function ProjectCard({ project }) {
     name = "Untitled project",
     description = "",
     primaryLanguage,
-    category,
     tags = [],
     stars = 0,
     contributors = 0,
     lastActivityAt,
     connection,
     verified = false,
-    hasBeginnerFriendlyIssues = false,
-    hasContributingGuide = false,
   } = project || {};
 
-  const languageColor =
-    LANGUAGE_COLORS[primaryLanguage] || "#94a3b8";
+  const languageColor = LANGUAGE_COLORS[primaryLanguage] || "var(--cm-teal)";
+  const connectionLabel = CONNECTION_LABELS[connection];
 
   return (
-    <Link
-      href={`/projects/${id}`}
-      className={styles.card}
-    >
-      <div className={styles.header}>
-        <h3 className={styles.name}>{name}</h3>
+    <Link href={`/projects/${id}`} className={`${styles.card} cm-glass`}>
+      <span aria-hidden="true" className={styles.blob} style={{ background: languageColor }} />
 
-        <div className={styles.badgeColumn}>
-          <ConnectionBadge connection={connection} />
-          <VerifiedBadge verified={verified} />
+      <div className={styles.topRow}>
+        <span className={styles.starPill} title={`${stars} stars`}>
+          <Star size={11} strokeWidth={0} fill="currentColor" aria-hidden="true" />
+          {formatCount(stars)}
+        </span>
+
+        <div className={styles.topRowRight}>
+          {connectionLabel && (
+            <span className={styles.connectionPill} title={`Connection: ${connectionLabel}`}>
+              {connectionLabel}
+            </span>
+          )}
+
+          {verified && (
+            <span className={styles.verifiedPill} title="Verified project">
+              <BadgeCheck size={12} strokeWidth={2} aria-hidden="true" />
+              Verified
+            </span>
+          )}
         </div>
       </div>
 
-      <div className={styles.meta}>
-        {category && <span>{category}</span>}
-
-        {primaryLanguage && (
-          <span className={styles.languageLabel}>
-            <span
-              className={styles.languageDot}
-              style={{ backgroundColor: languageColor }}
-              aria-hidden="true"
-            />
-            {primaryLanguage}
-          </span>
-        )}
-      </div>
-
-      {description && (
-        <p className={styles.description}>{description}</p>
-      )}
+      <h3 className={styles.name}>{name}</h3>
+      {description && <p className={styles.description}>{description}</p>}
 
       {tags.length > 0 && (
         <div className={styles.tags}>
-          {tags.map((tag) => (
+          {tags.slice(0, 3).map((tag) => (
             <span key={tag} className={styles.tag}>
               {tag}
             </span>
@@ -221,48 +105,24 @@ export default function ProjectCard({ project }) {
         </div>
       )}
 
-      <div className={styles.footerSection}>
-        <div className={styles.beginnerRow}>
-          <BeginnerBadge
-            hasBeginnerFriendlyIssues={
-              hasBeginnerFriendlyIssues
-            }
-          />
-          {hasContributingGuide && <ContributingGuideBadge />}
+      <div className={styles.footer}>
+        <div className={styles.footerStats}>
+          {primaryLanguage && (
+            <span className={styles.stat}>
+              <span className={styles.languageDot} style={{ backgroundColor: languageColor }} aria-hidden="true" />
+              {primaryLanguage}
+            </span>
+          )}
+          <span className={styles.stat}>
+            <Users size={12} strokeWidth={1.8} aria-hidden="true" />
+            {formatCount(contributors)}
+          </span>
+          <span className={styles.stat}>{formatRelativeTime(lastActivityAt)}</span>
         </div>
 
-        <div className={styles.footer}>
-          <div className={styles.stats}>
-            <span className={styles.stat} title="Stars">
-              <svg
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M10 2l2.2 4.9 5.3.6-4 3.7 1.1 5.3L10 13.9l-4.6 2.6 1.1-5.3-4-3.7 5.3-.6L10 2z" />
-              </svg>
-
-              {formatCount(stars)}
-            </span>
-
-            <span
-              className={styles.stat}
-              title="Contributors"
-            >
-              <svg
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M10 10a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7zM3.5 17a6.5 6.5 0 0 1 13 0 1 1 0 0 1-1 1h-11a1 1 0 0 1-1-1z" />
-              </svg>
-
-              {formatCount(contributors)}
-            </span>
-          </div>
-
-          <span>{formatRelativeTime(lastActivityAt)}</span>
-        </div>
+        <span className={styles.arrowButton} aria-hidden="true">
+          <ArrowUpRight size={15} strokeWidth={2} />
+        </span>
       </div>
     </Link>
   );

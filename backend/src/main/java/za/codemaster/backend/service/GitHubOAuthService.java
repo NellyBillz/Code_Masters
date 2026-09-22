@@ -7,6 +7,7 @@ import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestClient;
 import za.codemaster.backend.client.github.dto.GitHubOAuthUser;
+import za.codemaster.backend.exception.OAuthNotConfiguredException;
 
 import java.net.URI;
 import java.net.URLEncoder;
@@ -86,7 +87,7 @@ public class GitHubOAuthService {
 
     private void requireConfiguration() {
         if (clientId.isBlank() || clientSecret.isBlank()) {
-            throw new IllegalStateException("GitHub OAuth is not configured; set GITHUB_OAUTH_CLIENT_ID and GITHUB_OAUTH_CLIENT_SECRET");
+            throw new OAuthNotConfiguredException();
         }
     }
 

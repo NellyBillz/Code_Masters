@@ -1,306 +1,284 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { getPendingProjects, moderateProject } from "../../../lib/api";
+import { useRouter } from "next/navigation";
+import { Check, X, ShieldCheck, ArrowUpRight } from "lucide-react";
+import { listPendingProjects, moderateProject } from "../../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 
 const PAGE_SIZE = 20;
 
-function PendingProjectRow({ project, onDecision }) {
-    const [reason, setReason] = useState("");
-    const [busy, setBusy] = useState(false);
-    const [error, setError] = useState("");
+export default function AdminProjectsPage() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+  const isAdmin = Boolean(user?.siteAdmin);
 
-    async function handleDecision(decision) {
-        setBusy(true);
-        setError("");
+  const [pending, setPending] = useState([]);
+  const [meta, setMeta] = useState({ page: 0, size: PAGE_SIZE, total: 0 });
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reasons, setReasons] = useState({});
+  const [busyId, setBusyId] = useState(null);
 
-        try {
-            await moderateProject(project.id, {
-                decision,
-                reason: reason.trim() || undefined
-            });
-            onDecision(project.id);
-        } catch (err) {
-            setError(err.message || "Failed to record decision.");
-            setBusy(false);
-        }
+  // Non-admins (and the not-yet-resolved auth state) never trigger the
+  // pending-projects fetch at all — this view is absent, not disabled, for
+  // anyone who isn't a confirmed site admin. Redirecting away rather than
+  // rendering a "you don't have access" message here means a non-admin
+  // never sees so much as the shape of this page.
+  useEffect(() => {
+    if (!authLoading && !isAdmin) {
+      router.replace("/");
+    }
+  }, [authLoading, isAdmin, router]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    let cancelled = false;
+
+    async function load() {
+      setLoading(true);
+      setError("");
+      try {
+        const result = await listPendingProjects({ page: meta.page, size: PAGE_SIZE });
+        if (cancelled) return;
+        setPending(result.items || []);
+        setMeta(result.meta || { page: 0, size: PAGE_SIZE, total: 0 });
+      } catch (err) {
+        if (cancelled) return;
+        setError(err.message || "Failed to load the moderation queue.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
     }
 
-    return (
-        <li className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                    <h3 className="text-lg font-bold text-slate-900">
-                        {project.name}
-                    </h3>
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, meta.page]);
 
-                    <a
-                        href={project.githubUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800"
-                    >
-                        {project.githubUrl}
-                    </a>
-                </div>
+  async function handleDecide(projectId, decision) {
+    setBusyId(projectId);
+    setError("");
 
-                <div className="flex flex-wrap gap-2">
-                    {project.connection && (
-                        <span className="rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
-                            {project.connection}
-                        </span>
-                    )}
+    try {
+      await moderateProject(projectId, decision, decision === "reject" ? reasons[projectId] : undefined);
+      // Approved/rejected projects leave the pending queue immediately —
+      // approving flips listingStatus to published server-side, which is
+      // exactly what makes it show up on /projects right away; this page
+      // just needs to stop showing it here.
+      setPending((current) => current.filter((p) => p.id !== projectId));
+      setMeta((current) => ({ ...current, total: Math.max(current.total - 1, 0) }));
+    } catch (err) {
+      setError(err.message || "That decision didn't go through. Please try again.");
+    } finally {
+      setBusyId(null);
+    }
+  }
 
-                    {project.category && (
-                        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">
-                            {project.category}
-                        </span>
-                    )}
-                </div>
-            </div>
+  // While auth is resolving, or once it's resolved to "not an admin", render
+  // nothing resembling this page — no queue, no counts, no layout hints.
+  if (authLoading || !isAdmin) {
+    return null;
+  }
 
-            {project.description && (
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                    {project.description}
-                </p>
-            )}
+  return (
+    <div style={{ padding: "8px 4px 40px", maxWidth: "820px", margin: "0 auto" }}>
+      <header style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "20px" }}>
+        <span
+          aria-hidden="true"
+          style={{
+            width: "38px",
+            height: "38px",
+            borderRadius: "12px",
+            background: "var(--cm-sidebar)",
+            color: "var(--cm-lime)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          }}
+        >
+          <ShieldCheck size={18} strokeWidth={2} />
+        </span>
+        <div>
+          <h1 style={{ fontSize: "20px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+            Moderation queue
+          </h1>
+          <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: "2px 0 0" }}>
+            {meta.total} project{meta.total === 1 ? "" : "s"} awaiting review — site admins only.
+          </p>
+        </div>
+      </header>
 
-            {project.tags?.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                    {project.tags.map((tag) => (
-                        <span
-                            key={tag}
-                            className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700"
-                        >
-                            {tag}
-                        </span>
-                    ))}
-                </div>
-            )}
+      {error && (
+        <p
+          role="alert"
+          className="cm-glass"
+          style={{ borderRadius: "14px", padding: "12px 16px", fontSize: "13px", color: "var(--cm-orange-text)", marginBottom: "16px" }}
+        >
+          {error}
+        </p>
+      )}
 
-            <div className="mt-5 flex flex-wrap items-center gap-3">
-                <input
-                    type="text"
-                    placeholder="Reason (optional, shown on reject)"
-                    value={reason}
-                    onChange={(e) => setReason(e.target.value)}
-                    disabled={busy}
-                    className="min-w-[16rem] flex-1 rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                />
-
-                <button
-                    type="button"
-                    onClick={() => handleDecision("approve")}
-                    disabled={busy}
-                    className="rounded-xl bg-green-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    Approve
-                </button>
-
-                <button
-                    type="button"
-                    onClick={() => handleDecision("reject")}
-                    disabled={busy}
-                    className="rounded-xl border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    Reject
-                </button>
-            </div>
-
-            {error && (
-                <p role="alert" className="mt-3 text-sm text-red-700">
-                    {error}
-                </p>
-            )}
-        </li>
-    );
+      {loading ? (
+        <StatusPanel text="Loading the queue…" />
+      ) : pending.length === 0 ? (
+        <StatusPanel title="Nothing pending" text="Every submission has been reviewed." />
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+          {pending.map((project) => (
+            <PendingProjectCard
+              key={project.id}
+              project={project}
+              busy={busyId === project.id}
+              reason={reasons[project.id] || ""}
+              onReasonChange={(value) => setReasons((current) => ({ ...current, [project.id]: value }))}
+              onDecide={(decision) => handleDecide(project.id, decision)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default function AdminPendingProjectsPage() {
-    const { user, loading: authLoading } = useAuth();
-
-    const [projects, setProjects] = useState([]);
-    const [meta, setMeta] = useState({ page: 0, size: PAGE_SIZE, total: 0 });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState("");
-
-    const isSiteAdmin = Boolean(user?.isSiteAdmin);
-
-    useEffect(() => {
-        if (!isSiteAdmin) {
-            return;
-        }
-
-        let cancelled = false;
-
-        async function loadPending() {
-            setLoading(true);
-            setError("");
-
-            try {
-                const result = await getPendingProjects({
-                    page: meta.page,
-                    size: PAGE_SIZE
-                });
-
-                if (!cancelled) {
-                    setProjects(result.items);
-                    setMeta(result.meta);
-                }
-            } catch (err) {
-                if (!cancelled) {
-                    setError(err.message || "Failed to load pending projects.");
-                }
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            }
-        }
-
-        loadPending();
-
-        return () => {
-            cancelled = true;
-        };
-    }, [isSiteAdmin, meta.page]);
-
-    function handleDecision(projectId) {
-        setProjects((current) => current.filter((p) => p.id !== projectId));
-        setMeta((current) => ({
-            ...current,
-            total: Math.max(current.total - 1, 0)
-        }));
-    }
-
-    if (authLoading || (isSiteAdmin && loading)) {
-        return (
-            <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-                <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-                    <p className="text-sm font-medium text-slate-600">
-                        Loading...
-                    </p>
-                </div>
-            </main>
-        );
-    }
-
-    if (!isSiteAdmin) {
-        return (
-            <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-                <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-                    <h1 className="text-xl font-bold text-slate-900">
-                        Page not found
-                    </h1>
-                </div>
-            </main>
-        );
-    }
-
-    const totalPages = Math.ceil(meta.total / PAGE_SIZE);
-    const canGoPrevious = meta.page > 0;
-    const canGoNext = meta.page + 1 < totalPages;
-
-    return (
-        <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6 lg:px-8">
-            <div className="mb-8">
-                <Link
-                    href="/projects"
-                    className="inline-flex items-center text-sm font-medium text-blue-600 transition hover:text-blue-800"
-                >
-                    ← Back to projects
-                </Link>
-            </div>
-
-            <header className="mb-8">
-                <p className="mb-2 text-sm font-medium text-blue-600">
-                    Site admin
-                </p>
-
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                    Moderation queue
-                </h1>
-
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                    Projects submitted for review. Approving publishes a
-                    project immediately; rejecting keeps it hidden from
-                    public discovery.
-                </p>
-            </header>
-
-            {error && (
-                <div
-                    role="alert"
-                    className="mb-6 rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"
-                >
-                    {error}
-                </div>
+function PendingProjectCard({ project, busy, reason, onReasonChange, onDecide }) {
+  return (
+    <div className="cm-glass" style={{ borderRadius: "20px", padding: "18px 20px" }}>
+      <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+            <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+              {project.name}
+            </h2>
+            {project.owner && (
+              <span style={{ fontSize: "12px", color: "var(--cm-text-muted)" }}>by {project.owner}</span>
             )}
+          </div>
+          {project.description && (
+            <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: "6px 0 0", lineHeight: 1.5 }}>
+              {project.description}
+            </p>
+          )}
+        </div>
 
-            {!error && projects.length === 0 && (
-                <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-12 text-center">
-                    <h3 className="text-lg font-semibold text-slate-900">
-                        Nothing waiting on review
-                    </h3>
+        {project.githubUrl && (
+          <a
+            href={project.githubUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "12.5px", fontWeight: 600, color: "var(--cm-text-primary)", flexShrink: 0 }}
+          >
+            View on GitHub
+            <ArrowUpRight size={13} strokeWidth={2} aria-hidden="true" />
+          </a>
+        )}
+      </div>
 
-                    <p className="mt-2 text-sm text-slate-500">
-                        New submissions will show up here.
-                    </p>
-                </div>
-            )}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", margin: "12px 0" }}>
+        {project.primaryLanguage && <Tag>{project.primaryLanguage}</Tag>}
+        {project.category && <Tag>{project.category}</Tag>}
+        {project.connection && <Tag>{project.connection.replace(/_/g, " ")}</Tag>}
+        {project.createdAt && <Tag>submitted {new Date(project.createdAt).toLocaleDateString()}</Tag>}
+      </div>
 
-            {projects.length > 0 && (
-                <ul className="space-y-4">
-                    {projects.map((project) => (
-                        <PendingProjectRow
-                            key={project.id}
-                            project={project}
-                            onDecision={handleDecision}
-                        />
-                    ))}
-                </ul>
-            )}
+      <textarea
+        value={reason}
+        onChange={(event) => onReasonChange(event.target.value)}
+        placeholder="Reason for rejecting (optional, shown to the submitter)"
+        rows={2}
+        maxLength={1000}
+        disabled={busy}
+        style={{
+          width: "100%",
+          borderRadius: "12px",
+          border: "0.5px solid var(--cm-border)",
+          background: "var(--cm-surface)",
+          color: "var(--cm-text-primary)",
+          fontSize: "12.5px",
+          padding: "10px 12px",
+          marginBottom: "12px",
+          resize: "vertical",
+        }}
+      />
 
-            {totalPages > 1 && (
-                <nav
-                    aria-label="Pending project pagination"
-                    className="mt-8 flex items-center justify-center gap-4"
-                >
-                    <button
-                        type="button"
-                        disabled={!canGoPrevious || loading}
-                        onClick={() =>
-                            setMeta((current) => ({
-                                ...current,
-                                page: current.page - 1
-                            }))
-                        }
-                        className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                        Previous
-                    </button>
+      <div style={{ display: "flex", gap: "8px" }}>
+        <button
+          type="button"
+          onClick={() => onDecide("approve")}
+          disabled={busy}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            borderRadius: "999px",
+            padding: "9px 18px",
+            fontSize: "13px",
+            fontWeight: 700,
+            border: "none",
+            cursor: busy ? "not-allowed" : "pointer",
+            opacity: busy ? 0.6 : 1,
+            background: "var(--cm-lime)",
+            color: "#0A0A0A",
+          }}
+        >
+          <Check size={14} strokeWidth={2.4} aria-hidden="true" />
+          {busy ? "Working…" : "Approve"}
+        </button>
 
-                    <span className="text-sm font-medium text-slate-600">
-                        Page {meta.page + 1} of {Math.max(totalPages, 1)}
-                    </span>
+        <button
+          type="button"
+          onClick={() => onDecide("reject")}
+          disabled={busy}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            borderRadius: "999px",
+            padding: "9px 18px",
+            fontSize: "13px",
+            fontWeight: 700,
+            border: "0.5px solid var(--cm-border)",
+            cursor: busy ? "not-allowed" : "pointer",
+            opacity: busy ? 0.6 : 1,
+            background: "var(--cm-surface)",
+            color: "var(--cm-orange-text)",
+          }}
+        >
+          <X size={14} strokeWidth={2.4} aria-hidden="true" />
+          Reject
+        </button>
+      </div>
+    </div>
+  );
+}
 
-                    <button
-                        type="button"
-                        disabled={!canGoNext || loading}
-                        onClick={() =>
-                            setMeta((current) => ({
-                                ...current,
-                                page: current.page + 1
-                            }))
-                        }
-                        className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                    >
-                        Next
-                    </button>
-                </nav>
-            )}
-        </main>
-    );
+function Tag({ children }) {
+  return (
+    <span
+      style={{
+        fontSize: "11px",
+        color: "var(--cm-text-secondary)",
+        background: "var(--cm-surface-alt)",
+        padding: "3px 10px",
+        borderRadius: "999px",
+        textTransform: "capitalize",
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+function StatusPanel({ title, text }) {
+  return (
+    <div className="cm-glass" style={{ borderRadius: "24px", padding: "48px 24px", textAlign: "center" }}>
+      {title && (
+        <p style={{ fontSize: "15px", fontWeight: 600, margin: "0 0 6px", color: "var(--cm-text-primary)" }}>{title}</p>
+      )}
+      <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: 0 }}>{text}</p>
+    </div>
+  );
 }

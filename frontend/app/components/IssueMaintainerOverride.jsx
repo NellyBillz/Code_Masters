@@ -10,9 +10,7 @@ export default function IssueMaintainerOverride({ issue }) {
   const [project, setProject] = useState(null);
 
   useEffect(() => {
-    if (!issue?.project?.id) {
-      return;
-    }
+    if (!issue?.project?.id) return;
 
     getProject(issue.project.id)
       .then(setProject)
