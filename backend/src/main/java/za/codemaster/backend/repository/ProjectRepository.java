@@ -91,9 +91,11 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
               AND (
                     :q IS NULL OR :q = ''
                     OR p.tsv @@ plainto_tsquery('english', :q)
-                    OR similarity(p.name, :q) >= 0.2
-                    OR word_similarity(:q, p.name) >= 0.25
-                    OR p.name % :q
+                    OR (char_length(:q) >= 4 AND (
+                          similarity(p.name, :q) >= 0.2
+                          OR word_similarity(:q, p.name) >= 0.25
+                          OR p.name % :q
+                        ))
                     OR EXISTS (SELECT 1 FROM project_tags qt WHERE qt.project_id = p.id AND qt.tag ILIKE '%' || :q || '%')
                   )
             ORDER BY
@@ -119,9 +121,11 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
               AND (
                     :q IS NULL OR :q = ''
                     OR p.tsv @@ plainto_tsquery('english', :q)
-                    OR similarity(p.name, :q) >= 0.2
-                    OR word_similarity(:q, p.name) >= 0.25
-                    OR p.name % :q
+                    OR (char_length(:q) >= 4 AND (
+                          similarity(p.name, :q) >= 0.2
+                          OR word_similarity(:q, p.name) >= 0.25
+                          OR p.name % :q
+                        ))
                     OR EXISTS (SELECT 1 FROM project_tags qt WHERE qt.project_id = p.id AND qt.tag ILIKE '%' || :q || '%')
                   )
         """,

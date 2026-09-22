@@ -189,6 +189,26 @@ function listProjects(params) {
 }
 
 /**
+ * Unified cross-resource search — projects and issues in one ranked,
+ * paginated list, discriminated by `resultType` ('project' | 'issue'). A
+ * project result is a Project plus `resultType`; an issue result is an
+ * Issue plus `resultType`. Backs the header search and /search page.
+ *
+ * @param {Object} params
+ * @param {string} params.q Required, minimum 2 characters.
+ * @param {'all'|'projects'|'issues'} [params.type] Default 'all'.
+ * @param {string} [params.language] Only narrows project results.
+ * @param {'beginner'|'intermediate'|'advanced'|'unknown'} [params.difficulty] Only narrows issue results.
+ * @param {string} [params.country] e.g. 'ZA'. Only narrows project results.
+ * @param {number} [params.page] Zero-based page index. Default 0.
+ * @param {number} [params.size] Page size, 1-50. Default 20.
+ * @returns {Promise<{items: Object[], meta: PageMeta}>}
+ */
+function search(params) {
+  return apiFetch(`/search${buildQuery(params)}`);
+}
+
+/**
  * Get a single project's details, including maintainers, featured issues,
  * and recent comments.
  *
@@ -503,6 +523,7 @@ function moderateProject(projectId, decision, reason) {
 
 module.exports = {
   listProjects,
+  search,
   getProject,
   updateProject,
   getIssue,

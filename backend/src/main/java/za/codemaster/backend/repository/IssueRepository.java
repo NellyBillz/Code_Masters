@@ -93,9 +93,11 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
               AND (
                     :q IS NULL OR :q = ''
                     OR i.tsv @@ plainto_tsquery('english', :q)
-                    OR similarity(i.title, :q) >= 0.2
-                    OR word_similarity(:q, i.title) >= 0.25
-                    OR i.title % :q
+                    OR (char_length(:q) >= 4 AND (
+                          similarity(i.title, :q) >= 0.2
+                          OR word_similarity(:q, i.title) >= 0.25
+                          OR i.title % :q
+                        ))
                   )
             ORDER BY
               CASE WHEN :sortByRelevance = true THEN (
@@ -114,9 +116,11 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
               AND (
                     :q IS NULL OR :q = ''
                     OR i.tsv @@ plainto_tsquery('english', :q)
-                    OR similarity(i.title, :q) >= 0.2
-                    OR word_similarity(:q, i.title) >= 0.25
-                    OR i.title % :q
+                    OR (char_length(:q) >= 4 AND (
+                          similarity(i.title, :q) >= 0.2
+                          OR word_similarity(:q, i.title) >= 0.25
+                          OR i.title % :q
+                        ))
                   )
         """,
         nativeQuery = true

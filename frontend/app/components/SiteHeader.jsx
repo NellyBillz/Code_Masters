@@ -15,10 +15,9 @@ export default function SiteHeader() {
   function handleSearchSubmit(event) {
     event.preventDefault();
 
-    // /projects doesn't read a `q` param on mount yet — this gets someone
-    // to the right page today; wiring the pre-fill is a follow-up on the
-    // /projects side, not here.
-    router.push(query.trim() ? `/projects?q=${encodeURIComponent(query.trim())}` : "/projects");
+    // Empty search: send them to general discovery rather than a /search
+    // page that can't call the API anyway (q has a 2-character minimum).
+    router.push(query.trim() ? `/search?q=${encodeURIComponent(query.trim())}` : "/projects");
   }
 
   return (
