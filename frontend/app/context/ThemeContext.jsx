@@ -15,11 +15,7 @@ const ThemeContext = createContext({
   toggleTheme: () => {},
 });
 
-function getInitialTheme() {
-  // Runs during SSR too — window isn't available there, so fall back to
-  // "light" and let the client-only effect below reconcile it post-mount.
-  if (typeof window === "undefined") return "light";
-
+function getStoredTheme() {
   const stored = window.localStorage.getItem(STORAGE_KEY);
   if (stored === "dark" || stored === "light") return stored;
 
@@ -29,7 +25,15 @@ function getInitialTheme() {
 }
 
 export function ThemeProvider({ children }) {
-  const [theme, setTheme] = useState(getInitialTheme);
+  // Always starts as "light" so the server render and the client's first
+  // (hydration) render match exactly. The real theme — which depends on
+  // localStorage/matchMedia and is only knowable client-side — is applied
+  // in the effect below, after hydration has already succeeded.
+  const [theme, setTheme] = useState("light");
+
+  useEffect(() => {
+    setTheme(getStoredTheme());
+  }, []);
 
   // Apply the class + persist whenever theme changes (including the
   // initial value, so the <html> class matches on first client render).
