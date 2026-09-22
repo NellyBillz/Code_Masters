@@ -1,5 +1,7 @@
 package za.codemaster.backend.service;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import jakarta.servlet.http.Cookie;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -8,12 +10,16 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+import za.codemaster.backend.domain.model.Claim;
+import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.Project;
 import za.codemaster.backend.domain.model.ProjectMaintainer;
 import za.codemaster.backend.domain.model.Session;
 import za.codemaster.backend.domain.model.User;
+import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
 import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
@@ -23,6 +29,7 @@ import za.codemaster.backend.repository.UserRepository;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -59,6 +66,15 @@ class IssueControllerIntegrationTest {
     @Autowired
     private ProjectMaintainerRepository projectMaintainerRepository;
 
+    @Autowired
+    private ClaimRepository claimRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    @PersistenceContext
+    private EntityManager entityManager;
+
     private ProjectQueryServiceFixtures fixtures;
     private Long issueId;
     private Long projectId;
@@ -66,6 +82,14 @@ class IssueControllerIntegrationTest {
     @BeforeEach
     void setUp() {
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
+        // DB-default columns (issues.created_at, projects.last_activity_at) are
+        // insertable=false on the entity, so the in-memory instances just saved
+        // above never picked up their real DB-assigned values. Flush + clear so
+        // every find() from here on (including inside the controller under test)
+        // re-reads real rows instead of reusing these stale session-cached refs —
+        // matters for API-04.1's ageInDays, which NPEs on a null createdAt.
+        entityManager.flush();
+        entityManager.clear();
         issueId = fixtures.issueId(0);
         projectId = fixtures.projectId(0);
     }
@@ -160,6 +184,75 @@ class IssueControllerIntegrationTest {
                         .header(CSRF_HEADER, session.getCsrToken())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"difficulty\":\"advanced\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("ISSUE_NOT_FOUND"));
+    }
+
+    // --- API-04.1: GET /issues/{issueId}/contribution-context ---
+
+    @Test
+    @DisplayName("A project with hasContributingGuide/hasCodeOfConduct true reports both facts, and " +
+            "zero completed claims reports completedContributionsCount 0, not null")
+    void reportsProjectFactsAndZeroCompletedContributions() throws Exception {
+        Project project = projectRepository.findById(projectId).orElseThrow();
+        project.setHasContributingGuide(true);
+        project.setHasCodeOfConduct(true);
+        projectRepository.save(project);
+
+        mockMvc.perform(get("/api/v1/issues/{issueId}/contribution-context", issueId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.project.hasContributingGuide").value(true))
+                .andExpect(jsonPath("$.project.hasCodeOfConduct").value(true))
+                .andExpect(jsonPath("$.project.completedContributionsCount").value(0));
+    }
+
+    @Test
+    @DisplayName("daysSinceLastActivity is null when the project's lastActivityAt has never been synced")
+    void daysSinceLastActivityIsNullWhenNeverSynced() throws Exception {
+        mockMvc.perform(get("/api/v1/issues/{issueId}/contribution-context", issueId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.project.daysSinceLastActivity").doesNotExist());
+    }
+
+    @Test
+    @DisplayName("daysSinceLastActivity reflects a synced lastActivityAt")
+    void daysSinceLastActivityReflectsSyncedValue() throws Exception {
+        // lastActivityAt is insertable/updatable=false on the entity (set only by the
+        // GH-02.3 sync job's own JDBC write, see ProjectSyncRepository) — mirror that here.
+        jdbcTemplate.update(
+                "update projects set last_activity_at = ? where id = ?",
+                OffsetDateTime.now().minusDays(5), projectId);
+
+        mockMvc.perform(get("/api/v1/issues/{issueId}/contribution-context", issueId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.project.daysSinceLastActivity").value(5));
+    }
+
+    @Test
+    @DisplayName("inFlightClaimCount matches GET /issues/{id}'s own claimCount for the same issue")
+    void inFlightClaimCountMatchesIssueClaimCount() throws Exception {
+        Session session = createActiveSession();
+        claimRepository.save(Claim.builder()
+                .issue(issueRepository.findById(issueId).orElseThrow())
+                .user(session.getUser())
+                .status(ClaimStatus.ACTIVE)
+                .build());
+
+        mockMvc.perform(get("/api/v1/issues/{issueId}", issueId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.claimCount").value(1));
+
+        mockMvc.perform(get("/api/v1/issues/{issueId}/contribution-context", issueId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.issue.inFlightClaimCount").value(1))
+                .andExpect(jsonPath("$.issue.isBeginnerFriendly").value(true))
+                .andExpect(jsonPath("$.issue.labelCount").value(2));
+    }
+
+    @Test
+    @DisplayName("GET contribution-context for a missing issue -> 404 ISSUE_NOT_FOUND")
+    void contributionContextForMissingIssueIs404() throws Exception {
+        mockMvc.perform(get("/api/v1/issues/{issueId}/contribution-context", -999L))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("ISSUE_NOT_FOUND"));
     }

@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 import za.codemaster.backend.domain.model.User;
+import za.codemaster.backend.dto.issue.IssueContributionContext;
 import za.codemaster.backend.dto.issue.IssueDetail;
 import za.codemaster.backend.dto.issue.IssueDto;
 import za.codemaster.backend.dto.issue.UpdateIssueRequest;
@@ -41,6 +42,18 @@ public class IssueController {
     @GetMapping("/api/v1/issues/{issueId}")
     public IssueDetail getIssue(@PathVariable Long issueId) {
         return projectQueryService.getIssueDetail(issueId);
+    }
+
+    /**
+     * {@code GET /api/v1/issues/{issueId}/contribution-context}; evidence-based
+     * contribution context (API-04.1) — public, no auth required, same
+     * visibility as {@link #getIssue}. Plain facts and counts only, no
+     * combined score; rendered by {@code FE-04.6}. Throws {@code ISSUE_NOT_FOUND}
+     * (404) via GlobalExceptionHandler if the id doesn't exist.
+     */
+    @GetMapping("/api/v1/issues/{issueId}/contribution-context")
+    public IssueContributionContext getContributionContext(@PathVariable Long issueId) {
+        return projectQueryService.getIssueContributionContext(issueId);
     }
 
     /**

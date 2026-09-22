@@ -20,6 +20,8 @@ import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
@@ -223,6 +225,50 @@ public class ProjectQueryService {
     }
 
     /**
+     * Assembles evidence-based contribution context for a single issue
+     * (API-04.1): plain facts and counts a contributor can weigh themselves —
+     * no combined score, no ranking. {@code inFlightClaimCount} reuses
+     * {@link #inFlightClaimCount}, the same helper {@link #toDto(za.codemaster.backend.domain.model.Issue)}
+     * calls, so this endpoint and {@code GET /issues/{issueId}}'s own
+     * {@code claimCount} can never disagree for the same issue at the same
+     * point in time (the ticket's own acceptance criterion).
+     *
+     * @param issueId the issue id from the path
+     * @return the matching issue's contribution context
+     * @throws ApiException with code {@code ISSUE_NOT_FOUND} (404) if no issue matches
+     */
+    @Transactional(readOnly = true)
+    public IssueContributionContext getIssueContributionContext(Long issueId) {
+        var issueEntity = issueRepository.findById(issueId)
+                .orElseThrow(() -> new ApiException(
+                        "ISSUE_NOT_FOUND",
+                        "No issue exists with id " + issueId,
+                        HttpStatus.NOT_FOUND
+                ));
+        var projectEntity = issueEntity.getProject();
+
+        Integer daysSinceLastActivity = projectEntity.getLastActivityAt() == null
+                ? null
+                : (int) ChronoUnit.DAYS.between(projectEntity.getLastActivityAt(), OffsetDateTime.now());
+
+        ProjectContributionContext project = new ProjectContributionContext(
+                projectEntity.isHasContributingGuide(),
+                projectEntity.isHasCodeOfConduct(),
+                daysSinceLastActivity,
+                claimRepository.countByIssueProjectIdAndStatus(projectEntity.getId(), ClaimStatus.COMPLETED)
+        );
+
+        IssueContributionContextIssue issue = new IssueContributionContextIssue(
+                (int) ChronoUnit.DAYS.between(issueEntity.getCreatedAt(), OffsetDateTime.now()),
+                issueEntity.getLabels() == null ? 0 : issueEntity.getLabels().length,
+                Boolean.TRUE.equals(issueEntity.getIsBeginnerFriendly()),
+                (int) inFlightClaimCount(issueEntity.getId())
+        );
+
+        return new IssueContributionContext(project, issue);
+    }
+
+    /**
      * Maps a persisted project row to the API's {@link ProjectDto} shape.
      * Public (same reasoning as {@link #toDto(za.codemaster.backend.domain.model.Issue)}):
      * reused by {@code ProjectService} (API-02.7) after creating/updating a project,
@@ -274,8 +320,7 @@ public class ProjectQueryService {
      * override, rather than duplicating the claimCount/enum-mapping logic there.
      */
     public IssueDto toDto(za.codemaster.backend.domain.model.Issue entity) {
-        long inFlightClaims = claimRepository.countByIssueIdAndStatusIn(
-                entity.getId(), List.of(ClaimStatus.ACTIVE, ClaimStatus.CHANGES_REQUESTED));
+        long inFlightClaims = inFlightClaimCount(entity.getId());
 
         return new IssueDto(
                 entity.getId(),
@@ -299,6 +344,19 @@ public class ProjectQueryService {
                 entity.getCreatedAt(),
                 entity.getUpdatedAt()
         );
+    }
+
+    /**
+     * Counts an issue's in-flight claims — {@code active} or
+     * {@code changes_requested}, not {@code completed}/{@code released}.
+     * Shared by {@link #toDto(za.codemaster.backend.domain.model.Issue)}
+     * ({@code IssueDto.claimCount}) and {@link #getIssueContributionContext}
+     * ({@code IssueContributionContextIssue.inFlightClaimCount}) so the two
+     * can't drift apart (API-04.1's acceptance criterion).
+     */
+    private long inFlightClaimCount(Long issueId) {
+        return claimRepository.countByIssueIdAndStatusIn(
+                issueId, List.of(ClaimStatus.ACTIVE, ClaimStatus.CHANGES_REQUESTED));
     }
 
     /**

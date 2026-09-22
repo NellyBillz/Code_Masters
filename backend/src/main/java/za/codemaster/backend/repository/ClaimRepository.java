@@ -91,6 +91,13 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
     List<Claim> findByIssueProjectIdAndStatus(Long projectId, ClaimStatus status);
 
     /**
+     * Counts a project's claims in a given status (via {@code claim.issue.project}).
+     * Backs {@code ProjectContributionContext.completedContributionsCount}
+     * (API-04.1), always called with {@code ClaimStatus.COMPLETED}.
+     */
+    long countByIssueProjectIdAndStatus(Long projectId, ClaimStatus status);
+
+    /**
      * Finds a project's claims in a given status with a given pull-request state.
      * Backs {@code claimsAwaitingReview} in {@code GET /users/me/maintainer-activity}
      * (API-03.7): a PR is attached ({@code pullRequestState: open}) and the claim
