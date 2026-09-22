@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { listProjects } from "../../lib/api";
 import ProjectCard from "../components/ProjectCard";
 
@@ -141,26 +142,26 @@ export default function Projects() {
             <label htmlFor="language" style={{ display: "block", fontSize: "11px", color: "var(--cm-text-secondary)", marginBottom: "6px" }}>
               Language
             </label>
-            <select id="language" value={filters.language} onChange={(e) => updateFilter("language", e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+            <Select id="language" value={filters.language} onChange={(e) => updateFilter("language", e.target.value)}>
               <option value="">All languages</option>
               <option value="Java">Java</option>
               <option value="Python">Python</option>
               <option value="JavaScript">JavaScript</option>
               <option value="TypeScript">TypeScript</option>
               <option value="C++">C++</option>
-            </select>
+            </Select>
           </div>
 
           <div>
             <label htmlFor="sort" style={{ display: "block", fontSize: "11px", color: "var(--cm-text-secondary)", marginBottom: "6px" }}>
               Sort by
             </label>
-            <select id="sort" value={filters.sort} onChange={(e) => updateFilter("sort", e.target.value)} style={{ ...selectStyle, width: "100%" }}>
+            <Select id="sort" value={filters.sort} onChange={(e) => updateFilter("sort", e.target.value)}>
               <option value="relevance">Most relevant</option>
               <option value="recent">Recent</option>
               <option value="stars">Stars</option>
               <option value="contributors">Contributors</option>
-            </select>
+            </Select>
           </div>
 
           <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "var(--cm-text-secondary)", cursor: "pointer" }}>
@@ -259,6 +260,55 @@ function StatusPanel({ title, text }) {
         </p>
       )}
       <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: 0 }}>{text}</p>
+    </div>
+  );
+}
+
+// A plain <select> renders each browser/OS's own dropdown chrome on top of
+// whatever styling we give it — on a dark card that shows up as a stray
+// light-grey native arrow/box that doesn't match anything else on the page.
+// `appearance: none` (with the -webkit/-moz prefixes for older engines)
+// strips that native rendering so our own chevron and border are the only
+// thing drawn; the <option> list itself still uses OS chrome (no CSS can
+// change that cross-browser), but that's a floating native menu the person
+// only sees for a moment, not part of the page's persistent look.
+function Select({ id, value, onChange, children }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <select
+        id={id}
+        value={value}
+        onChange={onChange}
+        style={{
+          appearance: "none",
+          WebkitAppearance: "none",
+          MozAppearance: "none",
+          borderRadius: "10px",
+          border: "0.5px solid var(--cm-border)",
+          background: "var(--cm-surface)",
+          color: "var(--cm-text-primary)",
+          fontSize: "13px",
+          padding: "9px 34px 9px 12px",
+          outline: "none",
+          width: "100%",
+          cursor: "pointer",
+        }}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        size={15}
+        strokeWidth={2}
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          right: "10px",
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: "var(--cm-text-secondary)",
+          pointerEvents: "none",
+        }}
+      />
     </div>
   );
 }

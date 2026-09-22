@@ -112,6 +112,24 @@ function buildQuery(paramsObj) {
 }
 
 /**
+ * @typedef {Object} UserProfile
+ * @property {number} id
+ * @property {string} username
+ * @property {string} [displayName]
+ * @property {string} [avatarUrl]
+ * @property {string} [bio]
+ * @property {string} [location]
+ * @property {string[]} [skills]
+ * @property {number} [projectsCount]
+ * @property {number} [contributionsCount]
+ * @property {number} [reputation]
+ * @property {string} [email] Only present on GET /users/me, never on public profiles.
+ * @property {boolean} [githubAccess] Only present on GET /users/me.
+ * @property {boolean} [siteAdmin] Only present on GET /users/me. Gates the
+ *   /admin/* moderation views — absent (falsy) for everyone else.
+ */
+
+/**
  * @param {string} path
  * @param {RequestInit} [init]
  */
@@ -280,6 +298,7 @@ function postComment(issueId, body) {
     return apiFetch(`/issues/${issueId}/claims`);
   }
 
+  /** @returns {Promise<UserProfile>} */
   function getCurrentUser() {
     return apiFetch('/users/me');
   }
@@ -348,6 +367,44 @@ function updateIssueClassification(issueId, update) {
   });
 }
 
+/**
+ * List projects awaiting moderation. Site-admin only — the backend enforces
+ * this via SiteAdminGuard and returns 403 FORBIDDEN for anyone else; this
+ * function doesn't attempt its own client-side check, since the server is
+ * the real enforcement point.
+ *
+ * @param {Object} [params]
+ * @param {number} [params.page] Zero-based page index. Default 0.
+ * @param {number} [params.size] Page size, 1-50. Default 20.
+ * @returns {Promise<PagedProjects>}
+ */
+function listPendingProjects(params) {
+  return apiFetch(`/admin/projects/pending${buildQuery(params)}`);
+}
+
+/**
+ * Approve or reject a pending project submission. Site-admin only. Only
+ * ever changes the project's listingStatus (published/rejected) — never
+ * touches verified/verifiedAt, which is a separate concept.
+ *
+ * @param {number|string} projectId
+ * @param {'approve'|'reject'} decision
+ * @param {string} [reason] Recommended (not required) when rejecting.
+ * @returns {Promise<Project>} The updated project.
+ */
+function moderateProject(projectId, decision, reason) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/admin/projects/${projectId}/moderation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify(reason ? { decision, reason } : { decision }),
+  });
+}
+
 module.exports = {
   listProjects,
   getProject,
@@ -363,4 +420,6 @@ module.exports = {
   inviteMaintainer,
   removeMaintainer,
   updateIssueClassification,
+  listPendingProjects,
+  moderateProject,
 };
