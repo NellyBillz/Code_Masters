@@ -1,0 +1,91 @@
+@import "tailwindcss";
+
+:root {
+--background: #f8fafc;
+--foreground: #0f172a;
+
+/* Code_Masters design tokens — light mode */
+--cm-bg: #F7F6F0;
+--cm-surface: #FFFFFF;
+--cm-surface-alt: #F1EFE8;
+--cm-sidebar: #161611;
+--cm-sidebar-icon: #8A897F;
+--cm-border: #E5E3DA;
+--cm-text-primary: #161611;
+--cm-text-secondary: #5F5E5A;
+--cm-text-muted: #8A897F;
+--cm-lime: #D4E85A;
+--cm-lime-soft: #EBF1C9;
+--cm-lime-text: #3A4310;
+--cm-orange: #D4623A;
+--cm-orange-soft: #FBE3D3;
+--cm-orange-text: #6B2A15;
+}
+
+.dark {
+--background: #17170F;
+--foreground: #F2F1EA;
+
+/* Code_Masters design tokens — dark mode */
+--cm-bg: #17170F;
+--cm-surface: #201F19;
+--cm-surface-alt: #262620;
+--cm-sidebar: #0B0B08;
+--cm-sidebar-icon: #7A7970;
+--cm-border: #3A3A33;
+--cm-text-primary: #F2F1EA;
+--cm-text-secondary: #A6A59C;
+--cm-text-muted: #7A7970;
+--cm-lime: #D4E85A;
+--cm-lime-soft: #2A2E17;
+--cm-lime-text: #D4E85A;
+--cm-orange: #D4623A;
+--cm-orange-soft: #3A2216;
+--cm-orange-text: #E8A181;
+}
+
+html {
+scroll-behavior: smooth;
+color-scheme: light;
+}
+
+html.dark {
+color-scheme: dark;
+}
+
+html,
+body {
+min-height: 100%;
+max-width: 100vw;
+overflow-x: hidden;
+}
+
+body {
+margin: 0;
+background: var(--cm-bg);
+color: var(--cm-text-primary);
+font-family:
+Arial,
+Helvetica,
+sans-serif;
+-webkit-font-smoothing: antialiased;
+-moz-osx-font-smoothing: grayscale;
+transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+* {
+  box-sizing: border-box;
+  }
+
+button,
+input,
+select,
+textarea {
+font: inherit;
+}
+
+a {
+color: inherit;
+text-decoration: none;
+}
+
