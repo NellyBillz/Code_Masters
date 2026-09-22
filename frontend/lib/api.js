@@ -125,7 +125,7 @@ function buildQuery(paramsObj) {
  * @property {number} [reputation]
  * @property {string} [email] Only present on GET /users/me, never on public profiles.
  * @property {boolean} [githubAccess] Only present on GET /users/me.
- * @property {boolean} [siteAdmin] Only present on GET /users/me. Gates the
+ * @property {boolean} [isSiteAdmin] Only present on GET /users/me. Gates the
  *   /admin/* moderation views — absent (falsy) for everyone else.
  */
 
@@ -304,6 +304,34 @@ function postComment(issueId, body) {
   }
 
   /**
+   * A developer's verified contribution history — only claims with
+   * status `completed` (GitHub-merge-verified or maintainer-confirmed),
+   * most recent first. Backs the "activity summary" on /profile and public
+   * /users/{username} pages.
+   *
+   * @param {string} username
+   * @param {Object} [params]
+   * @param {number} [params.page] Zero-based page index. Default 0.
+   * @param {number} [params.size] Page size, 1-50. Default 20.
+   * @returns {Promise<{items: Object[], meta: PageMeta}>}
+   */
+  function getUserContributions(username, params) {
+    return apiFetch(`/users/${username}/contributions${buildQuery(params)}`);
+  }
+
+  /**
+   * Aggregated activity across every project the caller maintains: active
+   * claims, claims awaiting review (has a pull request attached, not yet
+   * reviewed), and recent comments — one rollup instead of checking each
+   * maintained project individually.
+   *
+   * @returns {Promise<{projects: Object[]}>}
+   */
+  function getMaintainerActivity() {
+    return apiFetch('/users/me/maintainer-activity');
+  }
+
+  /**
    * Log out the current session. Hits /auth/logout directly (not under
    * /api/v1, same as the /auth/github login link — see next.config.js's
    * rewrite for /auth/:path*), clearing the session and CSRF cookies.
@@ -414,6 +442,8 @@ module.exports = {
   ApiError,
   getIssueClaims,
   getCurrentUser,
+  getUserContributions,
+  getMaintainerActivity,
   postClaim,
   deleteClaim,
   logout,

@@ -11,7 +11,7 @@ const PAGE_SIZE = 20;
 export default function AdminProjectsPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
-  const isAdmin = Boolean(user?.siteAdmin);
+  const isAdmin = Boolean(user?.isSiteAdmin);
 
   const [pending, setPending] = useState([]);
   const [meta, setMeta] = useState({ page: 0, size: PAGE_SIZE, total: 0 });
