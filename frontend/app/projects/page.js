@@ -1,350 +1,314 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import { listProjects } from "../../lib/api";
 import ProjectCard from "../components/ProjectCard";
 
 const PAGE_SIZE = 20;
 
+const CATEGORIES = ["All", "Web", "Mobile", "AI", "Backend", "Game"];
+
 export default function Projects() {
-    const [filters, setFilters] = useState({
-        q: "",
-        language: "",
-        category: "",
-        hasBeginnerIssues: false,
-        sort: "relevance"
-    });
+  const [filters, setFilters] = useState({
+    q: "",
+    language: "",
+    category: "",
+    hasBeginnerIssues: false,
+    sort: "relevance",
+  });
 
-    const [projects, setProjects] = useState([]);
-    const [meta, setMeta] = useState({
-        page: 0,
-        size: PAGE_SIZE,
-        total: 0
-    });
+  const [projects, setProjects] = useState([]);
+  const [meta, setMeta] = useState({ page: 0, size: PAGE_SIZE, total: 0 });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState("");
+  const updateFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setMeta((current) => ({ ...current, page: 0 }));
+  };
 
-    const updateFilter = (key, value) => {
-        setFilters((current) => ({
-            ...current,
-            [key]: value
-        }));
+  useEffect(() => {
+    let cancelled = false;
 
-        setMeta((current) => ({
-            ...current,
-            page: 0
-        }));
+    async function loadProjects() {
+      setLoading(true);
+      setError("");
+
+      try {
+        const result = await listProjects({
+          page: meta.page,
+          size: PAGE_SIZE,
+          q: filters.q,
+          language: filters.language,
+          category: filters.category,
+          hasBeginnerIssues: filters.hasBeginnerIssues ? true : undefined,
+          sort: filters.sort,
+        });
+
+        if (cancelled) return;
+        setProjects(result.items);
+        setMeta(result.meta);
+      } catch (err) {
+        if (cancelled) return;
+        setProjects([]);
+        setError(err.message || "Failed to load projects.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadProjects();
+    return () => {
+      cancelled = true;
     };
+  }, [filters.q, filters.language, filters.category, filters.hasBeginnerIssues, filters.sort, meta.page]);
 
-    useEffect(() => {
-        let cancelled = false;
+  const totalPages = Math.ceil(meta.total / PAGE_SIZE);
+  const canGoPrevious = meta.page > 0;
+  const canGoNext = meta.page + 1 < totalPages;
 
-        async function loadProjects() {
-            setLoading(true);
-            setError("");
+  const selectStyle = {
+    borderRadius: "10px",
+    border: "0.5px solid var(--cm-border)",
+    background: "var(--cm-surface)",
+    color: "var(--cm-text-primary)",
+    fontSize: "13px",
+    padding: "9px 12px",
+    outline: "none",
+  };
 
-            try {
-                const result = await listProjects({
-                    page: meta.page,
-                    size: PAGE_SIZE,
-                    q: filters.q,
-                    language: filters.language,
-                    category: filters.category,
-                    hasBeginnerIssues: filters.hasBeginnerIssues
-                        ? true
-                        : undefined,
-                    sort: filters.sort
-                });
+  return (
+    <div style={{ padding: "8px 4px 40px" }}>
+      <header style={{ marginBottom: "24px" }}>
+        <p style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.1em", color: "var(--cm-orange-text)", margin: "0 0 8px" }}>
+          OPEN-SOURCE DISCOVERY
+        </p>
+        <h1 style={{ fontSize: "32px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+          Projects
+        </h1>
+        <p style={{ fontSize: "14px", color: "var(--cm-text-secondary)", margin: "8px 0 0", maxWidth: "560px" }}>
+          Discover South African open-source projects making an impact.
+        </p>
+      </header>
 
-                if (cancelled) {
-                    return;
-                }
+      {/* Filters */}
+      <section
+        aria-label="Project filters"
+        className="cm-glass"
+        style={{ borderRadius: "24px", padding: "20px", marginBottom: "24px" }}
+      >
+        <label htmlFor="search" style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "8px", color: "var(--cm-text-primary)" }}>
+          Search projects
+        </label>
+        <input
+          id="search"
+          type="text"
+          placeholder="Search by project name or description..."
+          value={filters.q}
+          onChange={(e) => updateFilter("q", e.target.value)}
+          style={{ ...selectStyle, width: "100%", padding: "11px 14px", marginBottom: "16px" }}
+        />
 
-                setProjects(result.items);
-                setMeta(result.meta);
-            } catch (err) {
-                if (cancelled) {
-                    return;
-                }
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+          {CATEGORIES.map((cat) => {
+            const value = cat === "All" ? "" : cat;
+            const active = filters.category === value;
 
-                setProjects([]);
-                setError(err.message || "Failed to load projects.");
-            } finally {
-                if (!cancelled) {
-                    setLoading(false);
-                }
-            }
-        }
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => updateFilter("category", value)}
+                style={{
+                  padding: "7px 16px",
+                  borderRadius: "999px",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: active ? "var(--cm-lime)" : "transparent",
+                  color: active ? "#0A0A0A" : "var(--cm-text-secondary)",
+                  border: active ? "none" : "0.5px solid var(--cm-border)",
+                }}
+              >
+                {cat}
+              </button>
+            );
+          })}
+        </div>
 
-        loadProjects();
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
+          <div>
+            <label htmlFor="language" style={{ display: "block", fontSize: "11px", color: "var(--cm-text-secondary)", marginBottom: "6px" }}>
+              Language
+            </label>
+            <Select id="language" value={filters.language} onChange={(e) => updateFilter("language", e.target.value)}>
+              <option value="">All languages</option>
+              <option value="Java">Java</option>
+              <option value="Python">Python</option>
+              <option value="JavaScript">JavaScript</option>
+              <option value="TypeScript">TypeScript</option>
+              <option value="C++">C++</option>
+            </Select>
+          </div>
 
-        return () => {
-            cancelled = true;
-        };
-    }, [
-        filters.q,
-        filters.language,
-        filters.category,
-        filters.hasBeginnerIssues,
-        filters.sort,
-        meta.page
-    ]);
+          <div>
+            <label htmlFor="sort" style={{ display: "block", fontSize: "11px", color: "var(--cm-text-secondary)", marginBottom: "6px" }}>
+              Sort by
+            </label>
+            <Select id="sort" value={filters.sort} onChange={(e) => updateFilter("sort", e.target.value)}>
+              <option value="relevance">Most relevant</option>
+              <option value="recent">Recent</option>
+              <option value="stars">Stars</option>
+              <option value="contributors">Contributors</option>
+            </Select>
+          </div>
 
-    const totalPages = Math.ceil(meta.total / PAGE_SIZE);
-    const canGoPrevious = meta.page > 0;
-    const canGoNext = meta.page + 1 < totalPages;
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "var(--cm-text-secondary)", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={filters.hasBeginnerIssues}
+              onChange={(e) => updateFilter("hasBeginnerIssues", e.target.checked)}
+              style={{ width: "15px", height: "15px", accentColor: "var(--cm-lime)" }}
+            />
+            Beginner-friendly issues
+          </label>
+        </div>
+      </section>
 
-    return (
-        <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-            <header className="mb-8">
-                <p className="mb-2 text-sm font-medium text-blue-600">
-                    Open-source discovery
-                </p>
+      {/* Results */}
+      <section aria-labelledby="projects-heading">
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+          <h2 id="projects-heading" style={{ fontSize: "17px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+            Explore projects
+          </h2>
 
-                <h1 className="text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-                    Projects
-                </h1>
+          {!loading && !error && (
+            <p style={{ fontSize: "12.5px", color: "var(--cm-text-secondary)", margin: 0 }}>
+              {meta.total} {meta.total === 1 ? "project" : "projects"} found
+            </p>
+          )}
+        </div>
 
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-                    Discover South African open-source projects and find
-                    opportunities to contribute.
-                </p>
-            </header>
+        {loading && <StatusPanel text="Loading projects…" />}
 
-            <section
-                aria-label="Project filters"
-                className="mb-8 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-6"
-            >
-                <div className="mb-5">
-                    <label
-                        htmlFor="search"
-                        className="mb-2 block text-sm font-semibold text-slate-800"
-                    >
-                        Search projects
-                    </label>
+        {!loading && error && <StatusPanel title="Something went wrong" text={error} />}
 
-                    <input
-                        id="search"
-                        type="text"
-                        placeholder="Search by project name or description..."
-                        value={filters.q}
-                        onChange={(e) =>
-                            updateFilter("q", e.target.value)
-                        }
-                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                    />
-                </div>
+        {!loading && !error && projects.length === 0 && (
+          <StatusPanel title="No projects found" text="Try changing your search or filters." />
+        )}
 
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <div>
-                        <label
-                            htmlFor="language"
-                            className="mb-2 block text-sm font-medium text-slate-700"
-                        >
-                            Language
-                        </label>
+        {!loading && !error && projects.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        )}
+      </section>
 
-                        <select
-                            id="language"
-                            value={filters.language}
-                            onChange={(e) =>
-                                updateFilter(
-                                    "language",
-                                    e.target.value
-                                )
-                            }
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        >
-                            <option value="">All languages</option>
-                            <option value="Java">Java</option>
-                            <option value="Python">Python</option>
-                            <option value="JavaScript">
-                                JavaScript
-                            </option>
-                            <option value="TypeScript">
-                                TypeScript
-                            </option>
-                            <option value="C++">C++</option>
-                        </select>
-                    </div>
+      {/* Pagination */}
+      <nav aria-label="Project pagination" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginTop: "32px" }}>
+        <button
+          type="button"
+          disabled={!canGoPrevious || loading}
+          onClick={() => setMeta((current) => ({ ...current, page: current.page - 1 }))}
+          style={{
+            ...selectStyle,
+            padding: "9px 18px",
+            fontWeight: 600,
+            cursor: canGoPrevious ? "pointer" : "not-allowed",
+            opacity: canGoPrevious ? 1 : 0.4,
+          }}
+        >
+          Previous
+        </button>
 
-                    <div>
-                        <label
-                            htmlFor="category"
-                            className="mb-2 block text-sm font-medium text-slate-700"
-                        >
-                            Category
-                        </label>
+        <span style={{ fontSize: "13px", color: "var(--cm-text-secondary)" }}>
+          Page {meta.page + 1} of {Math.max(totalPages, 1)}
+        </span>
 
-                        <select
-                            id="category"
-                            value={filters.category}
-                            onChange={(e) =>
-                                updateFilter(
-                                    "category",
-                                    e.target.value
-                                )
-                            }
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        >
-                            <option value="">All categories</option>
-                            <option value="Web">Web</option>
-                            <option value="Mobile">Mobile</option>
-                            <option value="AI">AI</option>
-                            <option value="Backend">Backend</option>
-                            <option value="Game">Game</option>
-                        </select>
-                    </div>
+        <button
+          type="button"
+          disabled={!canGoNext || loading}
+          onClick={() => setMeta((current) => ({ ...current, page: current.page + 1 }))}
+          style={{
+            borderRadius: "10px",
+            border: "none",
+            padding: "9px 18px",
+            fontSize: "13px",
+            fontWeight: 600,
+            background: "var(--cm-sidebar)",
+            color: "#FFFFFF",
+            cursor: canGoNext ? "pointer" : "not-allowed",
+            opacity: canGoNext ? 1 : 0.4,
+          }}
+        >
+          Next
+        </button>
+      </nav>
+    </div>
+  );
+}
 
-                    <div>
-                        <label
-                            htmlFor="sort"
-                            className="mb-2 block text-sm font-medium text-slate-700"
-                        >
-                            Sort by
-                        </label>
+function StatusPanel({ title, text }) {
+  return (
+    <div className="cm-glass" style={{ borderRadius: "24px", padding: "48px 24px", textAlign: "center" }}>
+      {title && (
+        <p style={{ fontSize: "15px", fontWeight: 600, margin: "0 0 6px", color: "var(--cm-text-primary)" }}>
+          {title}
+        </p>
+      )}
+      <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: 0 }}>{text}</p>
+    </div>
+  );
+}
 
-                        <select
-                            id="sort"
-                            value={filters.sort}
-                            onChange={(e) =>
-                                updateFilter(
-                                    "sort",
-                                    e.target.value
-                                )
-                            }
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm text-slate-800 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                        >
-                            <option value="relevance">
-                                Relevance
-                            </option>
-                            <option value="recent">Recent</option>
-                            <option value="stars">Stars</option>
-                            <option value="contributors">
-                                Contributors
-                            </option>
-                        </select>
-                    </div>
-                </div>
-
-                <label className="mt-5 flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100">
-                    <input
-                        type="checkbox"
-                        checked={filters.hasBeginnerIssues}
-                        onChange={(e) =>
-                            updateFilter(
-                                "hasBeginnerIssues",
-                                e.target.checked
-                            )
-                        }
-                        className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                    />
-
-                    <span>Show projects with beginner-friendly issues</span>
-                </label>
-            </section>
-
-            <section aria-labelledby="projects-heading">
-                <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                    <div>
-                        <h2
-                            id="projects-heading"
-                            className="text-xl font-bold text-slate-900"
-                        >
-                            Explore projects
-                        </h2>
-
-                        {!loading && !error && (
-                            <p className="mt-1 text-sm text-slate-500">
-                                {meta.total}{" "}
-                                {meta.total === 1
-                                    ? "project"
-                                    : "projects"}{" "}
-                                found
-                            </p>
-                        )}
-                    </div>
-                </div>
-
-                {loading && (
-                    <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-                        <p className="text-sm font-medium text-slate-600">
-                            Loading projects...
-                        </p>
-                    </div>
-                )}
-
-                {error && (
-                    <div
-                        role="alert"
-                        className="rounded-2xl border border-red-200 bg-red-50 p-5 text-sm text-red-700"
-                    >
-                        {error}
-                    </div>
-                )}
-
-                {!loading && !error && projects.length === 0 && (
-                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-12 text-center">
-                        <h3 className="text-lg font-semibold text-slate-900">
-                            No projects found
-                        </h3>
-
-                        <p className="mt-2 text-sm text-slate-500">
-                            Try changing your search or filters.
-                        </p>
-                    </div>
-                )}
-
-                {!loading && !error && projects.length > 0 && (
-                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                        {projects.map((project) => (
-                            <ProjectCard
-                                key={project.id}
-                                project={project}
-                            />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            <nav
-                aria-label="Project pagination"
-                className="mt-8 flex items-center justify-center gap-4"
-            >
-                <button
-                    type="button"
-                    disabled={!canGoPrevious || loading}
-                    onClick={() =>
-                        setMeta((current) => ({
-                            ...current,
-                            page: current.page - 1
-                        }))
-                    }
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                    Previous
-                </button>
-
-                <span className="text-sm font-medium text-slate-600">
-                    Page {meta.page + 1} of{" "}
-                    {Math.max(totalPages, 1)}
-                </span>
-
-                <button
-                    type="button"
-                    disabled={!canGoNext || loading}
-                    onClick={() =>
-                        setMeta((current) => ({
-                            ...current,
-                            page: current.page + 1
-                        }))
-                    }
-                    className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                    Next
-                </button>
-            </nav>
-        </main>
-    );
+// A plain <select> renders each browser/OS's own dropdown chrome on top of
+// whatever styling we give it — on a dark card that shows up as a stray
+// light-grey native arrow/box that doesn't match anything else on the page.
+// `appearance: none` (with the -webkit/-moz prefixes for older engines)
+// strips that native rendering so our own chevron and border are the only
+// thing drawn; the <option> list itself still uses OS chrome (no CSS can
+// change that cross-browser), but that's a floating native menu the person
+// only sees for a moment, not part of the page's persistent look.
+function Select({ id, value, onChange, children }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <select
+        id={id}
+        value={value}
+        onChange={onChange}
+        style={{
+          appearance: "none",
+          WebkitAppearance: "none",
+          MozAppearance: "none",
+          borderRadius: "10px",
+          border: "0.5px solid var(--cm-border)",
+          background: "var(--cm-surface)",
+          color: "var(--cm-text-primary)",
+          fontSize: "13px",
+          padding: "9px 34px 9px 12px",
+          outline: "none",
+          width: "100%",
+          cursor: "pointer",
+        }}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        size={15}
+        strokeWidth={2}
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          right: "10px",
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: "var(--cm-text-secondary)",
+          pointerEvents: "none",
+        }}
+      />
+    </div>
+  );
 }

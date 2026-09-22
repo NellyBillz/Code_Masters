@@ -22,10 +22,6 @@
  */
 
 /**
- * @typedef {'pending'|'published'|'rejected'} ProjectListingStatus
- */
-
-/**
  * @typedef {Object} Project
  * @property {number} id
  * @property {string} name
@@ -45,14 +41,7 @@
  * @property {number} [openIssues]
  * @property {number} [contributors]
  * @property {boolean} [hasBeginnerFriendlyIssues]
- * @property {boolean} [hasContributingGuide] From GitHub's community-profile
- *   endpoint (GH-03.3) — a plain onboarding-readiness fact, not a score.
- * @property {boolean} [hasCodeOfConduct] Same source as hasContributingGuide.
  * @property {string} [lastActivityAt] ISO date-time
- * @property {ProjectListingStatus} [listingStatus] `pending` until a site
- *   admin approves it (FE-03.1/.2); only `published` projects are publicly
- *   discoverable.
- * @property {boolean} [acceptingContributions]
  * @property {boolean} [verified]
  * @property {string|null} [verifiedAt] ISO date-time or null
  * @property {string} createdAt ISO date-time
@@ -95,26 +84,6 @@ class ApiError extends Error {
   }
 }
 
-const RATE_LIMIT_MESSAGE =
-  "You're doing that a lot — please wait a bit before trying again.";
-
-/**
- * A clear, friendly message for a failed write (FE-03.8) — specifically,
- * one that never surfaces a raw `RATE_LIMITED` error straight from the API.
- * Every write action's catch block should route its error through this
- * instead of showing `err.message` directly.
- *
- * @param {unknown} err
- * @param {string} fallback Used for any error that isn't a rate limit.
- * @returns {string}
- */
-function friendlyErrorMessage(err, fallback) {
-  if (err instanceof ApiError && err.code === 'RATE_LIMITED') {
-    return RATE_LIMIT_MESSAGE;
-  }
-  return (err && err.message) || fallback;
-}
-
 const isServer = typeof window === 'undefined';
 
 function getApiBase() {
@@ -143,13 +112,44 @@ function buildQuery(paramsObj) {
 }
 
 /**
+ * @typedef {Object} UserProfile
+ * @property {number} id
+ * @property {string} username
+ * @property {string} [displayName]
+ * @property {string} [avatarUrl]
+ * @property {string} [bio]
+ * @property {string} [location]
+ * @property {string[]} [skills]
+ * @property {number} [projectsCount]
+ * @property {number} [contributionsCount]
+ * @property {number} [reputation]
+ * @property {string} [email] Only present on GET /users/me, never on public profiles.
+ * @property {boolean} [githubAccess] Only present on GET /users/me.
+ * @property {boolean} [siteAdmin] Only present on GET /users/me. Gates the
+ *   /admin/* moderation views — absent (falsy) for everyone else.
+ */
+
+/**
  * @param {string} path
  * @param {RequestInit} [init]
  */
 async function apiFetch(path, init) {
+  const { headers: initHeaders, ...restInit } = init || {};
+
   const res = await fetch(`${getApiBase()}${path}`, {
-    headers: { Accept: 'application/json', ...((init && init.headers) || {}) },
-    ...init,
+    // Every write call (postComment, postClaim, deleteClaim, etc.) needs
+    // the session cookie sent for the server to know who's making the
+    // request. Setting this once here — rather than in each function below
+    // — is what "one place for every write call" actually means: a new
+    // write function added later gets this for free just by using
+    // apiFetch, instead of every caller needing to remember it.
+    credentials: 'include',
+    // headers is destructured out of init above and merged explicitly, so
+    // a caller's Content-Type/X-CSRF-Token headers don't silently clobber
+    // the Accept default the way `{ headers: {...}, ...init }` would
+    // (init.headers, spread last, would otherwise win outright).
+    headers: { Accept: 'application/json', ...initHeaders },
+    ...restInit,
   });
 
   if (!res.ok) {
@@ -189,18 +189,6 @@ function listProjects(params) {
 }
 
 /**
- * Public, non-personal, aggregate platform-impact metrics (FE-03.9) — no
- * auth required.
- *
- * @returns {Promise<Object>} PlatformStats: { publishedProjects,
- *   activeProjectsAcceptingContributions, totalContributorsEngaged,
- *   totalActiveClaims, totalContributionsCompleted, generatedAt }
- */
-function getStats() {
-  return apiFetch('/stats');
-}
-
-/**
  * Get a single project's details, including maintainers, featured issues,
  * and recent comments.
  *
@@ -209,112 +197,6 @@ function getStats() {
  */
 function getProject(projectId) {
   return apiFetch(`/projects/${projectId}`);
-}
-
-/**
- * List projects awaiting moderation, oldest first (FE-03.1). Site-admin only
- * — throws a 403 `ApiError` (code `FORBIDDEN`) for anyone else.
- *
- * @param {Object} [params]
- * @param {number} [params.page]
- * @param {number} [params.size]
- * @returns {Promise<PagedProjects>}
- */
-function getPendingProjects(params) {
-  return apiFetch(`/admin/projects/pending${buildQuery(params)}`);
-}
-
-/**
- * Approve or reject a pending project submission. Site-admin only.
- *
- * @param {number|string} projectId
- * @param {Object} params
- * @param {'approve'|'reject'} params.decision
- * @param {string} [params.reason]
- * @returns {Promise<Project>} The project, with its updated `listingStatus`.
- */
-function moderateProject(projectId, { decision, reason }) {
-  const csrfToken = getCsrfToken();
-
-  return apiFetch(`/admin/projects/${projectId}/moderation`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-    },
-    body: JSON.stringify({ decision, reason }),
-  });
-}
-
-/**
- * Update a project's Code-Masters-specific metadata (FE-03.7 uses this for
- * `acceptingContributions`; the same partial-update endpoint also accepts
- * `category`/`tags`/`connection`/`countryCodes`). Maintainer-only (any
- * role); only the fields provided are changed.
- *
- * @param {number|string} projectId
- * @param {Object} updates
- * @param {boolean} [updates.acceptingContributions]
- * @param {string} [updates.category]
- * @param {string[]} [updates.tags]
- * @param {ProjectConnection} [updates.connection]
- * @returns {Promise<Project>} The updated project.
- */
-function updateProject(projectId, updates) {
-  const csrfToken = getCsrfToken();
-
-  return apiFetch(`/projects/${projectId}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-    },
-    body: JSON.stringify(updates),
-  });
-}
-
-/**
- * Report a comment for a site admin to review (FE-03.7). Authenticated,
- * once per user per comment — a repeat attempt throws a 409 `ApiError` with
- * code `REPORT_ALREADY_EXISTS`.
- *
- * @param {number|string} commentId
- * @param {string} reason 3-500 characters.
- * @returns {Promise<Object>} The created ReportDto.
- */
-function reportComment(commentId, reason) {
-  const csrfToken = getCsrfToken();
-
-  return apiFetch(`/comments/${commentId}/reports`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-    },
-    body: JSON.stringify({ reason }),
-  });
-}
-
-/**
- * Report a project listing for a site admin to review (FE-03.7).
- * Authenticated, once per user per project — a repeat attempt throws a 409
- * `ApiError` with code `REPORT_ALREADY_EXISTS`.
- *
- * @param {number|string} projectId
- * @param {string} reason 3-500 characters.
- * @returns {Promise<Object>} The created ReportDto.
- */
-function reportProject(projectId, reason) {
-  const csrfToken = getCsrfToken();
-
-  return apiFetch(`/projects/${projectId}/reports`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-    },
-    body: JSON.stringify({ reason }),
-  });
 }
 
 /**
@@ -416,53 +298,9 @@ function postComment(issueId, body) {
     return apiFetch(`/issues/${issueId}/claims`);
   }
 
+  /** @returns {Promise<UserProfile>} */
   function getCurrentUser() {
     return apiFetch('/users/me');
-  }
-
-  /**
-   * Anonymize the caller's account (FE-03.8): clears username/displayName/
-   * avatarUrl/bio/location/skills/email and unlinks the GitHub identity, but
-   * leaves past comments and completed contributions attached to the
-   * now-anonymized row untouched. Deletes the session server-side, which
-   * clears both cookies via this response's Set-Cookie headers — no
-   * separate logout() call needed after this succeeds.
-   *
-   * @returns {Promise<null>}
-   */
-  function deleteAccount() {
-    const csrfToken = getCsrfToken();
-
-    return apiFetch('/users/me', {
-      method: 'DELETE',
-      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
-    });
-  }
-
-  /**
-   * A developer's verified contribution history (FE-03.5): only `completed`
-   * claims, most recent first. Public — no auth required.
-   *
-   * @param {string} username
-   * @param {Object} [params]
-   * @param {number} [params.page]
-   * @param {number} [params.size]
-   * @returns {Promise<Object>} PagedContributions
-   */
-  function getContributions(username, params) {
-    return apiFetch(`/users/${username}/contributions${buildQuery(params)}`);
-  }
-
-  /**
-   * The maintainer-sanity activity rollup (FE-03.6): per project the caller
-   * maintains, its active claims, claims awaiting review, and recent
-   * comments, in one call. Session-authenticated; a user maintaining zero
-   * projects gets `{ projects: [] }`, not an error.
-   *
-   * @returns {Promise<Object>} MaintainerActivitySummary
-   */
-  function getMaintainerActivity() {
-    return apiFetch('/users/me/maintainer-activity');
   }
 
   /**
@@ -475,6 +313,7 @@ function postComment(issueId, body) {
 
     return fetch('/auth/logout', {
       method: 'POST',
+      credentials: 'include',
       headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
     });
   }
@@ -500,53 +339,6 @@ function postComment(issueId, body) {
       headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
     });
   }
-
-/**
- * Attach or update the pull request link on the caller's own claim (FE-03.3).
- * The claim's owner only — a maintainer of the project is not exempt from
- * this check.
- *
- * @param {number|string} issueId
- * @param {number|string} claimId
- * @param {string} pullRequestUrl
- * @returns {Promise<Object>} The updated ClaimDto.
- */
-function attachPullRequest(issueId, claimId, pullRequestUrl) {
-  const csrfToken = getCsrfToken();
-
-  return apiFetch(`/issues/${issueId}/claims/${claimId}`, {
-    method: 'PATCH',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-    },
-    body: JSON.stringify({ pullRequestUrl }),
-  });
-}
-
-/**
- * A maintainer's review decision on a claim's attached pull request
- * (FE-03.3). Maintainer-only.
- *
- * @param {number|string} issueId
- * @param {number|string} claimId
- * @param {Object} params
- * @param {'request_changes'|'confirm_completed'} params.decision
- * @param {string} [params.feedback] Required when decision is `request_changes`.
- * @returns {Promise<Object>} The updated ClaimDto.
- */
-function reviewClaim(issueId, claimId, { decision, feedback }) {
-  const csrfToken = getCsrfToken();
-
-  return apiFetch(`/issues/${issueId}/claims/${claimId}/review`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
-    },
-    body: JSON.stringify({ decision, feedback }),
-  });
-}
 
 /**
  * Update an issue's difficulty and/or beginner-friendly status.
@@ -575,31 +367,59 @@ function updateIssueClassification(issueId, update) {
   });
 }
 
+/**
+ * List projects awaiting moderation. Site-admin only — the backend enforces
+ * this via SiteAdminGuard and returns 403 FORBIDDEN for anyone else; this
+ * function doesn't attempt its own client-side check, since the server is
+ * the real enforcement point.
+ *
+ * @param {Object} [params]
+ * @param {number} [params.page] Zero-based page index. Default 0.
+ * @param {number} [params.size] Page size, 1-50. Default 20.
+ * @returns {Promise<PagedProjects>}
+ */
+function listPendingProjects(params) {
+  return apiFetch(`/admin/projects/pending${buildQuery(params)}`);
+}
+
+/**
+ * Approve or reject a pending project submission. Site-admin only. Only
+ * ever changes the project's listingStatus (published/rejected) — never
+ * touches verified/verifiedAt, which is a separate concept.
+ *
+ * @param {number|string} projectId
+ * @param {'approve'|'reject'} decision
+ * @param {string} [reason] Recommended (not required) when rejecting.
+ * @returns {Promise<Project>} The updated project.
+ */
+function moderateProject(projectId, decision, reason) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/admin/projects/${projectId}/moderation`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify(reason ? { decision, reason } : { decision }),
+  });
+}
+
 module.exports = {
   listProjects,
-  getStats,
   getProject,
-  updateProject,
-  getPendingProjects,
-  moderateProject,
-  reportComment,
-  reportProject,
   getIssue,
   getIssueComments,
   postComment,
   ApiError,
-  friendlyErrorMessage,
   getIssueClaims,
   getCurrentUser,
-  deleteAccount,
-  getContributions,
-  getMaintainerActivity,
   postClaim,
   deleteClaim,
-  attachPullRequest,
-  reviewClaim,
   logout,
   inviteMaintainer,
   removeMaintainer,
   updateIssueClassification,
+  listPendingProjects,
+  moderateProject,
 };

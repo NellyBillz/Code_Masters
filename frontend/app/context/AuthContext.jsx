@@ -28,13 +28,26 @@ export function AuthProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount pattern; no derived-state alternative for reading auth session
     refresh();
   }, [refresh]);
 
   const logout = useCallback(async () => {
-    await apiLogout();
-    setUser(null);
-  }, []);
+    try {
+      await apiLogout();
+    } catch {
+      // If the POST itself fails (e.g. session already expired server-side),
+      // there's nothing actionable to show the user — fall through to
+      // refresh() below, which will resync the UI to whatever the server
+      // actually thinks the session state is.
+    } finally {
+      // Re-fetch /users/me rather than optimistically clearing local state —
+      // this is what actually confirms the server-side session is gone
+      // (a 401 now) instead of just trusting the POST succeeded. Matches
+      // the "log out, then refresh" round-trip the acceptance test checks.
+      await refresh();
+    }
+  }, [refresh]);
 
   return (
     <AuthContext.Provider value={{ user, loading, refresh, logout }}>
