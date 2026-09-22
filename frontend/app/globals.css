@@ -1,47 +1,67 @@
 @import "tailwindcss";
 
+/* Tailwind v4 theme colors — generates bg-lime, text-orange, border-teal, etc. */
+@theme {
+--color-lime: #C8FF64;
+--color-lime-soft: #D9F99D;
+--color-orange: #F48C3C;
+--color-orange-soft: #F18A4E;
+--color-teal: #2DD4BF;
+--color-ink: #0A0A0A;
+}
+
 :root {
 --background: #f8fafc;
 --foreground: #0f172a;
 
-/* Code_Masters design tokens — light mode */
---cm-bg: #F7F6F0;
+/* Code Masters design tokens — light mode */
+--cm-bg: #F5F5F0;
 --cm-surface: #FFFFFF;
 --cm-surface-alt: #F1EFE8;
---cm-sidebar: #161611;
---cm-sidebar-icon: #8A897F;
+--cm-sidebar: #0A0A0A;
+--cm-sidebar-icon: #9CA3AF;
 --cm-border: #E5E3DA;
---cm-text-primary: #161611;
---cm-text-secondary: #5F5E5A;
---cm-text-muted: #8A897F;
---cm-lime: #D4E85A;
---cm-lime-soft: #EBF1C9;
---cm-lime-text: #3A4310;
---cm-orange: #D4623A;
---cm-orange-soft: #FBE3D3;
---cm-orange-text: #6B2A15;
+--cm-text-primary: #0A0A0A;
+--cm-text-secondary: #6B7280;
+--cm-text-muted: #9CA3AF;
+--cm-lime: #C8FF64;
+--cm-lime-soft: #D9F99D;
+--cm-lime-text: #365314;
+--cm-orange: #F48C3C;
+--cm-orange-soft: #FCE3CB;
+--cm-orange-text: #7C3D0F;
+--cm-teal: #2DD4BF;
+--cm-blob: #E8FFB0;
+--cm-card-blur: none;
+--cm-card-bg: #FFFFFF;
+--cm-card-border: #E5E3DA;
 }
 
 .dark {
---background: #17170F;
---foreground: #F2F1EA;
+--background: #0A0F14;
+--foreground: #FFFFFF;
 
-/* Code_Masters design tokens — dark mode */
---cm-bg: #17170F;
---cm-surface: #201F19;
---cm-surface-alt: #262620;
---cm-sidebar: #0B0B08;
---cm-sidebar-icon: #7A7970;
---cm-border: #3A3A33;
---cm-text-primary: #F2F1EA;
---cm-text-secondary: #A6A59C;
---cm-text-muted: #7A7970;
---cm-lime: #D4E85A;
---cm-lime-soft: #2A2E17;
---cm-lime-text: #D4E85A;
---cm-orange: #D4623A;
---cm-orange-soft: #3A2216;
---cm-orange-text: #E8A181;
+/* Code Masters design tokens — dark mode */
+--cm-bg: #0A0F14;
+--cm-surface: rgba(255, 255, 255, 0.05);
+--cm-surface-alt: rgba(255, 255, 255, 0.08);
+--cm-sidebar: #0A0A0A;
+--cm-sidebar-icon: #9CA3AF;
+--cm-border: rgba(255, 255, 255, 0.08);
+--cm-text-primary: #FFFFFF;
+--cm-text-secondary: #9CA3AF;
+--cm-text-muted: #6B7280;
+--cm-lime: #C8FF64;
+--cm-lime-soft: rgba(200, 255, 100, 0.14);
+--cm-lime-text: #C8FF64;
+--cm-orange: #F48C3C;
+--cm-orange-soft: rgba(244, 140, 60, 0.14);
+--cm-orange-text: #F18A4E;
+--cm-teal: #2DD4BF;
+--cm-blob: rgba(232, 255, 176, 0.12);
+--cm-card-blur: blur(20px);
+--cm-card-bg: rgba(255, 255, 255, 0.05);
+--cm-card-border: rgba(255, 255, 255, 0.08);
 }
 
 html {
@@ -65,12 +85,23 @@ margin: 0;
 background: var(--cm-bg);
 color: var(--cm-text-primary);
 font-family:
+"Inter",
+ui-sans-serif,
+system-ui,
+-apple-system,
+"Segoe UI",
 Arial,
-Helvetica,
 sans-serif;
 -webkit-font-smoothing: antialiased;
 -moz-osx-font-smoothing: grayscale;
-transition: background-color 0.15s ease, color 0.15s ease;
+transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+.dark body {
+background:
+radial-gradient(circle at 15% 0%, rgba(45, 212, 191, 0.06), transparent 40%),
+radial-gradient(circle at 85% 10%, rgba(244, 140, 60, 0.07), transparent 45%),
+linear-gradient(180deg, #0A0F14 0%, #121A22 100%);
 }
 
 * {
@@ -89,3 +120,18 @@ color: inherit;
 text-decoration: none;
 }
 
+/* Glass card surface used throughout — flat in light mode, blurred glass in dark */
+.cm-glass {
+background: var(--cm-card-bg);
+border: 0.5px solid var(--cm-card-border);
+backdrop-filter: var(--cm-card-blur);
+-webkit-backdrop-filter: var(--cm-card-blur);
+}
+
+/* Soft organic blur blobs used in card corners / hero background */
+.cm-blob {
+position: absolute;
+border-radius: 50%;
+filter: blur(48px);
+pointer-events: none;
+}

@@ -2,89 +2,110 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, FolderKanban, Bug, Users } from "lucide-react";
+import { Home, Compass, GitPullRequest, BookOpen, Users, Sparkles } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
-// Only routes that exist today are real links. The rest render as
-// visually-present but disabled icons so the sidebar reads complete
-// without shipping dead links — wire these up as the pages land.
+// Only Home and Explore (→ /projects) map to real routes today. The rest
+// match the spec's icon set but render disabled until those pages exist,
+// so the sidebar looks complete without shipping dead links.
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: Home, enabled: true },
-  { href: "/projects", label: "Projects", icon: FolderKanban, enabled: true },
-  { href: "/issues", label: "Issues", icon: Bug, enabled: false },
-  { href: "/contributors", label: "Contributors", icon: Users, enabled: false },
+  { href: "/projects", label: "Explore", icon: Compass, enabled: true },
+  { href: "/contribute", label: "Contribute", icon: GitPullRequest, enabled: false },
+  { href: "/learn", label: "Learn", icon: BookOpen, enabled: false },
+  { href: "/community", label: "Community", icon: Users, enabled: false },
+  { href: "/impact", label: "Impact", icon: Sparkles, enabled: false },
 ];
 
 export default function Sidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
 
   return (
     <nav
       aria-label="Primary"
+      className="hidden md:flex"
       style={{
-        display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: "18px",
-        width: "56px",
+        gap: "8px",
+        width: "68px",
         flexShrink: 0,
-        padding: "16px 0",
+        padding: "16px 10px",
         background: "var(--cm-sidebar)",
-        borderRadius: "14px",
+        borderRadius: "999px",
+        position: "sticky",
+        top: "14px",
+        height: "fit-content",
+        maxHeight: "calc(100vh - 28px)",
       }}
     >
-      <Link
-        href="/"
-        aria-label="Code_Masters home"
-        style={{
-          width: "28px",
-          height: "28px",
-          borderRadius: "8px",
-          background: "var(--cm-lime)",
-          color: "#161611",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontWeight: 500,
-          fontSize: "13px",
-        }}
-      >
-        C
-      </Link>
-
       {NAV_ITEMS.map(({ href, label, icon: Icon, enabled }) => {
         const active = enabled && (href === "/" ? pathname === "/" : pathname.startsWith(href));
 
-        const iconStyle = {
+        const itemStyle = {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          width: "32px",
-          height: "32px",
-          borderRadius: "8px",
-          background: active ? "var(--cm-lime)" : "transparent",
-          color: active
-            ? "#161611"
-            : enabled
-              ? "var(--cm-sidebar-icon)"
-              : "color-mix(in srgb, var(--cm-sidebar-icon) 45%, transparent)",
+          width: "44px",
+          height: "44px",
+          borderRadius: "999px",
+          background: active ? "#FFFFFF" : "transparent",
+          color: active ? "#0A0A0A" : enabled ? "#FFFFFF" : "rgba(255,255,255,0.35)",
         };
 
         if (!enabled) {
           return (
-            <span key={href} title={`${label} — coming soon`} style={iconStyle}>
-              <Icon size={18} strokeWidth={1.75} />
+            <span key={href} title={`${label} — coming soon`} style={itemStyle}>
+              <Icon size={19} strokeWidth={1.9} />
             </span>
           );
         }
 
         return (
-          <Link key={href} href={href} aria-label={label} title={label} style={iconStyle}>
-            <Icon size={18} strokeWidth={1.75} />
+          <Link key={href} href={href} aria-label={label} title={label} style={itemStyle}>
+            <Icon size={19} strokeWidth={1.9} />
           </Link>
         );
       })}
 
       <div style={{ flex: 1 }} />
+
+      <Link
+        href={user ? "/profile" : "/auth/github"}
+        aria-label={user ? "Your profile" : "Sign in"}
+        title={user ? user.displayName || user.username : "Sign in"}
+        style={{ marginTop: "8px" }}
+      >
+        {user?.avatarUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- external, size-variable avatar URL
+          <img
+            src={user.avatarUrl}
+            alt=""
+            width={36}
+            height={36}
+            style={{ borderRadius: "50%", display: "block" }}
+          />
+        ) : (
+          <span
+            aria-hidden="true"
+            style={{
+              width: "36px",
+              height: "36px",
+              borderRadius: "50%",
+              background: "rgba(255,255,255,0.12)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              color: "#FFFFFF",
+              fontSize: "13px",
+              fontWeight: 500,
+            }}
+          >
+            {user?.displayName?.[0]?.toUpperCase() || user?.username?.[0]?.toUpperCase() || "?"}
+          </span>
+        )}
+      </Link>
     </nav>
   );
 }

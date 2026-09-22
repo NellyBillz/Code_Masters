@@ -1,329 +1,248 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Bell, Search } from "lucide-react";
-import Sidebar from "./components/Sidebar";
+import { ArrowRight } from "lucide-react";
+import HeroVisual from "./components/HeroVisual";
 import ProjectCard from "./components/ProjectCard";
-import { useAuth } from "./context/AuthContext";
+import { listProjects } from "../lib/api";
 
-// Placeholder catalogue until /projects' listProjects() feed is reused here.
-// Shape matches ProjectCard's prop contract exactly, so swapping this for a
-// real fetch later is a drop-in change — no card changes required.
-const FEATURED_PROJECTS = [
-  {
-    id: 1,
-    name: "Code Masters API",
-    category: "Platform foundation",
-    description:
-      "RESTful API powering African open-source discovery. Built with Node.js and PostgreSQL.",
-    primaryLanguage: "TypeScript",
-    tags: ["API", "Open source"],
-    stars: 2300,
-    contributors: 34,
-    lastActivityAt: new Date().toISOString(),
-    connection: "south_african",
-    verified: true,
-    hasBeginnerFriendlyIssues: true,
-  },
-  {
-    id: 2,
-    name: "African Vision",
-    category: "Computer vision library",
-    description:
-      "Open-source ML toolkit for African-specific computer vision applications.",
-    primaryLanguage: "Python",
-    tags: ["ML", "CV"],
-    stars: 1800,
-    contributors: 21,
-    lastActivityAt: new Date(Date.now() - 2 * 86400000).toISOString(),
-    connection: "community_verified",
-    verified: true,
-    hasBeginnerFriendlyIssues: false,
-  },
-  {
-    id: 3,
-    name: "Data Toolkit",
-    category: "Analytics framework",
-    description:
-      "Lightweight data processing and analytics framework for development teams.",
-    primaryLanguage: "Python",
-    tags: ["Data", "Analytics"],
-    stars: 1200,
-    contributors: 15,
-    lastActivityAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-    connection: "south_african",
-    verified: false,
-    hasBeginnerFriendlyIssues: true,
-  },
-  {
-    id: 4,
-    name: "Weave Design",
-    category: "UI component library",
-    description:
-      "Modern React components designed for African tech products and applications.",
-    primaryLanguage: "JavaScript",
-    tags: ["React", "Design system"],
-    stars: 956,
-    contributors: 18,
-    lastActivityAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-    connection: "community_verified",
-    verified: true,
-    hasBeginnerFriendlyIssues: true,
-  },
+// Placeholder headline stats — there's no aggregate stats endpoint in the
+// API client yet (lib/api.js only exposes paged project listings), so
+// these mirror the reference design rather than a live count. Swap in a
+// real endpoint here once one exists.
+const HERO_STATS = [
+  { value: "126", label: "Projects" },
+  { value: "2,431", label: "Builders" },
+  { value: "684", label: "Open issues" },
 ];
 
-const FILTERS = ["All", "Web", "Mobile", "Data", "Tools"];
+export default function Home() {
+  const [projects, setProjects] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-export default function CodeMastersHome() {
-  const { user } = useAuth();
-  const [activeFilter, setActiveFilter] = useState("all");
+  useEffect(() => {
+    let cancelled = false;
 
-  const greetingName = user?.displayName || user?.username || "there";
+    async function loadFeatured() {
+      setLoading(true);
+      setError(false);
 
-  const visibleProjects = useMemo(() => {
-    if (activeFilter === "all") return FEATURED_PROJECTS;
+      try {
+        const result = await listProjects({ size: 6, sort: "stars" });
+        if (cancelled) return;
+        setProjects(result.items);
+      } catch {
+        if (cancelled) return;
+        setError(true);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
 
-    return FEATURED_PROJECTS.filter((project) =>
-      project.tags.some((tag) => tag.toLowerCase() === activeFilter)
-    );
-  }, [activeFilter]);
+    loadFeatured();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
-    <div
-      style={{
-        background: "var(--cm-bg)",
-        minHeight: "calc(100vh - 61px)",
-        padding: "14px",
-        display: "grid",
-        gridTemplateColumns: "56px 1fr 220px",
-        gap: "14px",
-        alignItems: "start",
-      }}
-    >
-      <Sidebar />
+    <div>
+      {/* Hero */}
+      <section
+        className="cm-glass"
+        style={{
+          position: "relative",
+          overflow: "hidden",
+          borderRadius: "32px",
+          padding: "56px 40px",
+          display: "grid",
+          gridTemplateColumns: "1.3fr 1fr",
+          gap: "40px",
+          alignItems: "center",
+        }}
+      >
+        {/* Light-mode-only organic blob accents */}
+        <span className="cm-blob" style={{ width: 220, height: 220, top: -60, left: -60, background: "var(--cm-blob)" }} aria-hidden="true" />
+        <span className="cm-blob" style={{ width: 160, height: 160, bottom: -40, left: "30%", background: "var(--cm-blob)" }} aria-hidden="true" />
 
-      <main>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "1rem",
-            flexWrap: "wrap",
-            marginBottom: "18px",
-          }}
-        >
-          <div>
-            <h1 style={{ fontSize: "20px", fontWeight: 500, margin: 0 }}>
-              Hi {greetingName}
-            </h1>
-            <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: "2px 0 0" }}>
-              Welcome back to Code_Masters
-            </p>
-          </div>
+        <div style={{ position: "relative" }}>
+          <span
+            style={{
+              fontSize: "11px",
+              fontWeight: 600,
+              letterSpacing: "0.16em",
+              color: "var(--cm-text-secondary)",
+            }}
+          >
+            SOUTH AFRICAN OPEN SOURCE
+          </span>
 
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <label
+          <h1
+            style={{
+              fontSize: "clamp(38px, 5vw, 64px)",
+              fontWeight: 700,
+              lineHeight: 1.05,
+              letterSpacing: "-0.02em",
+              margin: "14px 0 18px",
+              color: "var(--cm-text-primary)",
+            }}
+          >
+            Build what
+            <br />
+            <span
               style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                border: "0.5px solid var(--cm-border)",
-                borderRadius: "8px",
-                padding: "6px 12px",
-                background: "var(--cm-surface)",
+                background: "linear-gradient(90deg, #F48C3C, #C8FF64, #2DD4BF)",
+                WebkitBackgroundClip: "text",
+                WebkitTextFillColor: "transparent",
+                backgroundClip: "text",
               }}
             >
-              <Search size={15} strokeWidth={1.75} color="var(--cm-text-muted)" aria-hidden="true" />
-              <input
-                type="search"
-                placeholder="Search projects"
-                aria-label="Search projects"
-                style={{
-                  border: "none",
-                  outline: "none",
-                  background: "transparent",
-                  fontSize: "13px",
-                  color: "var(--cm-text-primary)",
-                  width: "160px",
-                }}
-              />
-            </label>
+              matters.
+            </span>
+          </h1>
 
-            <button
-              type="button"
-              aria-label="Notifications"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: "32px",
-                height: "32px",
-                borderRadius: "8px",
-                border: "0.5px solid var(--cm-border)",
-                background: "var(--cm-surface)",
-                color: "var(--cm-text-secondary)",
-                cursor: "pointer",
-              }}
-            >
-              <Bell size={15} strokeWidth={1.75} />
-            </button>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
-            gap: "10px",
-            marginBottom: "20px",
-          }}
-        >
-          <StatCard value="6 issues" label="claimed this month" blob="var(--cm-lime)" />
-          <StatCard value="3 PRs" label="merged this month" blob="var(--cm-orange)" />
+          <p
+            style={{
+              fontSize: "15px",
+              lineHeight: 1.6,
+              color: "var(--cm-text-secondary)",
+              margin: "0 0 28px",
+              maxWidth: "380px",
+            }}
+          >
+            Real projects. Real people.
+            <br />
+            A stronger South Africa.
+          </p>
 
           <Link
             href="/projects"
             style={{
-              background: "var(--cm-orange)",
-              borderRadius: "14px",
-              padding: "14px",
-              color: "#2B1108",
-              display: "block",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              borderRadius: "999px",
+              padding: "13px 22px",
+              fontSize: "14px",
+              fontWeight: 600,
+              background: "var(--cm-sidebar)",
+              color: "#FFFFFF",
+              boxShadow: "0 0 0 rgba(0,0,0,0)",
             }}
           >
-            <p style={{ fontSize: "13px", fontWeight: 500, margin: "0 0 2px" }}>
-              Become a maintainer
-            </p>
-            <p style={{ fontSize: "11px", margin: 0, opacity: 0.85 }}>
-              Unlock repo access
-            </p>
+            Explore the ecosystem
+            <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
           </Link>
+
+          <div style={{ display: "flex", gap: "32px", marginTop: "36px" }}>
+            {HERO_STATS.map((stat) => (
+              <div key={stat.label}>
+                <p style={{ fontSize: "22px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+                  {stat.value}
+                </p>
+                <p style={{ fontSize: "12px", color: "var(--cm-text-secondary)", margin: "2px 0 0" }}>
+                  {stat.label}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          <p
+            style={{
+              fontSize: "12px",
+              color: "var(--cm-text-muted)",
+              marginTop: "24px",
+              fontStyle: "italic",
+            }}
+          >
+            &ldquo;A stronger South Africa builds when we build together.&rdquo;
+          </p>
         </div>
 
+        <HeroVisual />
+      </section>
+
+      {/* Featured projects */}
+      <section style={{ padding: "48px 4px 24px" }}>
         <div
           style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: "flex-end",
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: "10px",
-            marginBottom: "12px",
+            marginBottom: "20px",
           }}
         >
-          <p style={{ fontSize: "14px", fontWeight: 500, margin: 0 }}>
-            Open source projects
-          </p>
-
-          <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-            {FILTERS.map((filter) => {
-              const value = filter.toLowerCase();
-              const active = activeFilter === value;
-
-              return (
-                <button
-                  key={filter}
-                  type="button"
-                  onClick={() => setActiveFilter(value)}
-                  style={{
-                    padding: "6px 14px",
-                    borderRadius: "999px",
-                    fontSize: "12px",
-                    fontWeight: 500,
-                    border: active ? "none" : "0.5px solid var(--cm-border)",
-                    background: active ? "var(--cm-lime)" : "var(--cm-surface)",
-                    color: active ? "#232700" : "var(--cm-text-secondary)",
-                    cursor: "pointer",
-                  }}
-                >
-                  {filter}
-                </button>
-              );
-            })}
+          <div>
+            <h2 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 4px", color: "var(--cm-text-primary)" }}>
+              Featured projects
+            </h2>
+            <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: 0 }}>
+              Active South African open-source projects on Code Masters.
+            </p>
           </div>
+
+          <Link
+            href="/projects"
+            style={{ fontSize: "13px", fontWeight: 600, color: "var(--cm-lime-text)", display: "inline-flex", alignItems: "center", gap: "4px" }}
+          >
+            View all
+            <ArrowRight size={14} strokeWidth={2} aria-hidden="true" />
+          </Link>
         </div>
 
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-            gap: "12px",
-          }}
-        >
-          {visibleProjects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      </main>
+        {loading && (
+          <StatusPanel text="Loading projects…" />
+        )}
 
-      <aside style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-        <div style={{ background: "var(--cm-lime-soft)", borderRadius: "14px", padding: "14px" }}>
-          <p style={{ fontSize: "12px", fontWeight: 500, margin: "0 0 10px" }}>Claimed issues</p>
-          <ClaimedIssueRow label="Fix auth token refresh" />
-          <ClaimedIssueRow label="Add Swahili locale" highlighted />
-          <ClaimedIssueRow label="Docs: setup guide" />
-        </div>
+        {!loading && error && (
+          <StatusPanel
+            title="We couldn't load projects"
+            text="The platform may be temporarily unavailable. Please try again shortly."
+          />
+        )}
 
-        <div style={{ background: "var(--cm-orange-soft)", borderRadius: "14px", padding: "14px" }}>
-          <p style={{ fontSize: "12px", fontWeight: 500, margin: "0 0 6px" }}>Contributor rank</p>
-          <p style={{ fontSize: "11px", color: "var(--cm-text-secondary)", margin: 0 }}>
-            Top 12% this quarter across 5 repos.
-          </p>
-        </div>
-      </aside>
+        {!loading && !error && projects.length === 0 && (
+          <StatusPanel text="No featured projects yet — check back soon." />
+        )}
+
+        {!loading && !error && projects.length > 0 && (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+              gap: "16px",
+            }}
+          >
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        )}
+      </section>
     </div>
   );
 }
 
-function StatCard({ value, label, blob }) {
+function StatusPanel({ title, text }) {
   return (
     <div
+      className="cm-glass"
       style={{
-        background: "var(--cm-surface)",
-        borderRadius: "14px",
-        padding: "14px",
-        position: "relative",
-        overflow: "hidden",
-        border: "0.5px solid var(--cm-border)",
+        borderRadius: "24px",
+        padding: "48px 24px",
+        textAlign: "center",
       }}
     >
-      <div
-        aria-hidden="true"
-        style={{
-          position: "absolute",
-          top: "-14px",
-          right: "-14px",
-          width: "50px",
-          height: "50px",
-          borderRadius: "45% 55% 50% 50%",
-          background: blob,
-          opacity: 0.35,
-        }}
-      />
-      <p style={{ fontSize: "20px", fontWeight: 500, margin: "0 0 2px", position: "relative" }}>
-        {value}
-      </p>
-      <p style={{ fontSize: "11px", color: "var(--cm-text-secondary)", margin: 0, position: "relative" }}>
-        {label}
-      </p>
-    </div>
-  );
-}
-
-function ClaimedIssueRow({ label, highlighted }) {
-  return (
-    <div
-      style={{
-        background: highlighted ? "var(--cm-lime)" : "var(--cm-surface)",
-        color: highlighted ? "#232700" : "var(--cm-text-primary)",
-        borderRadius: "8px",
-        padding: "6px 10px",
-        fontSize: "11px",
-        marginBottom: "6px",
-      }}
-    >
-      {label}
+      {title && (
+        <p style={{ fontSize: "15px", fontWeight: 600, margin: "0 0 6px", color: "var(--cm-text-primary)" }}>
+          {title}
+        </p>
+      )}
+      <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: 0 }}>{text}</p>
     </div>
   );
 }

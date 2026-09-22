@@ -1,8 +1,8 @@
 import "./globals.css";
 import { AuthProvider } from "./context/AuthContext";
 import { ThemeProvider } from "./context/ThemeContext";
-import AuthStatus from "./components/AuthStatus";
-import ThemeToggle from "./components/ThemeToggle";
+import SiteHeader from "./components/SiteHeader";
+import Sidebar from "./components/Sidebar";
 
 export const metadata = {
 title: "Code Masters — African Open Source Discovery",
@@ -16,21 +16,13 @@ return (
       <body>
         <ThemeProvider>
           <AuthProvider>
-            <header
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "flex-end",
-                gap: "0.75rem",
-                padding: "1rem 1.5rem",
-                background: "var(--cm-bg)",
-                borderBottom: "0.5px solid var(--cm-border)",
-              }}
-            >
-              <AuthStatus />
-              <ThemeToggle />
-            </header>
-            {children}
+            <div style={{ padding: "14px", minHeight: "100vh" }}>
+              <SiteHeader />
+              <div style={{ display: "flex", gap: "16px", alignItems: "flex-start" }}>
+                <Sidebar />
+                <main style={{ flex: 1, minWidth: 0 }}>{children}</main>
+              </div>
+            </div>
           </AuthProvider>
         </ThemeProvider>
       </body>
