@@ -6,18 +6,21 @@ import {
   ArrowUpRight,
   ShieldCheck,
   AlertTriangle,
+  Pencil,
 } from "lucide-react";
 import Link from "next/link";
 import { getCurrentUser, getMaintainerActivity, ApiError } from "../../lib/api";
 import GitHubStats from "../components/GitHubStats";
 import StatTile from "../components/StatTile";
 import RecentContributions from "../components/RecentContributions";
+import EditProfilePanel from "../components/EditProfilePanel";
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
   const [maintainedProjects, setMaintainedProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [editing, setEditing] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,10 +92,48 @@ export default function ProfilePage() {
   const initials = (user.displayName || user.username || "?")[0]?.toUpperCase();
   const skills = user.skills || [];
 
+  if (editing) {
+    return (
+      <div style={{ padding: "8px 4px 40px", maxWidth: "760px", margin: "0 auto" }}>
+        <EditProfilePanel
+          user={user}
+          onCancel={() => setEditing(false)}
+          onSaved={(updated) => {
+            setUser(updated);
+            setEditing(false);
+          }}
+        />
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: "8px 4px 40px", maxWidth: "760px", margin: "0 auto" }}>
       {/* Header */}
-      <header className="cm-glass" style={{ borderRadius: "28px", padding: "28px", marginBottom: "20px" }}>
+      <header className="cm-glass" style={{ borderRadius: "28px", padding: "28px", marginBottom: "20px", position: "relative" }}>
+        <button
+          type="button"
+          onClick={() => setEditing(true)}
+          className="cm-glass"
+          style={{
+            position: "absolute",
+            top: "20px",
+            right: "20px",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            borderRadius: "999px",
+            padding: "7px 14px",
+            fontSize: "12.5px",
+            fontWeight: 600,
+            color: "var(--cm-text-primary)",
+            cursor: "pointer",
+          }}
+        >
+          <Pencil size={12} strokeWidth={2} aria-hidden="true" />
+          Edit profile
+        </button>
+
         <div style={{ display: "flex", alignItems: "flex-start", gap: "18px", flexWrap: "wrap" }}>
           {user.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- external, size-variable avatar URL

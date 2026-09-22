@@ -200,6 +200,36 @@ function getProject(projectId) {
 }
 
 /**
+ * Update a project's Code Masters-owned metadata. Requires the caller to be
+ * a maintainer (any role) on this project — the backend throws ApiError with
+ * status 403 (code FORBIDDEN) otherwise. Only GitHub-derived fields are
+ * excluded (name, description, stars, etc. — those come from sync, not this
+ * endpoint); listingStatus is also excluded (site-admin moderation only).
+ * All fields optional; only provided fields change.
+ *
+ * @param {number|string} projectId
+ * @param {Object} update
+ * @param {string} [update.category]
+ * @param {string[]} [update.tags]
+ * @param {'south_african'|'community_verified'} [update.connection]
+ * @param {string[]} [update.countryCodes]
+ * @param {boolean} [update.acceptingContributions]
+ * @returns {Promise<Project>} The updated project.
+ */
+function updateProject(projectId, update) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify(update),
+  });
+}
+
+/**
  * Invite a maintainer to a project by username. Owner-only.
  *
  * @param {number|string} projectId
@@ -301,6 +331,32 @@ function postComment(issueId, body) {
   /** @returns {Promise<UserProfile>} */
   function getCurrentUser() {
     return apiFetch('/users/me');
+  }
+
+  /**
+   * Update the caller's own profile. Only displayName/bio/location/skills are
+   * editable — username, avatarUrl, reputation and email are GitHub-derived
+   * or system-managed and aren't accepted here. All fields optional; only
+   * provided fields change.
+   *
+   * @param {Object} update
+   * @param {string} [update.displayName]
+   * @param {string} [update.bio] Max 1000 characters (server-validated).
+   * @param {string} [update.location]
+   * @param {string[]} [update.skills]
+   * @returns {Promise<UserProfile>} The updated profile.
+   */
+  function updateCurrentUser(update) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch('/users/me', {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      },
+      body: JSON.stringify(update),
+    });
   }
 
   /**
@@ -448,12 +504,14 @@ function moderateProject(projectId, decision, reason) {
 module.exports = {
   listProjects,
   getProject,
+  updateProject,
   getIssue,
   getIssueComments,
   postComment,
   ApiError,
   getIssueClaims,
   getCurrentUser,
+  updateCurrentUser,
   getPublicProfile,
   getUserContributions,
   getMaintainerActivity,
