@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { UserPlus, X } from "lucide-react";
 import { inviteMaintainer, removeMaintainer } from "../../lib/api";
 
@@ -104,7 +105,13 @@ export default function MaintainersPanel({
                   fontSize: "13px",
                 }}
               >
-                <span style={{ color: "var(--cm-text-primary)" }}>{username}</span>
+                {maint.user?.username ? (
+                  <Link href={`/users/${maint.user.username}`} style={{ color: "var(--cm-text-primary)", fontWeight: 600 }}>
+                    {username}
+                  </Link>
+                ) : (
+                  <span style={{ color: "var(--cm-text-primary)" }}>{username}</span>
+                )}
                 <button
                   type="button"
                   onClick={() => handleRemove(userId)}

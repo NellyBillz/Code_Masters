@@ -304,6 +304,18 @@ function postComment(issueId, body) {
   }
 
   /**
+   * A developer's public profile — never includes email, githubAccess, or
+   * isSiteAdmin (those are only on GET /users/me). Throws ApiError with
+   * status 404 (code USER_NOT_FOUND) if the username doesn't exist.
+   *
+   * @param {string} username
+   * @returns {Promise<Object>} PublicUserProfile
+   */
+  function getPublicProfile(username) {
+    return apiFetch(`/users/${username}`);
+  }
+
+  /**
    * A developer's verified contribution history — only claims with
    * status `completed` (GitHub-merge-verified or maintainer-confirmed),
    * most recent first. Backs the "activity summary" on /profile and public
@@ -442,6 +454,7 @@ module.exports = {
   ApiError,
   getIssueClaims,
   getCurrentUser,
+  getPublicProfile,
   getUserContributions,
   getMaintainerActivity,
   postClaim,

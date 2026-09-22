@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { HandHeart, AlertTriangle } from "lucide-react";
 import { getIssueClaims, postClaim, deleteClaim } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
@@ -123,7 +124,13 @@ export default function ClaimPanel({ issueId, initialClaims = [] }) {
               }}
             >
               <strong style={{ color: "var(--cm-text-primary)" }}>
-                {claim.user?.displayName || claim.user?.username || "User"}
+                {claim.user?.username ? (
+                  <Link href={`/users/${claim.user.username}`}>
+                    {claim.user?.displayName || claim.user.username}
+                  </Link>
+                ) : (
+                  claim.user?.displayName || "User"
+                )}
               </strong>
               {me && claim.user?.id === me.id ? " (you)" : ""}
               {claim.createdAt ? ` · ${new Date(claim.createdAt).toLocaleDateString()}` : ""}

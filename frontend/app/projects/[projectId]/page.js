@@ -339,25 +339,31 @@ function ContributorAvatars({ maintainers = [], count = 0 }) {
     <div style={{ display: "flex", alignItems: "center" }}>
       {shown.map((m, i) => {
         const label = m.user?.username ?? m.user?.name ?? "?";
+        const avatarStyle = {
+          width: "30px",
+          height: "30px",
+          borderRadius: "50%",
+          background: "var(--cm-sidebar)",
+          color: "var(--cm-lime)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "11px",
+          fontWeight: 600,
+          border: "2px solid var(--cm-bg)",
+          marginLeft: i === 0 ? 0 : "-8px",
+        };
+
+        if (m.user?.username) {
+          return (
+            <Link key={m.user.id ?? i} href={`/users/${m.user.username}`} title={label} style={avatarStyle}>
+              {label[0]?.toUpperCase()}
+            </Link>
+          );
+        }
+
         return (
-          <span
-            key={m.user?.id ?? i}
-            title={label}
-            style={{
-              width: "30px",
-              height: "30px",
-              borderRadius: "50%",
-              background: "var(--cm-sidebar)",
-              color: "var(--cm-lime)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              fontSize: "11px",
-              fontWeight: 600,
-              border: "2px solid var(--cm-bg)",
-              marginLeft: i === 0 ? 0 : "-8px",
-            }}
-          >
+          <span key={m.user?.id ?? i} title={label} style={avatarStyle}>
             {label[0]?.toUpperCase()}
           </span>
         );
@@ -442,9 +448,15 @@ function ContributorsTab({ project, isMaintainer, onMaintainerAdded, onMaintaine
                   fontSize: "13px",
                 }}
               >
-                <span style={{ color: "var(--cm-text-primary)" }}>
-                  {maintainer.user?.username ?? maintainer.user?.login ?? maintainer.user?.name ?? "Unknown"}
-                </span>
+                {maintainer.user?.username ? (
+                  <Link href={`/users/${maintainer.user.username}`} style={{ color: "var(--cm-text-primary)", fontWeight: 600 }}>
+                    {maintainer.user.username}
+                  </Link>
+                ) : (
+                  <span style={{ color: "var(--cm-text-primary)" }}>
+                    {maintainer.user?.login ?? maintainer.user?.name ?? "Unknown"}
+                  </span>
+                )}
                 {maintainer.role && (
                   <span
                     style={{

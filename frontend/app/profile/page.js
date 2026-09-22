@@ -1,38 +1,17 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import {
   MapPin,
   ArrowUpRight,
   ShieldCheck,
-  GitMerge,
-  UserCheck,
-  FolderGit2,
-  Users,
-  UserPlus,
-  CalendarDays,
   AlertTriangle,
-  Compass,
 } from "lucide-react";
-import {
-  getCurrentUser,
-  getUserContributions,
-  getMaintainerActivity,
-  ApiError,
-} from "../../lib/api";
-
-const COMPLETION_LABELS = {
-  github_verified: { label: "GitHub merge verified", icon: GitMerge, bg: "var(--cm-lime-soft)", text: "var(--cm-lime-text)" },
-  maintainer_confirmed: { label: "Maintainer confirmed", icon: UserCheck, bg: "var(--cm-orange-soft)", text: "var(--cm-orange-text)" },
-};
-
-function formatDate(isoString) {
-  if (!isoString) return "";
-  const date = new Date(isoString);
-  if (Number.isNaN(date.getTime())) return "";
-  return date.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
-}
+import Link from "next/link";
+import { getCurrentUser, getMaintainerActivity, ApiError } from "../../lib/api";
+import GitHubStats from "../components/GitHubStats";
+import StatTile from "../components/StatTile";
+import RecentContributions from "../components/RecentContributions";
 
 export default function ProfilePage() {
   const [user, setUser] = useState(null);
@@ -236,58 +215,8 @@ export default function ProfilePage() {
       {maintainedProjects.length > 0 && <MaintainedProjects projects={maintainedProjects} />}
 
       <div style={{ marginTop: maintainedProjects.length > 0 ? "20px" : 0 }}>
-        <RecentContributions username={user.username} />
+        <RecentContributions username={user.username} ownProfile />
       </div>
-    </div>
-  );
-}
-
-function GitHubStats({ username }) {
-  const [stats, setStats] = useState(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    // Public, unauthenticated GitHub REST endpoint — real numbers about the
-    // signed-in user's actual GitHub account, not platform data. Best-effort:
-    // GitHub's anonymous rate limit is low, so a failure here just means this
-    // row doesn't render, never a page-level error.
-    fetch(`https://api.github.com/users/${username}`)
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!cancelled && data) setStats(data);
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-  }, [username]);
-
-  if (!stats) return null;
-
-  const memberSince = stats.created_at ? new Date(stats.created_at).getFullYear() : null;
-
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "14px", flexWrap: "wrap", fontSize: "12px", color: "var(--cm-text-muted)", margin: "10px 0 0" }}>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-        <FolderGit2 size={13} strokeWidth={1.8} aria-hidden="true" />
-        {stats.public_repos ?? 0} repositories
-      </span>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-        <Users size={13} strokeWidth={1.8} aria-hidden="true" />
-        {stats.followers ?? 0} followers
-      </span>
-      <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-        <UserPlus size={13} strokeWidth={1.8} aria-hidden="true" />
-        {stats.following ?? 0} following
-      </span>
-      {memberSince && (
-        <span style={{ display: "inline-flex", alignItems: "center", gap: "5px" }}>
-          <CalendarDays size={13} strokeWidth={1.8} aria-hidden="true" />
-          On GitHub since {memberSince}
-        </span>
-      )}
     </div>
   );
 }
@@ -348,140 +277,6 @@ function MaintainedProjects({ projects }) {
           </Link>
         );
       })}
-    </section>
-  );
-}
-
-function StatTile({ label, value }) {
-  return (
-    <div className="cm-glass" style={{ borderRadius: "20px", padding: "18px", textAlign: "center" }}>
-      <p style={{ fontSize: "22px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>{value}</p>
-      <p style={{ fontSize: "12px", color: "var(--cm-text-secondary)", margin: "4px 0 0" }}>{label}</p>
-    </div>
-  );
-}
-
-function RecentContributions({ username }) {
-  const [contributions, setContributions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function load() {
-      setLoading(true);
-      setError("");
-      try {
-        const result = await getUserContributions(username, { size: 5 });
-        if (!cancelled) setContributions(result.items || []);
-      } catch (err) {
-        if (!cancelled) setError(err.message || "Failed to load contributions.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
-
-    load();
-    return () => {
-      cancelled = true;
-    };
-  }, [username]);
-
-  return (
-    <section className="cm-glass" style={{ borderRadius: "24px", padding: "8px" }}>
-      <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "12px 16px", color: "var(--cm-text-primary)" }}>
-        Recent contributions
-      </h2>
-
-      {loading && (
-        <p style={{ fontSize: "12.5px", color: "var(--cm-text-muted)", margin: "0 16px 16px" }}>Loading…</p>
-      )}
-
-      {!loading && error && (
-        <p role="alert" style={{ fontSize: "12.5px", color: "var(--cm-orange-text)", margin: "0 16px 16px" }}>
-          {error}
-        </p>
-      )}
-
-      {!loading && !error && contributions.length === 0 && (
-        <div style={{ margin: "0 16px 16px" }}>
-          <p style={{ fontSize: "12.5px", color: "var(--cm-text-muted)", margin: "0 0 10px" }}>
-            No verified contributions yet — claim an issue and see it here once it merges.
-          </p>
-          <Link
-            href="/projects"
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: "6px",
-              fontSize: "12.5px",
-              fontWeight: 600,
-              color: "var(--cm-lime-text)",
-            }}
-          >
-            <Compass size={13} strokeWidth={2} aria-hidden="true" />
-            Browse projects to find an issue
-          </Link>
-        </div>
-      )}
-
-      {!loading && !error && contributions.length > 0 && (
-        <div>
-          {contributions.map((contribution, index) => {
-            const completion = COMPLETION_LABELS[contribution.completionSource] || null;
-            const CompletionIcon = completion?.icon;
-
-            return (
-              <div
-                key={contribution.issue?.id ?? index}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: "12px",
-                  padding: "14px 16px",
-                  borderTop: index === 0 ? "none" : "0.5px solid var(--cm-border)",
-                  flexWrap: "wrap",
-                }}
-              >
-                <div style={{ minWidth: 0 }}>
-                  <Link
-                    href={`/issues/${contribution.issue?.id}`}
-                    style={{ fontSize: "13px", fontWeight: 600, color: "var(--cm-text-primary)" }}
-                  >
-                    {contribution.issue?.title ?? `Issue #${contribution.issue?.id}`}
-                  </Link>
-                  <p style={{ fontSize: "12px", color: "var(--cm-text-secondary)", margin: "3px 0 0" }}>
-                    {contribution.project?.name}
-                    {contribution.completedAt ? ` · ${formatDate(contribution.completedAt)}` : ""}
-                  </p>
-                </div>
-
-                {completion && (
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      padding: "3px 10px",
-                      borderRadius: "999px",
-                      background: completion.bg,
-                      color: completion.text,
-                      flexShrink: 0,
-                    }}
-                  >
-                    {CompletionIcon && <CompletionIcon size={11} strokeWidth={2} aria-hidden="true" />}
-                    {completion.label}
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
     </section>
   );
 }
