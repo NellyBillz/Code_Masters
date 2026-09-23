@@ -17,12 +17,14 @@ import {
   XCircle,
   GitPullRequest,
   GitMerge,
+  Flag,
 } from "lucide-react";
 import { getProject, getProjectIssues, getIssueClaims } from "../../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import MaintainersPanel from "../../components/MaintainersPanel";
 import SyncStatusBanner from "../../components/SyncStatusBanner";
 import EditProjectPanel from "../../components/EditProjectPanel";
+import ReportProjectPanel from "../../components/ReportProjectPanel";
 
 const TABS = ["Overview", "Issues", "Pull requests", "Contributors", "Discussions"];
 
@@ -37,6 +39,7 @@ export default function ProjectDetail() {
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("Overview");
   const [editing, setEditing] = useState(false);
+  const [reporting, setReporting] = useState(false);
 
   const isMaintainer = Boolean(
     currentUser &&
@@ -218,6 +221,28 @@ export default function ProjectDetail() {
               </button>
             )}
 
+            {currentUser && !isMaintainer && !reporting && (
+              <button
+                type="button"
+                onClick={() => setReporting(true)}
+                className="cm-glass"
+                aria-label="Report this project"
+                title="Report this project"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "34px",
+                  height: "34px",
+                  borderRadius: "999px",
+                  color: "var(--cm-text-muted)",
+                  cursor: "pointer",
+                }}
+              >
+                <Flag size={14} strokeWidth={2} aria-hidden="true" />
+              </button>
+            )}
+
             {project.githubUrl && (
               <a
                 href={project.githubUrl}
@@ -251,6 +276,13 @@ export default function ProjectDetail() {
             setProject((prev) => ({ ...prev, ...updated }));
             setEditing(false);
           }}
+        />
+      )}
+
+      {reporting && (
+        <ReportProjectPanel
+          projectId={project.id}
+          onCancel={() => setReporting(false)}
         />
       )}
 

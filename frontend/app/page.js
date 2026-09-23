@@ -5,23 +5,17 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import HeroVisual from "./components/HeroVisual";
 import ProjectCard from "./components/ProjectCard";
-import { listProjects } from "../lib/api";
+import { listProjects, getStats } from "../lib/api";
 
-// There's no aggregate stats endpoint in the API client (lib/api.js only
-// exposes paged project listings), so we don't fabricate a platform-wide
-// "Builders" or "Open issues" figure, that would be a fake number in a
-// live product. Instead every stat below is derived from the same
-// listProjects() response the featured grid already renders:
-//   - Projects:      the real platform-wide total, from meta.total
-//   - Beginner-friendly: how many of the featured projects have open
-//     beginner issues right now
-//   - Contributors:  summed contributor counts across the featured projects
-// Labels say "featured" where the number is scoped to the 6 shown below,
-// so nothing on this page claims to be a platform total it isn't.
+// The headline numbers (Projects, Contributors) come from the real
+// platform-wide GET /stats endpoint, not from the featured-projects
+// request below. Only "Beginner issues" is intentionally scoped to the
+// 6 projects featured on this page, since there's no platform-wide
+// beginner-issue count in the stats response.
 
 export default function Home() {
   const [projects, setProjects] = useState([]);
-  const [totalProjects, setTotalProjects] = useState(null);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -36,7 +30,6 @@ export default function Home() {
         const result = await listProjects({ size: 6, sort: "stars" });
         if (cancelled) return;
         setProjects(result.items);
-        setTotalProjects(result.meta?.total ?? result.items.length);
       } catch {
         if (cancelled) return;
         setError(true);
@@ -51,14 +44,23 @@ export default function Home() {
     };
   }, []);
 
-  const featuredContributors = projects.reduce((sum, p) => sum + (p.contributors || 0), 0);
+  useEffect(() => {
+    let cancelled = false;
+    getStats()
+      .then((result) => !cancelled && setStats(result))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const featuredBeginnerFriendly = projects.filter((p) => p.hasBeginnerFriendlyIssues).length;
 
   const heroStats = [
     {
-      value: totalProjects != null ? totalProjects.toLocaleString() : "-",
+      value: stats ? stats.publishedProjects.toLocaleString() : "-",
       label: "Projects",
-      title: "Live count of all projects on Code Masters",
+      title: "Live count of published projects on Code Masters",
     },
     {
       value: loading ? "-" : String(featuredBeginnerFriendly),
@@ -66,9 +68,9 @@ export default function Home() {
       title: "Of the 6 projects featured below, how many currently have open beginner-friendly issues",
     },
     {
-      value: loading ? "-" : featuredContributors.toLocaleString(),
-      label: "Contributors*",
-      title: "Combined contributor count across the 6 projects featured below",
+      value: stats ? stats.totalContributorsEngaged.toLocaleString() : "-",
+      label: "Contributors",
+      title: "Live count of contributors engaged across Code Masters",
     },
   ];
 
@@ -181,8 +183,7 @@ export default function Home() {
               marginTop: "8px",
             }}
           >
-            *Scoped to the featured projects below, Code Masters doesn&rsquo;t
-            have a platform-wide stats endpoint yet.
+            *Scoped to the featured projects below.
           </p>
 
           <p

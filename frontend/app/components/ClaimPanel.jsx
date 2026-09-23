@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { HandHeart, AlertTriangle } from "lucide-react";
+import { HandHeart } from "lucide-react";
 import { getIssueClaims, postClaim, deleteClaim } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 
@@ -49,20 +49,9 @@ export default function ClaimPanel({ issueId, initialClaims = [] }) {
 
   return (
     <section className="cm-glass" style={{ borderRadius: "24px", padding: "20px 24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "10px" }}>
-        <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
-          Contributors working on this
-        </h2>
-
-        {/* claim endpoints aren't on the confirmed-working list yet, say so rather than let a failure look like a bug */}
-        <span
-          title="This endpoint hasn't been confirmed working end-to-end yet"
-          style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 600, color: "var(--cm-orange-text)", background: "var(--cm-orange-soft)", padding: "3px 9px", borderRadius: "999px" }}
-        >
-          <AlertTriangle size={11} strokeWidth={2} aria-hidden="true" />
-          Rolling out
-        </span>
-      </div>
+      <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px", color: "var(--cm-text-primary)" }}>
+        Contributors working on this
+      </h2>
 
       <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: "0 0 4px" }}>
         {count === 0

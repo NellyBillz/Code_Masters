@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle } from "lucide-react";
 import { getIssueComments, postComment } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 import ReportCommentButton from "./ReportCommentButton";
@@ -55,18 +54,7 @@ export default function IssueComments({ issueId }) {
 
   return (
     <section className="cm-glass" style={{ borderRadius: "24px", padding: "20px 24px" }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: "16px" }}>
-        <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>Comments</h2>
-
-        {/* comments endpoints aren't on the confirmed-working list yet */}
-        <span
-          title="This endpoint hasn't been confirmed working end-to-end yet"
-          style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 600, color: "var(--cm-orange-text)", background: "var(--cm-orange-soft)", padding: "3px 9px", borderRadius: "999px" }}
-        >
-          <AlertTriangle size={11} strokeWidth={2} aria-hidden="true" />
-          Rolling out
-        </span>
-      </div>
+      <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 16px", color: "var(--cm-text-primary)" }}>Comments</h2>
 
       {authLoading ? (
         <p style={{ fontSize: "12.5px", color: "var(--cm-text-muted)" }}>Checking session…</p>

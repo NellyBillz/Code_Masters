@@ -2,35 +2,35 @@
 
 import { useState } from "react";
 import { CheckCircle2, XCircle } from "lucide-react";
-import { reviewReport, ApiError } from "../../lib/api";
+import { moderateProject, ApiError } from "../../lib/api";
 
-const RESOLUTION_MAX_LENGTH = 1000;
+const REASON_MAX_LENGTH = 500;
 
 /**
- * Resolve/dismiss controls for a single open abuse report (API-03.9,
- * PATCH /admin/reports/{id}). Only ever rendered by AdminReportsPage for
- * reports whose status is "open" (see admin/reports/page.js). Picking an
- * action expands into an optional resolution note plus an explicit confirm,
- * mirroring DeleteCommentButton's two-step pattern so a stray click can't
- * resolve/dismiss a report.
+ * Approve/reject controls for a single pending project submission
+ * (POST /admin/projects/{id}/moderation). Only ever rendered by
+ * AdminProjectsPage for projects whose listingStatus is "pending". Picking
+ * an action expands into an optional reason plus an explicit confirm,
+ * mirroring AdminReportActions' two-step pattern so a stray click can't
+ * approve/reject a submission.
  */
-export default function AdminReportActions({ report, onUpdated }) {
-  const [pendingAction, setPendingAction] = useState(null); // null | "resolved" | "dismissed"
-  const [resolution, setResolution] = useState("");
+export default function AdminProjectActions({ project, onUpdated }) {
+  const [pendingAction, setPendingAction] = useState(null); // null | "approve" | "reject"
+  const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const trimmedResolution = resolution.trim();
+  const trimmedReason = reason.trim();
 
   function startAction(action) {
     setPendingAction(action);
-    setResolution("");
+    setReason("");
     setError("");
   }
 
   function cancel() {
     setPendingAction(null);
-    setResolution("");
+    setReason("");
     setError("");
   }
 
@@ -39,17 +39,17 @@ export default function AdminReportActions({ report, onUpdated }) {
     setError("");
 
     try {
-      const updated = await reviewReport(report.id, pendingAction, trimmedResolution || undefined);
+      const updated = await moderateProject(project.id, pendingAction, trimmedReason || undefined);
       onUpdated(updated);
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        setError("Please sign in again to review reports.");
+        setError("Please sign in again to review submissions.");
       } else if (err instanceof ApiError && err.status === 403) {
-        setError("You don't have permission to review reports.");
+        setError("You don't have permission to review submissions.");
       } else if (err instanceof ApiError && err.status === 404) {
-        setError("This report no longer exists.");
+        setError("This submission no longer exists.");
       } else {
-        setError(err.message || "Failed to update this report. Please try again.");
+        setError(err.message || "Failed to update this submission. Please try again.");
       }
       setSubmitting(false);
     }
@@ -60,7 +60,7 @@ export default function AdminReportActions({ report, onUpdated }) {
       <div style={{ display: "inline-flex", gap: "14px" }}>
         <button
           type="button"
-          onClick={() => startAction("resolved")}
+          onClick={() => startAction("approve")}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -75,11 +75,11 @@ export default function AdminReportActions({ report, onUpdated }) {
           }}
         >
           <CheckCircle2 size={12} strokeWidth={2} aria-hidden="true" />
-          Resolve
+          Approve
         </button>
         <button
           type="button"
-          onClick={() => startAction("dismissed")}
+          onClick={() => startAction("reject")}
           style={{
             display: "inline-flex",
             alignItems: "center",
@@ -94,7 +94,7 @@ export default function AdminReportActions({ report, onUpdated }) {
           }}
         >
           <XCircle size={12} strokeWidth={2} aria-hidden="true" />
-          Dismiss
+          Reject
         </button>
       </div>
     );
@@ -103,14 +103,14 @@ export default function AdminReportActions({ report, onUpdated }) {
   return (
     <div style={{ textAlign: "left", width: "220px" }}>
       <p style={{ fontSize: "11.5px", fontWeight: 600, margin: "0 0 6px", color: "var(--cm-text-primary)" }}>
-        {pendingAction === "resolved" ? "Resolve this report?" : "Dismiss this report?"}
+        {pendingAction === "approve" ? "Approve this submission?" : "Reject this submission?"}
       </p>
       <textarea
-        value={resolution}
-        onChange={(e) => setResolution(e.target.value)}
-        placeholder="Resolution note (optional)"
+        value={reason}
+        onChange={(e) => setReason(e.target.value)}
+        placeholder={pendingAction === "reject" ? "Reason (recommended)" : "Note (optional)"}
         rows={2}
-        maxLength={RESOLUTION_MAX_LENGTH}
+        maxLength={REASON_MAX_LENGTH}
         disabled={submitting}
         style={{
           width: "100%",
@@ -144,11 +144,11 @@ export default function AdminReportActions({ report, onUpdated }) {
             border: "none",
             cursor: submitting ? "not-allowed" : "pointer",
             opacity: submitting ? 0.6 : 1,
-            background: pendingAction === "resolved" ? "var(--cm-lime)" : "var(--cm-orange)",
-            color: pendingAction === "resolved" ? "#0A0A0A" : "#FCE9DD",
+            background: pendingAction === "approve" ? "var(--cm-lime)" : "var(--cm-orange)",
+            color: pendingAction === "approve" ? "#0A0A0A" : "#FCE9DD",
           }}
         >
-          {submitting ? "Saving…" : `Confirm ${pendingAction === "resolved" ? "resolve" : "dismiss"}`}
+          {submitting ? "Saving…" : `Confirm ${pendingAction}`}
         </button>
         <button
           type="button"
