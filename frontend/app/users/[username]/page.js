@@ -127,7 +127,7 @@ export default async function PublicProfilePage({ params }) {
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "12px", marginBottom: "20px" }}>
         <StatTile label="Verified contributions" value={user.contributionsCount ?? 0} />
-        <StatTile label="Projects" value={user.projectsCount ?? "—"} />
+        <StatTile label="Projects" value={user.projectsCount ?? "-"} />
         <StatTile label="Reputation" value={user.reputation ?? 0} />
       </div>
 

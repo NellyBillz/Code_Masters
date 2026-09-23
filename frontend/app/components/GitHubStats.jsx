@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FolderGit2, Users, UserPlus, CalendarDays } from "lucide-react";
 
 /**
- * Live public GitHub numbers for a username — repos, followers, following,
+ * Live public GitHub numbers for a username, repos, followers, following,
  * account age. Public, unauthenticated GitHub REST endpoint; no backend
  * involvement. Best-effort: GitHub's anonymous rate limit is low, so a
  * failure here just means this row doesn't render, never a page-level error.

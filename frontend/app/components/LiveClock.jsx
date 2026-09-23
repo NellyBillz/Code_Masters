@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 export default function LiveClock() {
-  // Must start as null on both server and client's first render — the
+  // Must start as null on both server and client's first render, the
   // server has no Date to show, and the client's first render has to
   // match that or React logs a hydration mismatch. The real value is set
   // in the effect below, which only ever runs post-mount, client-side.

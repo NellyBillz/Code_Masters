@@ -15,14 +15,14 @@ const GITHUB_URL_PATTERN = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/;
 
 // No automatic South-African-connection detection exists anywhere in the
 // platform yet (no algorithm in the sync pipeline, nothing in the product
-// spec defines one) — asking a submitter to self-declare "South African"
+// spec defines one), asking a submitter to self-declare "South African"
 // vs "community verified" would just be asking them to answer a question
 // the platform itself hasn't defined criteria for. Every new submission
 // is honestly "not yet verified" until a maintainer/curator corrects it
 // via the project's Edit panel, which is where that judgment call belongs.
 const DEFAULT_CONNECTION = "community_verified";
 
-// The platform is scoped to South Africa (product definition, throughout) —
+// The platform is scoped to South Africa (product definition, throughout),
 // there's nothing for a submitter to choose here, so it isn't asked.
 const DEFAULT_COUNTRY_CODES = ["ZA"];
 
@@ -95,7 +95,7 @@ export default function SubmitProjectPage() {
   }
 
   // Waits for the sync job to finish so the page we redirect to already has
-  // real GitHub data instead of a bare stub — but never for long, and never
+  // real GitHub data instead of a bare stub, but never for long, and never
   // fatally. A slow or rate-limited GitHub call must not trap someone who
   // already successfully submitted; per api-design.md Rule 5, a sync
   // failure never breaks anything else, so on timeout/error we just move on
@@ -150,7 +150,7 @@ export default function SubmitProjectPage() {
       return;
     }
 
-    // The project itself is already saved at this point — anything past
+    // The project itself is already saved at this point, anything past
     // here is best-effort enrichment, not something that should ever make
     // submission look like it failed.
     let jobId = null;
@@ -160,7 +160,7 @@ export default function SubmitProjectPage() {
       jobId = job.id;
       await waitForSync(jobId);
     } catch {
-      // Sync couldn't even start (e.g. a transient error) — the project
+      // Sync couldn't even start (e.g. a transient error), the project
       // still exists and redirecting to it is still correct. No jobId to
       // pass through means the project page just won't show a sync banner.
     }

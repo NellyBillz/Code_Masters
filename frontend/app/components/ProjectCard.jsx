@@ -13,7 +13,7 @@ const LANGUAGE_COLORS = {
   Ruby: "#F48C3C",
 };
 
-// connection describes *what kind* of African link a project has —
+// connection describes *what kind* of African link a project has,
 // distinct from `verified`, which describes whether that claim has been
 // confirmed. Kept as a short label rather than a loud badge so it doesn't
 // compete visually with the verified pill.

@@ -21,7 +21,7 @@ export default function AdminProjectsPage() {
   const [busyId, setBusyId] = useState(null);
 
   // Non-admins (and the not-yet-resolved auth state) never trigger the
-  // pending-projects fetch at all — this view is absent, not disabled, for
+  // pending-projects fetch at all, this view is absent, not disabled, for
   // anyone who isn't a confirmed site admin. Redirecting away rather than
   // rendering a "you don't have access" message here means a non-admin
   // never sees so much as the shape of this page.
@@ -64,7 +64,7 @@ export default function AdminProjectsPage() {
 
     try {
       await moderateProject(projectId, decision, decision === "reject" ? reasons[projectId] : undefined);
-      // Approved/rejected projects leave the pending queue immediately —
+      // Approved/rejected projects leave the pending queue immediately,
       // approving flips listingStatus to published server-side, which is
       // exactly what makes it show up on /projects right away; this page
       // just needs to stop showing it here.
@@ -78,7 +78,7 @@ export default function AdminProjectsPage() {
   }
 
   // While auth is resolving, or once it's resolved to "not an admin", render
-  // nothing resembling this page — no queue, no counts, no layout hints.
+  // nothing resembling this page, no queue, no counts, no layout hints.
   if (authLoading || !isAdmin) {
     return null;
   }
@@ -107,7 +107,7 @@ export default function AdminProjectsPage() {
             Moderation queue
           </h1>
           <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: "2px 0 0" }}>
-            {meta.total} project{meta.total === 1 ? "" : "s"} awaiting review — site admins only.
+            {meta.total} project{meta.total === 1 ? "" : "s"} awaiting review, site admins only.
           </p>
         </div>
       </header>

@@ -9,7 +9,7 @@ import { listProjects } from "../lib/api";
 
 // There's no aggregate stats endpoint in the API client (lib/api.js only
 // exposes paged project listings), so we don't fabricate a platform-wide
-// "Builders" or "Open issues" figure — that would be a fake number in a
+// "Builders" or "Open issues" figure, that would be a fake number in a
 // live product. Instead every stat below is derived from the same
 // listProjects() response the featured grid already renders:
 //   - Projects:      the real platform-wide total, from meta.total
@@ -56,17 +56,17 @@ export default function Home() {
 
   const heroStats = [
     {
-      value: totalProjects != null ? totalProjects.toLocaleString() : "—",
+      value: totalProjects != null ? totalProjects.toLocaleString() : "-",
       label: "Projects",
       title: "Live count of all projects on Code Masters",
     },
     {
-      value: loading ? "—" : String(featuredBeginnerFriendly),
+      value: loading ? "-" : String(featuredBeginnerFriendly),
       label: "Beginner issues*",
       title: "Of the 6 projects featured below, how many currently have open beginner-friendly issues",
     },
     {
-      value: loading ? "—" : featuredContributors.toLocaleString(),
+      value: loading ? "-" : featuredContributors.toLocaleString(),
       label: "Contributors*",
       title: "Combined contributor count across the 6 projects featured below",
     },
@@ -181,7 +181,7 @@ export default function Home() {
               marginTop: "8px",
             }}
           >
-            *Scoped to the featured projects below — Code Masters doesn&rsquo;t
+            *Scoped to the featured projects below, Code Masters doesn&rsquo;t
             have a platform-wide stats endpoint yet.
           </p>
 
@@ -242,7 +242,7 @@ export default function Home() {
         )}
 
         {!loading && !error && projects.length === 0 && (
-          <StatusPanel text="No featured projects yet — check back soon." />
+          <StatusPanel text="No featured projects yet, check back soon." />
         )}
 
         {!loading && !error && projects.length > 0 && (

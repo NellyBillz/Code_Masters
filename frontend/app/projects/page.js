@@ -287,7 +287,7 @@ function StatusPanel({ title, text }) {
 }
 
 // A plain <select> renders each browser/OS's own dropdown chrome on top of
-// whatever styling we give it — on a dark card that shows up as a stray
+// whatever styling we give it, on a dark card that shows up as a stray
 // light-grey native arrow/box that doesn't match anything else on the page.
 // `appearance: none` (with the -webkit/-moz prefixes for older engines)
 // strips that native rendering so our own chevron and border are the only

@@ -13,6 +13,8 @@ import {
   Circle,
   Minus,
   Pencil,
+  Clock,
+  XCircle,
 } from "lucide-react";
 import { getProject, getProjectIssues } from "../../../lib/api";
 import { useAuth } from "../../context/AuthContext";
@@ -88,6 +90,33 @@ export default function ProjectDetail() {
         <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
         Back to projects
       </Link>
+
+      {project.listingStatus !== "published" && (
+        <div
+          className="cm-glass"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "10px",
+            borderRadius: "16px",
+            padding: "12px 18px",
+            marginBottom: "20px",
+            background: project.listingStatus === "rejected" ? "var(--cm-orange-soft)" : "var(--cm-surface-alt)",
+            color: project.listingStatus === "rejected" ? "var(--cm-orange-text)" : "var(--cm-text-secondary)",
+            fontSize: "13px",
+            fontWeight: 600,
+          }}
+        >
+          {project.listingStatus === "rejected" ? (
+            <XCircle size={16} strokeWidth={2} aria-hidden="true" />
+          ) : (
+            <Clock size={16} strokeWidth={2} aria-hidden="true" />
+          )}
+          {project.listingStatus === "rejected"
+            ? "This submission was rejected by a site admin and isn't visible to anyone else on Code Masters."
+            : "Pending review, only you and this project's maintainers can see this. It won't appear in search, the projects list, or platform stats until a site admin approves it."}
+        </div>
+      )}
 
       <SyncStatusBanner
         projectId={project.id}
@@ -265,10 +294,10 @@ export default function ProjectDetail() {
 
 function OverviewTab({ project }) {
   // Every check here reflects a real project field except README and
-  // Tests/CI, which have no backing signal anywhere in the API — those are
+  // Tests/CI, which have no backing signal anywhere in the API, those are
   // explicitly "unknown", not silently marked done. hasContributingGuide/
   // hasCodeOfConduct come from GitHub's community-profile endpoint via sync
-  // (confirmed present on GET /projects/{id} — this file previously ignored
+  // (confirmed present on GET /projects/{id}, this file previously ignored
   // them and hardcoded both to done).
   const checklist = [
     { label: "License", status: project.license ? "yes" : "no" },
@@ -279,7 +308,7 @@ function OverviewTab({ project }) {
     { label: "README present", status: "unknown" },
     { label: "Tests / CI", status: "unknown" },
   ];
-  // Readiness is a percentage of known facts only — an "unknown" isn't a
+  // Readiness is a percentage of known facts only, an "unknown" isn't a
   // failure, and counting it as one would just trade one kind of made-up
   // number for another.
   const trackedChecks = checklist.filter((c) => c.status !== "unknown");
@@ -351,7 +380,7 @@ function OverviewTab({ project }) {
             </p>
           </div>
           <p style={{ fontSize: "12.5px", color: "var(--cm-text-secondary)", margin: 0, lineHeight: 1.5 }}>
-            Based on known signals only — license, contributing guide, code of conduct, active maintainers, and open beginner issues. README and test coverage aren&rsquo;t tracked yet, so they&rsquo;re excluded rather than assumed.
+            Based on known signals only, license, contributing guide, code of conduct, active maintainers, and open beginner issues. README and test coverage aren&rsquo;t tracked yet, so they&rsquo;re excluded rather than assumed.
           </p>
         </div>
 
@@ -605,7 +634,7 @@ function DiscussionsTab({ project }) {
 }
 
 function ComingSoonTab({ label }) {
-  return <StatusPanel text={`Pull request tracking isn't wired up yet — this tab is a placeholder for ${label}.`} />;
+  return <StatusPanel text={`Pull request tracking isn't wired up yet, this tab is a placeholder for ${label}.`} />;
 }
 
 function StatusPanel({ title, text }) {

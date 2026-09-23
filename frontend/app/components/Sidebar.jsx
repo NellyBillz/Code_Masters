@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Compass, GitPullRequest, BookOpen, Users, Sparkles, ShieldCheck } from "lucide-react";
+import { Home, Compass, GitPullRequest, BookOpen, Users, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 // Only Home and Explore (→ /projects) map to real routes today. The rest
@@ -22,11 +22,15 @@ export default function Sidebar() {
   const { user } = useAuth();
 
   // The moderation queue link only exists in this array for a confirmed
-  // site admin (user.isSiteAdmin, from GET /users/me) — it's appended here,
+  // site admin (user.isSiteAdmin, from GET /users/me), it's appended here,
   // not rendered-but-disabled like the placeholders above, so it's genuinely
   // absent from the DOM for everyone else, not just visually hidden.
   const navItems = user?.isSiteAdmin
-    ? [...NAV_ITEMS, { href: "/admin/projects", label: "Admin queue", icon: ShieldCheck, enabled: true }]
+    ? [
+        ...NAV_ITEMS,
+        { href: "/admin/projects", label: "Admin queue", icon: ShieldCheck, enabled: true },
+        { href: "/admin/reports", label: "Abuse reports", icon: ShieldAlert, enabled: true },
+      ]
     : NAV_ITEMS;
 
   return (
@@ -64,7 +68,7 @@ export default function Sidebar() {
 
         if (!enabled) {
           return (
-            <span key={href} title={`${label} — coming soon`} style={itemStyle}>
+            <span key={href} title={`${label}, coming soon`} style={itemStyle}>
               <Icon size={19} strokeWidth={1.9} />
             </span>
           );

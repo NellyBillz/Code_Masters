@@ -54,7 +54,7 @@ export default function ClaimPanel({ issueId, initialClaims = [] }) {
           Contributors working on this
         </h2>
 
-        {/* claim endpoints aren't on the confirmed-working list yet — say so rather than let a failure look like a bug */}
+        {/* claim endpoints aren't on the confirmed-working list yet, say so rather than let a failure look like a bug */}
         <span
           title="This endpoint hasn't been confirmed working end-to-end yet"
           style={{ display: "inline-flex", alignItems: "center", gap: "4px", fontSize: "10.5px", fontWeight: 600, color: "var(--cm-orange-text)", background: "var(--cm-orange-soft)", padding: "3px 9px", borderRadius: "999px" }}

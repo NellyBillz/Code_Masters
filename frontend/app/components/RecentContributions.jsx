@@ -71,7 +71,7 @@ export default function RecentContributions({ username, ownProfile = false }) {
         <div style={{ margin: "0 16px 16px" }}>
           <p style={{ fontSize: "12.5px", color: "var(--cm-text-muted)", margin: "0 0 10px" }}>
             {ownProfile
-              ? "No verified contributions yet — claim an issue and see it here once it merges."
+              ? "No verified contributions yet, claim an issue and see it here once it merges."
               : "No verified contributions yet."}
           </p>
           {ownProfile && (

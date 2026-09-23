@@ -62,7 +62,7 @@ const REQUIRED_PROJECT_FIELDS = [
 
     const first = result.items && result.items[0];
     if (!first) {
-      errors.push('items is empty — expected several seeded mock projects');
+      errors.push('items is empty, expected several seeded mock projects');
     } else {
       for (const field of REQUIRED_PROJECT_FIELDS) {
         if (!(field in first)) errors.push(`items[0].${field} is missing`);

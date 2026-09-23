@@ -97,7 +97,7 @@ export default function SiteHeader() {
           <ChevronDown size={12} strokeWidth={2} aria-hidden="true" />
         </button>
 
-        {/* Static placeholder — no weather API wired up yet */}
+        {/* Static placeholder, no weather API wired up yet */}
         <span
           style={{
             display: "flex",

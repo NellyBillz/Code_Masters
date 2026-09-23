@@ -7,7 +7,7 @@ import { updateCurrentUser } from "../../lib/api";
 const BIO_MAX_LENGTH = 1000;
 
 /**
- * Edit form for the caller's own profile — displayName, bio, location,
+ * Edit form for the caller's own profile, displayName, bio, location,
  * skills. These are the only fields PATCH /users/me accepts; username,
  * avatarUrl, reputation and email are GitHub-derived/system-managed and
  * aren't editable here.
