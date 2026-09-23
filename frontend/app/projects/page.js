@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown } from "lucide-react";
+import Link from "next/link";
+import { ChevronDown, Plus } from "lucide-react";
 import { listProjects } from "../../lib/api";
 import ProjectCard from "../components/ProjectCard";
 
@@ -80,16 +81,37 @@ export default function Projects() {
 
   return (
     <div style={{ padding: "8px 4px 40px" }}>
-      <header style={{ marginBottom: "24px" }}>
-        <p style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.1em", color: "var(--cm-orange-text)", margin: "0 0 8px" }}>
-          OPEN-SOURCE DISCOVERY
-        </p>
-        <h1 style={{ fontSize: "32px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
-          Projects
-        </h1>
-        <p style={{ fontSize: "14px", color: "var(--cm-text-secondary)", margin: "8px 0 0", maxWidth: "560px" }}>
-          Discover South African open-source projects making an impact.
-        </p>
+      <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "16px", flexWrap: "wrap", marginBottom: "24px" }}>
+        <div>
+          <p style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.1em", color: "var(--cm-orange-text)", margin: "0 0 8px" }}>
+            OPEN-SOURCE DISCOVERY
+          </p>
+          <h1 style={{ fontSize: "32px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+            Projects
+          </h1>
+          <p style={{ fontSize: "14px", color: "var(--cm-text-secondary)", margin: "8px 0 0", maxWidth: "560px" }}>
+            Discover South African open-source projects making an impact.
+          </p>
+        </div>
+
+        <Link
+          href="/projects/new"
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            borderRadius: "999px",
+            padding: "10px 18px",
+            fontSize: "13px",
+            fontWeight: 700,
+            background: "var(--cm-lime)",
+            color: "#0A0A0A",
+            flexShrink: 0,
+          }}
+        >
+          <Plus size={15} strokeWidth={2.2} aria-hidden="true" />
+          Submit a project
+        </Link>
       </header>
 
       {/* Filters */}

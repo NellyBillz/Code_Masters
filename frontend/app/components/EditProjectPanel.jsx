@@ -11,16 +11,23 @@ const CONNECTIONS = [
 
 /**
  * Edit form for a project's Code Masters-owned metadata (category, tags,
- * connection, country codes, accepting-contributions toggle). Only rendered
- * for a confirmed maintainer — the backend re-checks this on submit
- * regardless (403 FORBIDDEN), so this component surfaces that error rather
- * than assuming the caller is always authorized.
+ * connection, accepting-contributions toggle). Only rendered for a
+ * confirmed maintainer — the backend re-checks this on submit regardless
+ * (403 FORBIDDEN), so this component surfaces that error rather than
+ * assuming the caller is always authorized.
+ *
+ * `connection` is kept editable here (unlike the submission form, which
+ * always defaults new projects to `community_verified`) — this is where a
+ * maintainer/curator corrects it to `south_african` once that's actually
+ * confirmed, since no automatic detection exists yet.
+ *
+ * `countryCodes` isn't exposed — the platform is scoped to South Africa,
+ * so it's always sent as `["ZA"]`.
  */
 export default function EditProjectPanel({ project, onCancel, onSaved }) {
   const [category, setCategory] = useState(project.category || "");
   const [tagsInput, setTagsInput] = useState((project.tags || []).join(", "));
-  const [connection, setConnection] = useState(project.connection || "south_african");
-  const [countryCodesInput, setCountryCodesInput] = useState((project.countryCodes || []).join(", "));
+  const [connection, setConnection] = useState(project.connection || "community_verified");
   const [acceptingContributions, setAcceptingContributions] = useState(project.acceptingContributions ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -42,7 +49,7 @@ export default function EditProjectPanel({ project, onCancel, onSaved }) {
         category: category.trim(),
         tags: parseList(tagsInput),
         connection,
-        countryCodes: parseList(countryCodesInput).map((c) => c.toUpperCase()),
+        countryCodes: ["ZA"],
         acceptingContributions,
       });
       onSaved(updated);
@@ -135,18 +142,6 @@ export default function EditProjectPanel({ project, onCancel, onSaved }) {
             value={tagsInput}
             onChange={(e) => setTagsInput(e.target.value)}
             placeholder="e.g. spring-boot, postgres"
-            style={fieldStyle}
-          />
-        </div>
-
-        <div style={{ marginBottom: "18px" }}>
-          <label htmlFor="edit-countries" style={labelStyle}>Country codes (comma-separated)</label>
-          <input
-            id="edit-countries"
-            type="text"
-            value={countryCodesInput}
-            onChange={(e) => setCountryCodesInput(e.target.value)}
-            placeholder="e.g. ZA"
             style={fieldStyle}
           />
         </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import {
   ArrowLeft,
   Star,
@@ -11,15 +11,18 @@ import {
   BadgeCheck,
   Check,
   Circle,
+  Minus,
 } from "lucide-react";
 import { getProject } from "../../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import MaintainersPanel from "../../components/MaintainersPanel";
+import SyncStatusBanner from "../../components/SyncStatusBanner";
 
 const TABS = ["Overview", "Issues", "Pull requests", "Contributors", "Discussions"];
 
 export default function ProjectDetail() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const projectId = params?.projectId;
   const { user: currentUser } = useAuth();
 
@@ -82,6 +85,13 @@ export default function ProjectDetail() {
         <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
         Back to projects
       </Link>
+
+      <SyncStatusBanner
+        projectId={project.id}
+        initialJobId={searchParams.get("syncJobId")}
+        isMaintainer={isMaintainer}
+        onSynced={() => getProject(projectId).then(setProject).catch(() => {})}
+      />
 
       {/* Header */}
       <header className="cm-glass" style={{ borderRadius: "28px", padding: "24px 28px", marginBottom: "20px" }}>
@@ -218,20 +228,28 @@ export default function ProjectDetail() {
 }
 
 function OverviewTab({ project }) {
-  // Readiness checklist: License, active-maintainers, and beginner-issues
-  // are computed from real project fields. README present, Contributing
-  // guide, and Tests/CI have no backing field in the API client yet, so
-  // they default to true as a placeholder — swap for real signals once
-  // the backend exposes them.
+  // Every check here reflects a real project field except README and
+  // Tests/CI, which have no backing signal anywhere in the API — those are
+  // explicitly "unknown", not silently marked done. hasContributingGuide/
+  // hasCodeOfConduct come from GitHub's community-profile endpoint via sync
+  // (confirmed present on GET /projects/{id} — this file previously ignored
+  // them and hardcoded both to done).
   const checklist = [
-    { label: "README present", done: true, real: false },
-    { label: "Contributing guide", done: true, real: false },
-    { label: "License", done: Boolean(project.license), real: true },
-    { label: "Active maintainers", done: (project.maintainers?.length ?? 0) > 0, real: true },
-    { label: "Good first issues", done: Boolean(project.hasBeginnerFriendlyIssues), real: true },
-    { label: "Tests / CI", done: true, real: false },
+    { label: "License", status: project.license ? "yes" : "no" },
+    { label: "Contributing guide", status: project.hasContributingGuide ? "yes" : "no" },
+    { label: "Code of Conduct", status: project.hasCodeOfConduct ? "yes" : "no" },
+    { label: "Active maintainers", status: (project.maintainers?.length ?? 0) > 0 ? "yes" : "no" },
+    { label: "Good first issues", status: project.hasBeginnerFriendlyIssues ? "yes" : "no" },
+    { label: "README present", status: "unknown" },
+    { label: "Tests / CI", status: "unknown" },
   ];
-  const readiness = Math.round((checklist.filter((c) => c.done).length / checklist.length) * 100);
+  // Readiness is a percentage of known facts only — an "unknown" isn't a
+  // failure, and counting it as one would just trade one kind of made-up
+  // number for another.
+  const trackedChecks = checklist.filter((c) => c.status !== "unknown");
+  const readiness = trackedChecks.length > 0
+    ? Math.round((trackedChecks.filter((c) => c.status === "yes").length / trackedChecks.length) * 100)
+    : 0;
 
   const circumference = 2 * Math.PI * 42;
   const dash = (readiness / 100) * circumference;
@@ -245,10 +263,10 @@ function OverviewTab({ project }) {
         </p>
 
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          <InfoRow label="README" />
-          <InfoRow label="Contributing Guide" />
-          <InfoRow label="Code of Conduct" />
-          <InfoRow label={project.license || "License unspecified"} />
+          <InfoRow label="README" status="unknown" />
+          <InfoRow label="Contributing Guide" status={project.hasContributingGuide ? "yes" : "no"} />
+          <InfoRow label="Code of Conduct" status={project.hasCodeOfConduct ? "yes" : "no"} />
+          <InfoRow label={project.license || "License unspecified"} status={project.license ? "yes" : "no"} />
         </div>
 
         <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "0.5px solid var(--cm-border)" }}>
@@ -297,19 +315,20 @@ function OverviewTab({ project }) {
             </p>
           </div>
           <p style={{ fontSize: "12.5px", color: "var(--cm-text-secondary)", margin: 0, lineHeight: 1.5 }}>
-            How ready this project is for new contributors, based on docs, maintainers, and open beginner issues.
+            Based on known signals only — license, contributing guide, code of conduct, active maintainers, and open beginner issues. README and test coverage aren&rsquo;t tracked yet, so they&rsquo;re excluded rather than assumed.
           </p>
         </div>
 
         <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
           {checklist.map((item) => (
-            <li key={item.label} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "var(--cm-text-secondary)" }}>
-              {item.done ? (
-                <Check size={14} strokeWidth={2.2} color="var(--cm-lime-text)" aria-hidden="true" />
-              ) : (
-                <Circle size={14} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />
-              )}
+            <li key={item.label} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: item.status === "unknown" ? "var(--cm-text-muted)" : "var(--cm-text-secondary)" }}>
+              {item.status === "yes" && <Check size={14} strokeWidth={2.2} color="var(--cm-lime-text)" aria-hidden="true" />}
+              {item.status === "no" && <Circle size={14} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />}
+              {item.status === "unknown" && <Minus size={14} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />}
               {item.label}
+              {item.status === "unknown" && (
+                <span style={{ fontSize: "10.5px" }}>(not tracked yet)</span>
+              )}
             </li>
           ))}
         </ul>
@@ -318,11 +337,14 @@ function OverviewTab({ project }) {
   );
 }
 
-function InfoRow({ label }) {
+function InfoRow({ label, status }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "var(--cm-text-secondary)" }}>
-      <Check size={13} strokeWidth={2} color="var(--cm-lime-text)" aria-hidden="true" />
+    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: status === "unknown" ? "var(--cm-text-muted)" : "var(--cm-text-secondary)" }}>
+      {status === "yes" && <Check size={13} strokeWidth={2} color="var(--cm-lime-text)" aria-hidden="true" />}
+      {status === "no" && <Circle size={13} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />}
+      {status === "unknown" && <Minus size={13} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />}
       {label}
+      {status === "unknown" && <span style={{ fontSize: "10.5px" }}>(not tracked yet)</span>}
     </div>
   );
 }

@@ -189,6 +189,70 @@ function listProjects(params) {
 }
 
 /**
+ * Submit a new project. Creates it with listingStatus 'pending' and makes
+ * the caller its owner — it won't appear in GET /projects or /search until
+ * a site admin approves it. GitHub-derived fields (name, description,
+ * stars, etc.) are deliberately not accepted here; they're filled in later
+ * by a maintainer triggering project sync.
+ *
+ * @param {Object} payload
+ * @param {string} payload.githubUrl Required. Must match https://github.com/{owner}/{repo}.
+ * @param {'south_african'|'community_verified'} payload.connection Required.
+ * @param {string} payload.category Required, free text.
+ * @param {string[]} [payload.tags]
+ * @param {string[]} [payload.countryCodes]
+ * @returns {Promise<Project>} The created project (id, listingStatus: 'pending', etc.)
+ */
+function createProject(payload) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch('/projects', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+/**
+ * Trigger a GitHub sync for a project — populates GitHub-derived fields
+ * (name, description, stars, language, issues, etc.) that submission alone
+ * never fills in. Requires the caller to be a maintainer (any role); the
+ * backend throws ApiError with status 403 (code FORBIDDEN) otherwise. Runs
+ * asynchronously server-side — returns a SyncJob (status: accepted) to poll
+ * via getSyncJob, not the finished result.
+ *
+ * The job's id field is `id`, NOT `jobId` as codemasters-api-spec.yaml's
+ * SyncJob schema claims — SyncController returns the JPA entity directly
+ * (no dedicated DTO), and its only id getter is getId() -> `id`. Confirmed
+ * against a live POST /projects/{id}/issues/sync response; this is a real
+ * spec/implementation drift, not a typo here.
+ *
+ * @param {number|string} projectId
+ * @returns {Promise<Object>} SyncJob, keyed by `id` (not `jobId`)
+ */
+function syncProject(projectId) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}/issues/sync`, {
+    method: 'POST',
+    headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+  });
+}
+
+/**
+ * Poll a sync job's status (accepted -> running -> completed|failed).
+ *
+ * @param {string} jobId
+ * @returns {Promise<Object>} SyncJob
+ */
+function getSyncJob(jobId) {
+  return apiFetch(`/sync-jobs/${jobId}`);
+}
+
+/**
  * Unified cross-resource search — projects and issues in one ranked,
  * paginated list, discriminated by `resultType` ('project' | 'issue'). A
  * project result is a Project plus `resultType`; an issue result is an
@@ -523,6 +587,9 @@ function moderateProject(projectId, decision, reason) {
 
 module.exports = {
   listProjects,
+  createProject,
+  syncProject,
+  getSyncJob,
   search,
   getProject,
   updateProject,
