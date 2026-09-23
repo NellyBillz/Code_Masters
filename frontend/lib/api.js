@@ -273,6 +273,32 @@ function search(params) {
 }
 
 /**
+ * Report a project listing for moderation (API-03.9). Any authenticated
+ * user may flag a given project once; a second report of the same project
+ * by the same caller is rejected by the backend.
+ *
+ * @param {number|string} projectId
+ * @param {string} reason Required, 3-500 characters (server-validated).
+ * @returns {Promise<Object>} The created ReportDto (id, targetType: 'project',
+ *   targetId, reason, status: 'open', createdAt, ...).
+ * @throws {ApiError} status 400 (invalid/missing reason), 401 (not signed
+ *   in), 404 (project doesn't exist), or 409 code REPORT_ALREADY_EXISTS
+ *   (caller already reported this project).
+ */
+function reportProject(projectId, reason) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}/reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/**
  * Get a single project's details, including maintainers, featured issues,
  * and recent comments.
  *
@@ -674,6 +700,7 @@ module.exports = {
   getProject,
   getProjectIssues,
   updateProject,
+  reportProject,
   getIssue,
   getIssueComments,
   postComment,
