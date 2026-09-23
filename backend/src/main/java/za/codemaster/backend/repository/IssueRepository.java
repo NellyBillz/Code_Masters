@@ -70,6 +70,12 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * Native PostgreSQL relevance-ranked search query.
      * Combines full-text search over the generated tsvector (title + body_excerpt)
      * with trigram similarity fallback on title for typo tolerance.
+     * <p>
+     * Joins {@code projects} and requires {@code listing_status = 'published'} —
+     * this is the only caller of this query ({@link za.codemaster.backend.service.SearchService}),
+     * a public unauthenticated endpoint, so an issue belonging to a pending or
+     * rejected project must never surface here even though its parent project
+     * is correctly hidden from every other public read.
      *
      * @param q optional free-text search query (supports typos via pg_trgm)
      * @param projectId optional parent project filter
@@ -85,7 +91,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         value = """
             SELECT i.*
             FROM issues i
-            WHERE (:projectId IS NULL OR i.project_id = :projectId)
+            JOIN projects p ON p.id = i.project_id
+            WHERE p.listing_status = 'published'
+              AND (:projectId IS NULL OR i.project_id = :projectId)
               AND (:status IS NULL OR :status = '' OR i.status = :status)
               AND (:difficulty IS NULL OR :difficulty = '' OR i.difficulty = :difficulty)
               AND (:isBeginnerFriendly IS NULL OR i.is_beginner_friendly = :isBeginnerFriendly)
@@ -108,7 +116,9 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
         countQuery = """
             SELECT count(*)
             FROM issues i
-            WHERE (:projectId IS NULL OR i.project_id = :projectId)
+            JOIN projects p ON p.id = i.project_id
+            WHERE p.listing_status = 'published'
+              AND (:projectId IS NULL OR i.project_id = :projectId)
               AND (:status IS NULL OR :status = '' OR i.status = :status)
               AND (:difficulty IS NULL OR :difficulty = '' OR i.difficulty = :difficulty)
               AND (:isBeginnerFriendly IS NULL OR i.is_beginner_friendly = :isBeginnerFriendly)

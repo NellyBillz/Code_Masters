@@ -69,9 +69,9 @@ class ProjectIssuesTest {
 
     @Test
     void filtersByDifficulty() {
-        PagedIssues all = service.getProjectIssues(projectWithIssues, emptyParams());
+        PagedIssues all = service.getProjectIssues(projectWithIssues, emptyParams(), null);
         PagedIssues filtered = service.getProjectIssues(projectWithIssues,
-                new ProjectIssuesSearchParams(null, null, Difficulty.BEGINNER, null, null));
+                new ProjectIssuesSearchParams(null, null, Difficulty.BEGINNER, null, null), null);
 
         assertTrue(filtered.items().size() < all.items().size());
         assertTrue(filtered.items().stream().allMatch(i -> i.difficulty() == Difficulty.BEGINNER));
@@ -80,7 +80,7 @@ class ProjectIssuesTest {
     @Test
     void filtersByLabel() {
         PagedIssues filtered = service.getProjectIssues(projectWithIssues,
-                new ProjectIssuesSearchParams(null, null, null, "good-first-issue", null));
+                new ProjectIssuesSearchParams(null, null, null, "good-first-issue", null), null);
 
         assertTrue(filtered.items().size() > 0);
         assertTrue(filtered.items().stream()
@@ -93,7 +93,7 @@ class ProjectIssuesTest {
         Long mzansiDevTools = fixtures.projectId(1);
 
         PagedIssues filtered = service.getProjectIssues(mzansiDevTools,
-                new ProjectIssuesSearchParams(null, null, null, null, IssueStatus.CLAIMED));
+                new ProjectIssuesSearchParams(null, null, null, null, IssueStatus.CLAIMED), null);
 
         assertTrue(filtered.items().size() > 0);
         assertTrue(filtered.items().stream().allMatch(i -> i.status() == IssueStatus.CLAIMED));
@@ -101,7 +101,7 @@ class ProjectIssuesTest {
 
     @Test
     void onlyReturnsIssuesBelongingToTheRequestedProject() {
-        PagedIssues result = service.getProjectIssues(projectWithIssues, emptyParams());
+        PagedIssues result = service.getProjectIssues(projectWithIssues, emptyParams(), null);
 
         assertTrue(result.items().stream().allMatch(i -> i.projectId().equals(projectWithIssues)));
     }
@@ -111,7 +111,7 @@ class ProjectIssuesTest {
         Long missingId = -999L;
 
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.getProjectIssues(missingId, emptyParams()));
+                () -> service.getProjectIssues(missingId, emptyParams(), null));
 
         assertEquals("PROJECT_NOT_FOUND", ex.getCode());
         assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatus());

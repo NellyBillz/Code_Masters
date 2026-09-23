@@ -14,7 +14,7 @@ import {
   Minus,
   Pencil,
 } from "lucide-react";
-import { getProject } from "../../../lib/api";
+import { getProject, getProjectIssues } from "../../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import MaintainersPanel from "../../components/MaintainersPanel";
 import SyncStatusBanner from "../../components/SyncStatusBanner";
@@ -451,11 +451,32 @@ function ContributorAvatars({ maintainers = [], count = 0 }) {
 }
 
 function IssuesTab({ project }) {
-  const issues = project.featuredIssues || [];
+  const [issues, setIssues] = useState(null);
+  const [error, setError] = useState("");
 
-  if (issues.length === 0) {
-    return <StatusPanel text="No featured issues on this project yet." />;
-  }
+  useEffect(() => {
+    let cancelled = false;
+
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount pattern; no derived-state alternative for reading server data
+    setIssues(null);
+    setError("");
+
+    getProjectIssues(project.id, { size: 50 })
+      .then((result) => {
+        if (!cancelled) setIssues(result.items || []);
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || "Failed to load issues.");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [project.id]);
+
+  if (error) return <StatusPanel title="Something went wrong" text={error} />;
+  if (issues === null) return <StatusPanel text="Loading issues…" />;
+  if (issues.length === 0) return <StatusPanel text="No issues found for this project yet." />;
 
   return (
     <div className="cm-glass" style={{ borderRadius: "24px", padding: "8px" }}>
@@ -467,14 +488,31 @@ function IssuesTab({ project }) {
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
+            gap: "12px",
             padding: "14px 16px",
             borderBottom: index < issues.length - 1 ? "0.5px solid var(--cm-border)" : "none",
             fontSize: "13px",
             color: "var(--cm-text-primary)",
           }}
         >
-          {issue.title ?? `Issue #${issue.id}`}
-          <ArrowUpRight size={14} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />
+          <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
+            <span
+              style={{
+                fontSize: "10.5px",
+                fontWeight: 600,
+                textTransform: "capitalize",
+                padding: "2px 8px",
+                borderRadius: "999px",
+                background: issue.status === "open" ? "var(--cm-lime-soft)" : "var(--cm-surface-alt)",
+                color: issue.status === "open" ? "var(--cm-lime-text)" : "var(--cm-text-secondary)",
+                flexShrink: 0,
+              }}
+            >
+              {issue.status || "unknown"}
+            </span>
+            {issue.title ?? `Issue #${issue.id}`}
+          </span>
+          <ArrowUpRight size={14} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
         </Link>
       ))}
     </div>

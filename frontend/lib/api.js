@@ -284,6 +284,24 @@ function getProject(projectId) {
 }
 
 /**
+ * A project's real issues, filtered and paginated — GET /projects/{id} never
+ * includes them (its featuredIssues field is hardcoded empty backend-side),
+ * so this is the only way to actually populate the Issues tab.
+ *
+ * @param {number|string} projectId
+ * @param {Object} [params]
+ * @param {number} [params.page] Zero-based page index. Default 0.
+ * @param {number} [params.size] Page size, 1-50. Default 20.
+ * @param {'beginner'|'intermediate'|'advanced'|'unknown'} [params.difficulty]
+ * @param {string} [params.label]
+ * @param {'open'|'closed'|'claimed'} [params.status]
+ * @returns {Promise<{items: Object[], meta: PageMeta}>}
+ */
+function getProjectIssues(projectId, params) {
+  return apiFetch(`/projects/${projectId}/issues${buildQuery(params)}`);
+}
+
+/**
  * Update a project's Code Masters-owned metadata. Requires the caller to be
  * a maintainer (any role) on this project — the backend throws ApiError with
  * status 403 (code FORBIDDEN) otherwise. Only GitHub-derived fields are
@@ -592,6 +610,7 @@ module.exports = {
   getSyncJob,
   search,
   getProject,
+  getProjectIssues,
   updateProject,
   getIssue,
   getIssueComments,

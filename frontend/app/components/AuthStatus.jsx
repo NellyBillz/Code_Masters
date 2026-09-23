@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useAuth } from "../context/AuthContext";
 
 function GithubMark() {
@@ -41,20 +42,26 @@ export default function AuthStatus() {
 
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-      {user.avatarUrl && (
-        // eslint-disable-next-line @next/next/no-img-element -- external, size-variable avatar URLs; not worth next/image's config here
-        <img
-          src={user.avatarUrl}
-          alt=""
-          width={26}
-          height={26}
-          style={{ borderRadius: "50%" }}
-        />
-      )}
+      <Link
+        href="/profile"
+        title="Your profile"
+        style={{ display: "flex", alignItems: "center", gap: "8px" }}
+      >
+        {user.avatarUrl && (
+          // eslint-disable-next-line @next/next/no-img-element -- external, size-variable avatar URLs; not worth next/image's config here
+          <img
+            src={user.avatarUrl}
+            alt=""
+            width={26}
+            height={26}
+            style={{ borderRadius: "50%" }}
+          />
+        )}
 
-      <span style={{ fontSize: "13px", color: "var(--cm-text-primary)" }}>
-        {user.displayName || user.username}
-      </span>
+        <span style={{ fontSize: "13px", color: "var(--cm-text-primary)" }}>
+          {user.displayName || user.username}
+        </span>
+      </Link>
 
       <button
         type="button"

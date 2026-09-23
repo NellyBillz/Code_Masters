@@ -97,10 +97,11 @@ public class ProjectController {
             @RequestParam(required = false) Integer size,
             @RequestParam(required = false) Difficulty difficulty,
             @RequestParam(required = false) String label,
-            @RequestParam(required = false) IssueStatus status
+            @RequestParam(required = false) IssueStatus status,
+            @OptionalAuthenticatedUser User caller
     ) {
         ProjectIssuesSearchParams params = new ProjectIssuesSearchParams(page, size, difficulty, label, status);
-        return projectQueryService.getProjectIssues(projectId, params);
+        return projectQueryService.getProjectIssues(projectId, params, caller);
     }
 
     /**

@@ -136,13 +136,7 @@ public class ProjectQueryService {
     @Transactional(readOnly = true)
     public ProjectDetail getProjectDetail(Long projectId, User caller) {
         za.codemaster.backend.domain.model.Project entity = findProjectEntityOrThrow(projectId);
-
-        boolean published = entity.getListingStatus() == za.codemaster.backend.domain.model.ListingStatus.PUBLISHED;
-        boolean callerIsMaintainer = caller != null
-                && projectMaintainerRepository.existsByProjectIdAndUserId(projectId, caller.getId());
-        if (!published && !callerIsMaintainer) {
-            throw projectNotFound(projectId);
-        }
+        requireVisible(entity, caller);
 
         ProjectDto project = toDto(entity);
         List<ProjectMaintainerDto> maintainers = projectMaintainerRepository.findByProjectId(projectId).stream()
@@ -170,20 +164,41 @@ public class ProjectQueryService {
     }
 
     /**
+     * Shared visibility gate: a non-{@code published} project (pending review,
+     * or rejected) is only visible to its submitter/any maintainer — everyone
+     * else, including an anonymous caller, gets the same {@code PROJECT_NOT_FOUND}
+     * a missing id would produce. Used by every read that exposes project-scoped
+     * data (detail, issues) so "pending projects are hidden" is enforced once,
+     * not re-derived per endpoint.
+     */
+    private void requireVisible(za.codemaster.backend.domain.model.Project entity, User caller) {
+        boolean published = entity.getListingStatus() == za.codemaster.backend.domain.model.ListingStatus.PUBLISHED;
+        boolean callerIsMaintainer = caller != null
+                && projectMaintainerRepository.existsByProjectIdAndUserId(entity.getId(), caller.getId());
+        if (!published && !callerIsMaintainer) {
+            throw projectNotFound(entity.getId());
+        }
+    }
+
+    /**
      * Lists a project's issues, filtered by difficulty/label/status and paginated.
      * Delegates to {@link IssueRepository#findWithFilters}, which already does
      * this filtering and pagination in SQL.
      *
      * @param projectId the project id from the path
      * @param params    the requested filters/pagination; any field may be {@code null}
+     * @param caller    the requesting user, or {@code null} if anonymous
      * @return one page of matching issues for this project
      * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if the
-     *                       project itself doesn't exist — same exception,
-     *                       same helper, as {@link #getProjectDetail}
+     *                       project itself doesn't exist, or isn't visible to
+     *                       {@code caller} — same rule as {@link #getProjectDetail};
+     *                       a pending project's issues shouldn't be reachable
+     *                       just because its id is known when its detail page isn't.
      */
     @Transactional(readOnly = true)
-    public PagedIssues getProjectIssues(Long projectId, ProjectIssuesSearchParams params) {
-        findProjectEntityOrThrow(projectId);
+    public PagedIssues getProjectIssues(Long projectId, ProjectIssuesSearchParams params, User caller) {
+        za.codemaster.backend.domain.model.Project entity = findProjectEntityOrThrow(projectId);
+        requireVisible(entity, caller);
 
         int size = clampSize(params.size());
         int page = clampPage(params.page());
