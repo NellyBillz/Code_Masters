@@ -603,6 +603,23 @@ function moderateProject(projectId, decision, reason) {
   });
 }
 
+/**
+ * List abuse reports (filed against a comment or a project listing).
+ * Site-admin only; the backend returns 403 FORBIDDEN for anyone else.
+ * Defaults to `status=open` server-side when no status is passed. Read-only,
+ * resolving/dismissing a report (PATCH /admin/reports/{id}) is FE-GAP-11's
+ * job, not this one.
+ *
+ * @param {Object} [params]
+ * @param {'open'|'resolved'|'dismissed'} [params.status]
+ * @param {number} [params.page] Zero-based page index. Default 0.
+ * @param {number} [params.size] Page size, 1-50. Default 20.
+ * @returns {Promise<{items: Object[], meta: PageMeta}>} items are Report DTOs.
+ */
+function listReports(params) {
+  return apiFetch(`/admin/reports${buildQuery(params)}`);
+}
+
 module.exports = {
   listProjects,
   createProject,
@@ -630,4 +647,5 @@ module.exports = {
   updateIssueClassification,
   listPendingProjects,
   moderateProject,
+  listReports,
 };
