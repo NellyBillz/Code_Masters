@@ -476,6 +476,28 @@ function updateComment(commentId, body) {
   });
 }
 
+/**
+ * Delete a comment (soft-delete; API-02.4). Author-only from this UI's
+ * point of view — the backend also allows the parent project's maintainer,
+ * but this ticket only wires up the "delete your own comment" path, so the
+ * Delete action is only ever shown to the comment's author (see
+ * DeleteCommentButton.jsx / IssueComments.jsx).
+ *
+ * @param {number|string} commentId
+ * @returns {Promise<null>}
+ * @throws {ApiError} status 401 (not signed in), 403 code FORBIDDEN
+ *   (caller is neither the author nor a maintainer), or 404 code
+ *   COMMENT_NOT_FOUND.
+ */
+function deleteComment(commentId) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/comments/${commentId}`, {
+    method: 'DELETE',
+    headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+  });
+}
+
 function reportComment(commentId, reason) {
   const csrfToken = getCsrfToken();
 
@@ -730,6 +752,7 @@ module.exports = {
   getIssueComments,
   postComment,
   updateComment,
+  deleteComment,
   reportComment,
   ApiError,
   getIssueClaims,

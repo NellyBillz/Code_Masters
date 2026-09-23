@@ -6,6 +6,8 @@ import { AlertTriangle } from "lucide-react";
 import { getIssueComments, postComment } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 import ReportCommentButton from "./ReportCommentButton";
+import EditCommentButton from "./EditCommentButton";
+import DeleteCommentButton from "./DeleteCommentButton";
 
 export default function IssueComments({ issueId }) {
   const { user, loading: authLoading } = useAuth();
@@ -123,24 +125,50 @@ export default function IssueComments({ issueId }) {
         <p style={{ fontSize: "12.5px", color: "var(--cm-text-muted)" }}>Loading comments…</p>
       ) : comments.length ? (
         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          {comments.map((comment) => (
-            <article key={comment.id} style={{ background: "var(--cm-surface-alt)", borderRadius: "14px", padding: "12px 16px" }}>
-              <p style={{ fontSize: "13px", color: "var(--cm-text-primary)", margin: "0 0 6px", lineHeight: 1.5 }}>{comment.body}</p>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
-                <p style={{ fontSize: "11.5px", color: "var(--cm-text-muted)", margin: 0 }}>
-                  {comment.author?.username ? (
-                    <Link href={`/users/${comment.author.username}`} style={{ fontWeight: 600 }}>
-                      {comment.author.username}
-                    </Link>
-                  ) : (
-                    "User"
+          {comments.map((comment) => {
+            const isOwner = Boolean(user && comment.author?.id === user.id);
+
+            return (
+              <article key={comment.id} style={{ background: "var(--cm-surface-alt)", borderRadius: "14px", padding: "12px 16px" }}>
+                {isOwner ? (
+                  <EditCommentButton
+                    comment={comment}
+                    onSaved={(updated) =>
+                      setComments((prev) => prev.map((c) => (c.id === comment.id ? updated : c)))
+                    }
+                  />
+                ) : (
+                  <p style={{ fontSize: "13px", color: "var(--cm-text-primary)", margin: "0 0 6px", lineHeight: 1.5 }}>
+                    {comment.body}
+                    {comment.edited && (
+                      <span style={{ fontSize: "11px", color: "var(--cm-text-muted)", marginLeft: "6px" }}>(edited)</span>
+                    )}
+                  </p>
+                )}
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+                  <p style={{ fontSize: "11.5px", color: "var(--cm-text-muted)", margin: 0 }}>
+                    {comment.author?.username ? (
+                      <Link href={`/users/${comment.author.username}`} style={{ fontWeight: 600 }}>
+                        {comment.author.username}
+                      </Link>
+                    ) : (
+                      "User"
+                    )}
+                    {comment.createdAt ? ` · ${new Date(comment.createdAt).toLocaleString()}` : ""}
+                  </p>
+                  {user && !isOwner && <ReportCommentButton commentId={comment.id} />}
+                  {isOwner && (
+                    <DeleteCommentButton
+                      commentId={comment.id}
+                      onDeleted={(deletedId) =>
+                        setComments((prev) => prev.filter((c) => c.id !== deletedId))
+                      }
+                    />
                   )}
-                  {comment.createdAt ? ` · ${new Date(comment.createdAt).toLocaleString()}` : ""}
-                </p>
-                {user && <ReportCommentButton commentId={comment.id} />}
-              </div>
-            </article>
-          ))}
+                </div>
+              </article>
+            );
+          })}
         </div>
       ) : (
         <p style={{ fontSize: "12.5px", color: "var(--cm-text-muted)" }}>No comments yet.</p>
