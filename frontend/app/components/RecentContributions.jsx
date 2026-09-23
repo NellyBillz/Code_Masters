@@ -8,6 +8,10 @@ import { getUserContributions } from "../../lib/api";
 const COMPLETION_LABELS = {
   github_verified: { label: "GitHub merge verified", icon: GitMerge, bg: "var(--cm-lime-soft)", text: "var(--cm-lime-text)" },
   maintainer_confirmed: { label: "Maintainer confirmed", icon: UserCheck, bg: "var(--cm-orange-soft)", text: "var(--cm-orange-text)" },
+  // Falls back to this if the backend returns Claim.status ("completed")
+  // instead of the richer completionSource this component was designed
+  // around — see the contract warning in the doc comment below.
+  completed: { label: "Completed", icon: GitMerge, bg: "var(--cm-lime-soft)", text: "var(--cm-lime-text)" },
 };
 
 function formatDate(isoString) {
@@ -19,7 +23,28 @@ function formatDate(isoString) {
 
 /**
  * A developer's verified contribution history (GET /users/{username}/contributions),
- * most recent first. Used on both /profile (own) and /users/{username} (public).
+ * most recent first. Used on both /profile (own) and /users/{username) (public).
+ *
+ * ⚠️ CONTRACT UNVERIFIED — this endpoint does not appear anywhere in
+ * codemasters-api-spec.yml (only /users/me and /users/{username} are
+ * documented there). The field names this component was originally built
+ * against (contribution.issue.title, contribution.project.name,
+ * contribution.completionSource, contribution.completedAt) do not match
+ * the only related schema that *is* in the spec (Claim: flat issueId, no
+ * project, status enum [active, released, completed], no
+ * completionSource/completedAt).
+ *
+ * Either this endpoint returns a richer DTO than Claim (undocumented,
+ * same category of drift as SyncJob's id/jobId — see lib/api.js), or this
+ * component was built against invented field names before the endpoint
+ * existed. Nobody has confirmed which by hitting the live backend yet.
+ *
+ * The rendering below now falls back to the flat Claim shape (issueId,
+ * status, createdAt) when the richer nested fields are absent, so this
+ * degrades to something reasonable either way instead of showing
+ * "Issue #undefined" with no project name. Once someone pastes the real
+ * response JSON, delete this comment (or correct it) and simplify the
+ * fallbacks below to match whichever shape is actually real.
  *
  * @param {string} username
  * @param {boolean} [ownProfile] Swaps the empty-state copy/CTA for "you" vs "this developer".
@@ -96,12 +121,22 @@ export default function RecentContributions({ username, ownProfile = false }) {
       {!loading && !error && contributions.length > 0 && (
         <div>
           {contributions.map((contribution, index) => {
-            const completion = COMPLETION_LABELS[contribution.completionSource] || null;
+            // Prefer the richer nested shape this component was designed
+            // around; fall back to the flat Claim schema (issueId, status,
+            // createdAt) that's actually documented in the spec, so either
+            // real response shape renders something sensible.
+            const issueId = contribution.issue?.id ?? contribution.issueId;
+            const issueTitle = contribution.issue?.title ?? (issueId ? `Issue #${issueId}` : "Untitled issue");
+            const projectName = contribution.project?.name ?? null;
+            const when = contribution.completedAt ?? contribution.updatedAt ?? contribution.createdAt;
+
+            const completionKey = contribution.completionSource ?? contribution.status;
+            const completion = COMPLETION_LABELS[completionKey] || null;
             const CompletionIcon = completion?.icon;
 
             return (
               <div
-                key={contribution.issue?.id ?? index}
+                key={contribution.id ?? issueId ?? index}
                 style={{
                   display: "flex",
                   alignItems: "center",
@@ -113,15 +148,22 @@ export default function RecentContributions({ username, ownProfile = false }) {
                 }}
               >
                 <div style={{ minWidth: 0 }}>
-                  <Link
-                    href={`/issues/${contribution.issue?.id}`}
-                    style={{ fontSize: "13px", fontWeight: 600, color: "var(--cm-text-primary)" }}
-                  >
-                    {contribution.issue?.title ?? `Issue #${contribution.issue?.id}`}
-                  </Link>
+                  {issueId ? (
+                    <Link
+                      href={`/issues/${issueId}`}
+                      style={{ fontSize: "13px", fontWeight: 600, color: "var(--cm-text-primary)" }}
+                    >
+                      {issueTitle}
+                    </Link>
+                  ) : (
+                    <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--cm-text-primary)" }}>
+                      {issueTitle}
+                    </span>
+                  )}
                   <p style={{ fontSize: "12px", color: "var(--cm-text-secondary)", margin: "3px 0 0" }}>
-                    {contribution.project?.name}
-                    {contribution.completedAt ? ` · ${formatDate(contribution.completedAt)}` : ""}
+                    {projectName}
+                    {projectName && when ? " · " : ""}
+                    {when ? formatDate(when) : ""}
                   </p>
                 </div>
 
