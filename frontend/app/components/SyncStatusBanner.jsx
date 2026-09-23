@@ -8,7 +8,7 @@ const POLL_INTERVAL_MS = 1500;
 const MAX_POLL_ATTEMPTS = 15;
 
 /**
- * Surfaces GitHub sync status on a project page — previously a sync could
+ * Surfaces GitHub sync status on a project page, previously a sync could
  * fail (or still be running) with zero visible feedback, which just looked
  * like the page was stuck. Tracks one job at a time: either the job just
  * created by /projects/new's auto-sync-on-submit (passed in via
@@ -86,7 +86,7 @@ export default function SyncStatusBanner({ projectId, initialJobId, isMaintainer
   if (!jobId && !job && !isMaintainer) return null;
 
   // A maintainer with no active/past job to show yet: a plain small trigger,
-  // not a full banner — there's nothing to report until they ask for it.
+  // not a full banner, there's nothing to report until they ask for it.
   if (!jobId && !job) {
     return (
       <button
@@ -138,7 +138,7 @@ export default function SyncStatusBanner({ projectId, initialJobId, isMaintainer
         {!job && "Checking sync status…"}
         {inProgress && "Syncing project data from GitHub…"}
         {completed &&
-          `Synced — ${job.issuesCreatedCount ?? 0} issue${job.issuesCreatedCount === 1 ? "" : "s"} created, ${job.issuesUpdatedCount ?? 0} updated.`}
+          `Synced, ${job.issuesCreatedCount ?? 0} issue${job.issuesCreatedCount === 1 ? "" : "s"} created, ${job.issuesUpdatedCount ?? 0} updated.`}
         {failed && (job.errorMessage || "GitHub sync failed.")}
       </div>
 

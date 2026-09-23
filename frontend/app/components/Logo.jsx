@@ -3,7 +3,7 @@
 import { useTheme } from "../context/ThemeContext";
 
 /**
- * Four chevrons arranged to form an X — the core Code Masters mark.
+ * Four chevrons arranged to form an X, the core Code Masters mark.
  * `tone` controls the chevron color independent of the surrounding
  * treatment, so the same paths work inside either variant below.
  */
@@ -23,7 +23,7 @@ export default function Logo({ withWordmark = true, size = 34 }) {
   return (
     <span style={{ display: "inline-flex", alignItems: "center", gap: "10px" }}>
       {isDark ? (
-        // Dark mode: holographic glass tile — layered borders + a soft
+        // Dark mode: holographic glass tile, layered borders + a soft
         // multi-color glow standing in for the "glass cube" render.
         <span
           aria-hidden="true"

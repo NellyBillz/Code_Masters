@@ -1,6 +1,6 @@
 @import "tailwindcss";
 
-/* Tailwind v4 theme colors — generates bg-lime, text-orange, border-teal, etc. */
+/* Tailwind v4 theme colors, generates bg-lime, text-orange, border-teal, etc. */
 @theme {
 --color-lime: #C8FF64;
 --color-lime-soft: #D9F99D;
@@ -14,7 +14,7 @@
 --background: #f8fafc;
 --foreground: #0f172a;
 
-/* Code Masters design tokens — light mode */
+/* Code Masters design tokens, light mode */
 --cm-bg: #F5F5F0;
 --cm-surface: #FFFFFF;
 --cm-surface-alt: #F1EFE8;
@@ -41,7 +41,7 @@
 --background: #0A0F14;
 --foreground: #FFFFFF;
 
-/* Code Masters design tokens — dark mode */
+/* Code Masters design tokens, dark mode */
 --cm-bg: #0A0F14;
 --cm-surface: rgba(255, 255, 255, 0.05);
 --cm-surface-alt: rgba(255, 255, 255, 0.08);
@@ -120,7 +120,7 @@ color: inherit;
 text-decoration: none;
 }
 
-/* Glass card surface used throughout — flat in light mode, blurred glass in dark */
+/* Glass card surface used throughout, flat in light mode, blurred glass in dark */
 .cm-glass {
 background: var(--cm-card-bg);
 border: 0.5px solid var(--cm-card-border);

@@ -4,7 +4,7 @@
   flex-direction: column;
   gap: 10px;
   padding: 18px 20px;
-  border-radius: 28px 20px 32px 22px; /* irregular, organic — not a plain rectangle */
+  border-radius: 28px 20px 32px 22px; /* irregular, organic, not a plain rectangle */
   overflow: hidden;
   color: var(--cm-text-primary);
   transition: transform 0.15s ease, border-color 0.15s ease;

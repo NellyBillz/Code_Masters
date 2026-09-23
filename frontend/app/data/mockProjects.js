@@ -8,7 +8,7 @@
  * `connection` (south_african | community_verified) is varied across
  * entries so every label renders.
  *
- * Shape matches the Project contract exactly — no extra fields, so this
+ * Shape matches the Project contract exactly, no extra fields, so this
  * can be swapped for API-01's real response later with no reshaping.
  */
 

@@ -1,18 +1,18 @@
 /**
  * Typed API client (FE-01.3). Every page must import API calls from this
- * module only — no component should call fetch() directly. Field names and
+ * module only, no component should call fetch() directly. Field names and
  * types here are kept in sync with codemasters-api-spec.yml (the
  * authoritative contract), so treat that spec as the source of truth if the
  * two ever disagree.
  *
  * All calls go through /api/v1/*, which next.config.js rewrites to
- * `${BACKEND_URL}/api/v1/*` for browser requests — so this file works
+ * `${BACKEND_URL}/api/v1/*` for browser requests, so this file works
  * unchanged against the mock server (FE-01.2) today and the real backend
  * later, with BACKEND_URL as the only thing that ever changes.
  *
  * On the server (SSR, React Server Components, or a plain Node script like
  * scripts/check-api-client.js) there's no browser to proxy through, so we
- * call BACKEND_URL directly instead. Same contract, same single switch —
+ * call BACKEND_URL directly instead. Same contract, same single switch,
  * we're just skipping the same-origin hop that only matters for browser
  * cookies (see codemasters-api-design.md §4.1).
  */
@@ -126,7 +126,7 @@ function buildQuery(paramsObj) {
  * @property {string} [email] Only present on GET /users/me, never on public profiles.
  * @property {boolean} [githubAccess] Only present on GET /users/me.
  * @property {boolean} [isSiteAdmin] Only present on GET /users/me. Gates the
- *   /admin/* moderation views — absent (falsy) for everyone else.
+ *   /admin/* moderation views, absent (falsy) for everyone else.
  */
 
 /**
@@ -139,8 +139,8 @@ async function apiFetch(path, init) {
   const res = await fetch(`${getApiBase()}${path}`, {
     // Every write call (postComment, postClaim, deleteClaim, etc.) needs
     // the session cookie sent for the server to know who's making the
-    // request. Setting this once here — rather than in each function below
-    // — is what "one place for every write call" actually means: a new
+    // request. Setting this once here, rather than in each function below
+    //, is what "one place for every write call" actually means: a new
     // write function added later gets this for free just by using
     // apiFetch, instead of every caller needing to remember it.
     credentials: 'include',
@@ -190,7 +190,7 @@ function listProjects(params) {
 
 /**
  * Submit a new project. Creates it with listingStatus 'pending' and makes
- * the caller its owner — it won't appear in GET /projects or /search until
+ * the caller its owner, it won't appear in GET /projects or /search until
  * a site admin approves it. GitHub-derived fields (name, description,
  * stars, etc.) are deliberately not accepted here; they're filled in later
  * by a maintainer triggering project sync.
@@ -217,15 +217,15 @@ function createProject(payload) {
 }
 
 /**
- * Trigger a GitHub sync for a project — populates GitHub-derived fields
+ * Trigger a GitHub sync for a project, populates GitHub-derived fields
  * (name, description, stars, language, issues, etc.) that submission alone
  * never fills in. Requires the caller to be a maintainer (any role); the
  * backend throws ApiError with status 403 (code FORBIDDEN) otherwise. Runs
- * asynchronously server-side — returns a SyncJob (status: accepted) to poll
+ * asynchronously server-side, returns a SyncJob (status: accepted) to poll
  * via getSyncJob, not the finished result.
  *
  * The job's id field is `id`, NOT `jobId` as codemasters-api-spec.yaml's
- * SyncJob schema claims — SyncController returns the JPA entity directly
+ * SyncJob schema claims, SyncController returns the JPA entity directly
  * (no dedicated DTO), and its only id getter is getId() -> `id`. Confirmed
  * against a live POST /projects/{id}/issues/sync response; this is a real
  * spec/implementation drift, not a typo here.
@@ -253,7 +253,7 @@ function getSyncJob(jobId) {
 }
 
 /**
- * Unified cross-resource search — projects and issues in one ranked,
+ * Unified cross-resource search, projects and issues in one ranked,
  * paginated list, discriminated by `resultType` ('project' | 'issue'). A
  * project result is a Project plus `resultType`; an issue result is an
  * Issue plus `resultType`. Backs the header search and /search page.
@@ -284,7 +284,7 @@ function getProject(projectId) {
 }
 
 /**
- * A project's real issues, filtered and paginated — GET /projects/{id} never
+ * A project's real issues, filtered and paginated, GET /projects/{id} never
  * includes them (its featuredIssues field is hardcoded empty backend-side),
  * so this is the only way to actually populate the Issues tab.
  *
@@ -303,9 +303,9 @@ function getProjectIssues(projectId, params) {
 
 /**
  * Update a project's Code Masters-owned metadata. Requires the caller to be
- * a maintainer (any role) on this project — the backend throws ApiError with
+ * a maintainer (any role) on this project, the backend throws ApiError with
  * status 403 (code FORBIDDEN) otherwise. Only GitHub-derived fields are
- * excluded (name, description, stars, etc. — those come from sync, not this
+ * excluded (name, description, stars, etc., those come from sync, not this
  * endpoint); listingStatus is also excluded (site-admin moderation only).
  * All fields optional; only provided fields change.
  *
@@ -437,7 +437,7 @@ function postComment(issueId, body) {
 
   /**
    * Update the caller's own profile. Only displayName/bio/location/skills are
-   * editable — username, avatarUrl, reputation and email are GitHub-derived
+   * editable, username, avatarUrl, reputation and email are GitHub-derived
    * or system-managed and aren't accepted here. All fields optional; only
    * provided fields change.
    *
@@ -462,7 +462,7 @@ function postComment(issueId, body) {
   }
 
   /**
-   * A developer's public profile — never includes email, githubAccess, or
+   * A developer's public profile, never includes email, githubAccess, or
    * isSiteAdmin (those are only on GET /users/me). Throws ApiError with
    * status 404 (code USER_NOT_FOUND) if the username doesn't exist.
    *
@@ -474,7 +474,7 @@ function postComment(issueId, body) {
   }
 
   /**
-   * A developer's verified contribution history — only claims with
+   * A developer's verified contribution history, only claims with
    * status `completed` (GitHub-merge-verified or maintainer-confirmed),
    * most recent first. Backs the "activity summary" on /profile and public
    * /users/{username} pages.
@@ -492,7 +492,7 @@ function postComment(issueId, body) {
   /**
    * Aggregated activity across every project the caller maintains: active
    * claims, claims awaiting review (has a pull request attached, not yet
-   * reviewed), and recent comments — one rollup instead of checking each
+   * reviewed), and recent comments, one rollup instead of checking each
    * maintained project individually.
    *
    * @returns {Promise<{projects: Object[]}>}
@@ -503,7 +503,7 @@ function postComment(issueId, body) {
 
   /**
    * Log out the current session. Hits /auth/logout directly (not under
-   * /api/v1, same as the /auth/github login link — see next.config.js's
+   * /api/v1, same as the /auth/github login link, see next.config.js's
    * rewrite for /auth/:path*), clearing the session and CSRF cookies.
    */
   function logout() {
@@ -566,7 +566,7 @@ function updateIssueClassification(issueId, update) {
 }
 
 /**
- * List projects awaiting moderation. Site-admin only — the backend enforces
+ * List projects awaiting moderation. Site-admin only, the backend enforces
  * this via SiteAdminGuard and returns 403 FORBIDDEN for anyone else; this
  * function doesn't attempt its own client-side check, since the server is
  * the real enforcement point.
@@ -582,7 +582,7 @@ function listPendingProjects(params) {
 
 /**
  * Approve or reject a pending project submission. Site-admin only. Only
- * ever changes the project's listingStatus (published/rejected) — never
+ * ever changes the project's listingStatus (published/rejected), never
  * touches verified/verifiedAt, which is a separate concept.
  *
  * @param {number|string} projectId

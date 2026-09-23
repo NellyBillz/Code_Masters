@@ -17,7 +17,7 @@ export default function HeroVisual() {
         marginLeft: "auto",
       }}
     >
-      {/* Dark-mode-only dusk skyline, built from CSS shapes — a stand-in for
+      {/* Dark-mode-only dusk skyline, built from CSS shapes, a stand-in for
           the reference photo, since no real Cape Town asset is available
           here and hot-linking a stock photo into product code isn't safe
           to do without a license. */}

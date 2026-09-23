@@ -5,7 +5,7 @@ import SiteHeader from "./components/SiteHeader";
 import Sidebar from "./components/Sidebar";
 
 export const metadata = {
-title: "Code Masters — African Open Source Discovery",
+title: "Code Masters, African Open Source Discovery",
 description:
 "Discover African open-source projects, developers, and opportunities to contribute.",
 };

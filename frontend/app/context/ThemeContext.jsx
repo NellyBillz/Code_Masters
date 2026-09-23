@@ -26,8 +26,8 @@ function getStoredTheme() {
 
 export function ThemeProvider({ children }) {
   // Always starts as "light" so the server render and the client's first
-  // (hydration) render match exactly. The real theme — which depends on
-  // localStorage/matchMedia and is only knowable client-side — is applied
+  // (hydration) render match exactly. The real theme, which depends on
+  // localStorage/matchMedia and is only knowable client-side, is applied
   // in the effect below, after hydration has already succeeded.
   const [theme, setTheme] = useState("light");
 

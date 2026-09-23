@@ -22,7 +22,7 @@ export default function Sidebar() {
   const { user } = useAuth();
 
   // The moderation queue link only exists in this array for a confirmed
-  // site admin (user.isSiteAdmin, from GET /users/me) — it's appended here,
+  // site admin (user.isSiteAdmin, from GET /users/me), it's appended here,
   // not rendered-but-disabled like the placeholders above, so it's genuinely
   // absent from the DOM for everyone else, not just visually hidden.
   const navItems = user?.isSiteAdmin
@@ -64,7 +64,7 @@ export default function Sidebar() {
 
         if (!enabled) {
           return (
-            <span key={href} title={`${label} — coming soon`} style={itemStyle}>
+            <span key={href} title={`${label}, coming soon`} style={itemStyle}>
               <Icon size={19} strokeWidth={1.9} />
             </span>
           );

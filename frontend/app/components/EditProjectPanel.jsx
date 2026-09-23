@@ -13,16 +13,16 @@ const CONNECTIONS = [
 /**
  * Edit form for a project's Code Masters-owned metadata (category, tags,
  * connection, accepting-contributions toggle). Only rendered for a
- * confirmed maintainer — the backend re-checks this on submit regardless
+ * confirmed maintainer, the backend re-checks this on submit regardless
  * (403 FORBIDDEN), so this component surfaces that error rather than
  * assuming the caller is always authorized.
  *
  * `connection` is kept editable here (unlike the submission form, which
- * always defaults new projects to `community_verified`) — this is where a
+ * always defaults new projects to `community_verified`), this is where a
  * maintainer/curator corrects it to `south_african` once that's actually
  * confirmed, since no automatic detection exists yet.
  *
- * `countryCodes` isn't exposed — the platform is scoped to South Africa,
+ * `countryCodes` isn't exposed, the platform is scoped to South Africa,
  * so it's always sent as `["ZA"]`.
  */
 export default function EditProjectPanel({ project, onCancel, onSaved }) {
@@ -115,7 +115,7 @@ export default function EditProjectPanel({ project, onCancel, onSaved }) {
       </div>
 
       <p style={{ fontSize: "12px", color: "var(--cm-text-muted)", margin: "0 0 18px" }}>
-        Only Code Masters-owned fields are editable here — name, description, and stats come from GitHub sync.
+        Only Code Masters-owned fields are editable here, name, description, and stats come from GitHub sync.
       </p>
 
       <form onSubmit={handleSubmit}>

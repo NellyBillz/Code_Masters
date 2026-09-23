@@ -33,7 +33,7 @@ export default function ProfilePage() {
         if (cancelled) return;
         setUser(result);
 
-        // Maintainer activity is a bonus section, not core to the profile —
+        // Maintainer activity is a bonus section, not core to the profile,
         // if it fails (e.g. the caller maintains nothing yet), the page
         // still shows the rest of the profile rather than erroring out.
         try {
@@ -265,9 +265,14 @@ export default function ProfilePage() {
 function MaintainedProjects({ projects }) {
   return (
     <section className="cm-glass" style={{ borderRadius: "24px", padding: "8px", marginBottom: "20px" }}>
-      <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "12px 16px", color: "var(--cm-text-primary)" }}>
-        Projects you maintain
-      </h2>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", margin: "12px 16px" }}>
+        <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+          Projects you maintain
+        </h2>
+        <Link href="/dashboard" style={{ fontSize: "12px", fontWeight: 600, color: "var(--cm-lime-text)" }}>
+          Full dashboard
+        </Link>
+      </div>
 
       {projects.map((entry, index) => {
         const activeCount = entry.activeClaims?.length ?? 0;

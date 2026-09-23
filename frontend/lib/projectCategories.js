@@ -1,5 +1,5 @@
 /**
- * Shared category taxonomy for project submission and editing — one list so
+ * Shared category taxonomy for project submission and editing, one list so
  * both forms can't drift apart. `category` is free text server-side
  * (CreateProjectRequest.category / UpdateProjectRequest.category are plain
  * strings, not an enum), but presenting an uncontrolled text field lets
