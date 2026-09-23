@@ -738,6 +738,35 @@ function listReports(params) {
   return apiFetch(`/admin/reports${buildQuery(params)}`);
 }
 
+/**
+ * Resolve or dismiss an abuse report (API-03.9, site-admin only). This
+ * updates the report's own record only — it never itself hides, deletes,
+ * or otherwise touches the reported comment/project; an admin who agrees
+ * with the report acts on the content separately (e.g. deleteComment()).
+ *
+ * @param {number|string} reportId
+ * @param {"resolved"|"dismissed"} status The only two values the API
+ *   accepts here; a report can never be set back to "open" this way.
+ * @param {string} [resolution] Optional note, up to 1000 characters.
+ * @returns {Promise<Object>} The updated ReportDto (status, resolution,
+ *   resolvedAt, ...).
+ * @throws {ApiError} status 400 (missing/invalid status, or resolution too
+ *   long), 401 (not signed in), 403 (caller isn't a site admin), or 404
+ *   code REPORT_NOT_FOUND.
+ */
+function reviewReport(reportId, status, resolution) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/admin/reports/${reportId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ status, resolution: resolution || undefined }),
+  });
+}
+
 module.exports = {
   listProjects,
   createProject,
@@ -771,4 +800,5 @@ module.exports = {
   listPendingProjects,
   moderateProject,
   listReports,
+  reviewReport,
 };
