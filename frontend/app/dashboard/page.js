@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle, ArrowUpRight, HandHeart, Inbox, MessageCircle } from "lucide-react";
 import { getMaintainerActivity } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
+import ClaimReviewActions from "../components/ClaimReviewActions";
 
 function formatDate(isoString) {
   if (!isoString) return "";
@@ -17,6 +18,15 @@ export default function MaintainerDashboardPage() {
   const { user, loading: authLoading } = useAuth();
   const [projects, setProjects] = useState(null);
   const [error, setError] = useState("");
+
+  async function loadActivity() {
+    try {
+      const activity = await getMaintainerActivity();
+      setProjects(activity.projects || []);
+    } catch (err) {
+      setError(err.message || "Failed to load your maintainer activity.");
+    }
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -110,7 +120,7 @@ export default function MaintainerDashboardPage() {
           </h2>
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {needsReview.map(({ claim, project }, index) => (
-              <ClaimRow key={claim.id ?? index} claim={claim} project={project} highlight />
+              <ClaimRow key={claim.id ?? index} claim={claim} project={project} highlight onReviewed={loadActivity} />
             ))}
           </div>
         </section>
@@ -201,7 +211,7 @@ function ActivitySubsection({ icon: Icon, title, items, emptyText, renderItem, l
   );
 }
 
-function ClaimRow({ claim, project, highlight }) {
+function ClaimRow({ claim, project, highlight, onReviewed }) {
   return (
     <div
       style={{
@@ -243,6 +253,9 @@ function ClaimRow({ claim, project, highlight }) {
           View pull request
           <ArrowUpRight size={12} strokeWidth={2} aria-hidden="true" />
         </a>
+      )}
+      {highlight && (
+        <ClaimReviewActions issueId={claim.issueId} claimId={claim.id} onReviewed={onReviewed} />
       )}
     </div>
   );

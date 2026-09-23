@@ -2,23 +2,37 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { HandHeart } from "lucide-react";
-import { getIssueClaims, postClaim, deleteClaim } from "../../lib/api";
+import { HandHeart, GitPullRequest, CheckCircle2, MessageSquareWarning } from "lucide-react";
+import { getIssueClaims, postClaim, deleteClaim, attachPullRequest, ApiError } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 
-function isActive(claim) {
-  return !claim.status || String(claim.status).toLowerCase() === "active";
+// "released" is a retracted signal, nothing left to show for it. Every other
+// status (active, changes_requested, completed) stays visible so a claim's
+// resolution is still visible instead of quietly disappearing once it's no
+// longer "active".
+function isVisible(claim) {
+  const status = claim.status ? String(claim.status).toLowerCase() : "active";
+  return status !== "released";
 }
+
+function statusOf(claim) {
+  return claim.status ? String(claim.status).toLowerCase() : "active";
+}
+
+const COMPLETION_LABELS = {
+  github_verified: "Verified by GitHub",
+  maintainer_confirmed: "Confirmed by a maintainer",
+};
 
 export default function ClaimPanel({ issueId, initialClaims = [] }) {
   const { user: me, loading: authLoading } = useAuth();
-  const [claims, setClaims] = useState(initialClaims.filter(isActive));
+  const [claims, setClaims] = useState(initialClaims.filter(isVisible));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   async function refresh() {
     const list = await getIssueClaims(issueId);
-    setClaims((Array.isArray(list) ? list : []).filter(isActive));
+    setClaims((Array.isArray(list) ? list : []).filter(isVisible));
   }
 
   useEffect(() => {
@@ -28,7 +42,8 @@ export default function ClaimPanel({ issueId, initialClaims = [] }) {
   }, [issueId]);
 
   const myClaim = me ? claims.find((c) => c.user?.id === me.id) : null;
-  const count = claims.length;
+  const myClaimStatus = myClaim ? statusOf(myClaim) : null;
+  const activeCount = claims.filter((c) => statusOf(c) === "active").length;
 
   async function handleToggle() {
     setBusy(true);
@@ -54,9 +69,9 @@ export default function ClaimPanel({ issueId, initialClaims = [] }) {
       </h2>
 
       <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: "0 0 4px" }}>
-        {count === 0
+        {activeCount === 0
           ? "No one has said they're working on this yet."
-          : `${count} contributor${count === 1 ? " has" : "s have"} said they're working on this.`}
+          : `${activeCount} contributor${activeCount === 1 ? " has" : "s have"} said they're working on this.`}
       </p>
       <p style={{ fontSize: "12px", color: "var(--cm-text-muted)", margin: "0 0 16px" }}>
         Claims are a signal of intent. Several people can claim the same issue.
@@ -65,28 +80,31 @@ export default function ClaimPanel({ issueId, initialClaims = [] }) {
       {authLoading ? (
         <p style={{ fontSize: "12.5px", color: "var(--cm-text-muted)" }}>Checking session…</p>
       ) : me ? (
-        <button
-          type="button"
-          onClick={handleToggle}
-          disabled={busy}
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: "8px",
-            borderRadius: "999px",
-            padding: "10px 20px",
-            fontSize: "13px",
-            fontWeight: 700,
-            border: "none",
-            cursor: busy ? "not-allowed" : "pointer",
-            opacity: busy ? 0.6 : 1,
-            background: myClaim ? "var(--cm-surface-alt)" : "var(--cm-lime)",
-            color: myClaim ? "var(--cm-text-primary)" : "#0A0A0A",
-          }}
-        >
-          <HandHeart size={15} strokeWidth={2} aria-hidden="true" />
-          {busy ? "Working…" : myClaim ? "Release my claim" : "Claim this issue"}
-        </button>
+        myClaimStatus !== "completed" && (
+          <button
+            type="button"
+            onClick={handleToggle}
+            disabled={busy || myClaimStatus === "changes_requested"}
+            title={myClaimStatus === "changes_requested" ? "Attach an updated pull request instead of releasing" : undefined}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "8px",
+              borderRadius: "999px",
+              padding: "10px 20px",
+              fontSize: "13px",
+              fontWeight: 700,
+              border: "none",
+              cursor: busy || myClaimStatus === "changes_requested" ? "not-allowed" : "pointer",
+              opacity: busy || myClaimStatus === "changes_requested" ? 0.6 : 1,
+              background: myClaim ? "var(--cm-surface-alt)" : "var(--cm-lime)",
+              color: myClaim ? "var(--cm-text-primary)" : "#0A0A0A",
+            }}
+          >
+            <HandHeart size={15} strokeWidth={2} aria-hidden="true" />
+            {busy ? "Working…" : myClaim ? "Release my claim" : "Claim this issue"}
+          </button>
+        )
       ) : (
         <a href="/auth/github" style={{ fontSize: "13px", fontWeight: 600, color: "var(--cm-lime-text)" }}>
           Log in with GitHub to claim this issue
@@ -99,35 +117,182 @@ export default function ClaimPanel({ issueId, initialClaims = [] }) {
         </p>
       )}
 
-      {count > 0 && (
+      {myClaim && (myClaimStatus === "active" || myClaimStatus === "changes_requested") && (
+        <PullRequestForm
+          issueId={issueId}
+          claim={myClaim}
+          onAttached={() => refresh().catch(() => {})}
+        />
+      )}
+
+      {claims.length > 0 && (
         <ul style={{ listStyle: "none", margin: "16px 0 0", padding: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
           {claims.map((claim) => (
-            <li
-              key={claim.id}
-              style={{
-                fontSize: "12.5px",
-                color: "var(--cm-text-secondary)",
-                background: "var(--cm-surface-alt)",
-                borderRadius: "12px",
-                padding: "10px 14px",
-              }}
-            >
-              <strong style={{ color: "var(--cm-text-primary)" }}>
-                {claim.user?.username ? (
-                  <Link href={`/users/${claim.user.username}`}>
-                    {claim.user?.displayName || claim.user.username}
-                  </Link>
-                ) : (
-                  claim.user?.displayName || "User"
-                )}
-              </strong>
-              {me && claim.user?.id === me.id ? " (you)" : ""}
-              {claim.createdAt ? ` · ${new Date(claim.createdAt).toLocaleDateString()}` : ""}
-              {claim.note ? <div style={{ marginTop: "4px" }}>{claim.note}</div> : null}
-            </li>
+            <ClaimRow key={claim.id} claim={claim} isMe={Boolean(me && claim.user?.id === me.id)} />
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+function ClaimRow({ claim, isMe }) {
+  const status = statusOf(claim);
+
+  return (
+    <li
+      style={{
+        fontSize: "12.5px",
+        color: "var(--cm-text-secondary)",
+        background: "var(--cm-surface-alt)",
+        borderRadius: "12px",
+        padding: "10px 14px",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+        <strong style={{ color: "var(--cm-text-primary)" }}>
+          {claim.user?.username ? (
+            <Link href={`/users/${claim.user.username}`}>
+              {claim.user?.displayName || claim.user.username}
+            </Link>
+          ) : (
+            claim.user?.displayName || "User"
+          )}
+        </strong>
+        {isMe ? " (you)" : ""}
+        {claim.createdAt ? ` · ${new Date(claim.createdAt).toLocaleDateString()}` : ""}
+
+        {status === "completed" && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "10.5px",
+              fontWeight: 700,
+              color: "var(--cm-lime-text)",
+              background: "var(--cm-lime-soft)",
+              padding: "2px 8px",
+              borderRadius: "999px",
+            }}
+          >
+            <CheckCircle2 size={11} strokeWidth={2} aria-hidden="true" />
+            Completed{claim.completionSource ? ` · ${COMPLETION_LABELS[claim.completionSource] || claim.completionSource}` : ""}
+          </span>
+        )}
+
+        {status === "changes_requested" && (
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: "4px",
+              fontSize: "10.5px",
+              fontWeight: 700,
+              color: "var(--cm-orange-text)",
+              background: "var(--cm-orange-soft)",
+              padding: "2px 8px",
+              borderRadius: "999px",
+            }}
+          >
+            <MessageSquareWarning size={11} strokeWidth={2} aria-hidden="true" />
+            Changes requested
+          </span>
+        )}
+      </div>
+
+      {claim.note ? <div style={{ marginTop: "4px" }}>{claim.note}</div> : null}
+
+      {claim.maintainerFeedback && (
+        <p style={{ margin: "6px 0 0", padding: "8px 10px", borderRadius: "8px", background: "var(--cm-orange-soft)", color: "var(--cm-orange-text)" }}>
+          {claim.maintainerFeedback}
+        </p>
+      )}
+
+      {claim.pullRequestUrl && (
+        <a
+          href={claim.pullRequestUrl}
+          target="_blank"
+          rel="noreferrer"
+          style={{ display: "inline-flex", alignItems: "center", gap: "4px", marginTop: "6px", color: "var(--cm-text-primary)", fontWeight: 600 }}
+        >
+          <GitPullRequest size={12} strokeWidth={2} aria-hidden="true" />
+          View pull request
+        </a>
+      )}
+    </li>
+  );
+}
+
+function PullRequestForm({ issueId, claim, onAttached }) {
+  const [url, setUrl] = useState(claim.pullRequestUrl || "");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    const trimmedUrl = url.trim();
+    if (!trimmedUrl) return;
+
+    setSubmitting(true);
+    setError("");
+    try {
+      await attachPullRequest(issueId, claim.id, trimmedUrl);
+      onAttached();
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        setError("Only the claim's owner can attach a pull request.");
+      } else {
+        setError(err.message || "Failed to attach pull request. Please try again.");
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} style={{ marginTop: "14px", display: "flex", gap: "8px", flexWrap: "wrap" }}>
+      <input
+        type="url"
+        value={url}
+        onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://github.com/owner/repo/pull/123"
+        disabled={submitting}
+        required
+        style={{
+          flex: "1 1 260px",
+          borderRadius: "10px",
+          border: "0.5px solid var(--cm-border)",
+          background: "var(--cm-surface)",
+          color: "var(--cm-text-primary)",
+          fontSize: "12.5px",
+          padding: "9px 12px",
+          outline: "none",
+        }}
+      />
+      <button
+        type="submit"
+        disabled={submitting}
+        style={{
+          borderRadius: "999px",
+          padding: "9px 16px",
+          fontSize: "12.5px",
+          fontWeight: 700,
+          border: "none",
+          cursor: submitting ? "not-allowed" : "pointer",
+          opacity: submitting ? 0.6 : 1,
+          background: "var(--cm-orange)",
+          color: "#2B1108",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {submitting ? "Saving…" : claim.pullRequestUrl ? "Update pull request" : "Attach pull request"}
+      </button>
+      {error && (
+        <p role="alert" style={{ flexBasis: "100%", fontSize: "12px", color: "var(--cm-orange-text)", margin: 0 }}>
+          {error}
+        </p>
+      )}
+    </form>
   );
 }

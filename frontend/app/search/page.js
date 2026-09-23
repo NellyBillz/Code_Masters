@@ -20,6 +20,16 @@ const STATUS_STYLES = {
   closed: { bg: "var(--cm-surface-alt)", text: "var(--cm-text-secondary)" },
 };
 
+const SEARCH_FILTER_SELECT_STYLE = {
+  borderRadius: "10px",
+  border: "0.5px solid var(--cm-border)",
+  background: "var(--cm-surface)",
+  color: "var(--cm-text-primary)",
+  fontSize: "12.5px",
+  padding: "8px 12px",
+  outline: "none",
+};
+
 export default function SearchPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -27,6 +37,8 @@ export default function SearchPage() {
   const type = searchParams.get("type") || "all";
 
   const [queryInput, setQueryInput] = useState(q);
+  const [language, setLanguage] = useState("");
+  const [difficulty, setDifficulty] = useState("");
   const [page, setPage] = useState(0);
   const [results, setResults] = useState([]);
   const [meta, setMeta] = useState({ page: 0, size: PAGE_SIZE, total: 0 });
@@ -40,11 +52,11 @@ export default function SearchPage() {
     setQueryInput(q);
   }, [q]);
 
-  // A new search term or type always starts back at page 0.
+  // A new search term, type, or filter always starts back at page 0.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting pagination in response to a q/type change, not derivable inline
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting pagination in response to a q/type/filter change, not derivable inline
     setPage(0);
-  }, [q, type]);
+  }, [q, type, language, difficulty]);
 
   useEffect(() => {
     if (q.trim().length < 2) {
@@ -62,7 +74,14 @@ export default function SearchPage() {
       setLoading(true);
       setError("");
       try {
-        const result = await search({ q, type, size: PAGE_SIZE, page });
+        const result = await search({
+          q,
+          type,
+          language: language || undefined,
+          difficulty: difficulty || undefined,
+          size: PAGE_SIZE,
+          page,
+        });
         if (cancelled) return;
         setResults(result.items || []);
         setMeta(result.meta || { page: 0, size: PAGE_SIZE, total: 0 });
@@ -79,7 +98,7 @@ export default function SearchPage() {
     return () => {
       cancelled = true;
     };
-  }, [q, type, page]);
+  }, [q, type, language, difficulty, page]);
 
   function goTo(nextQ, nextType) {
     const params = new URLSearchParams();
@@ -139,7 +158,7 @@ export default function SearchPage() {
         </button>
       </form>
 
-      <div style={{ display: "flex", gap: "8px", marginBottom: "24px" }}>
+      <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
         {TYPES.map((t) => {
           const active = type === t.value;
           return (
@@ -165,6 +184,39 @@ export default function SearchPage() {
             </button>
           );
         })}
+      </div>
+
+      <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "24px" }}>
+        {(type === "all" || type === "projects") && (
+          <select
+            aria-label="Filter by language"
+            value={language}
+            onChange={(e) => setLanguage(e.target.value)}
+            style={SEARCH_FILTER_SELECT_STYLE}
+          >
+            <option value="">All languages</option>
+            <option value="Java">Java</option>
+            <option value="Python">Python</option>
+            <option value="JavaScript">JavaScript</option>
+            <option value="TypeScript">TypeScript</option>
+            <option value="C++">C++</option>
+          </select>
+        )}
+
+        {(type === "all" || type === "issues") && (
+          <select
+            aria-label="Filter by difficulty"
+            value={difficulty}
+            onChange={(e) => setDifficulty(e.target.value)}
+            style={SEARCH_FILTER_SELECT_STYLE}
+          >
+            <option value="">All difficulties</option>
+            <option value="beginner">Beginner</option>
+            <option value="intermediate">Intermediate</option>
+            <option value="advanced">Advanced</option>
+            <option value="unknown">Unknown</option>
+          </select>
+        )}
       </div>
 
       {q.trim().length > 0 && q.trim().length < 2 && (

@@ -433,6 +433,20 @@ function getIssueComments(issueId, params) {
 }
 
 /**
+ * Get paginated comments for a project (project-level discussion, distinct
+ * from an issue's comments).
+ *
+ * @param {number|string} projectId
+ * @param {Object} [params]
+ * @param {number} [params.page]
+ * @param {number} [params.size]
+ * @returns {Promise<Object>}
+ */
+function getProjectComments(projectId, params) {
+  return apiFetch(`/projects/${projectId}/comments${buildQuery(params)}`);
+}
+
+/**
  * Create a comment on an issue.
  *
  * @param {number|string} issueId
@@ -526,6 +540,27 @@ function postComment(issueId, body) {
   const csrfToken = getCsrfToken();
 
   return apiFetch(`/issues/${issueId}/comments`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ body }),
+  });
+}
+
+/**
+ * Create a comment on a project (project-level discussion). Requires
+ * authentication (401 if not signed in).
+ *
+ * @param {number|string} projectId
+ * @param {string} body Required, 1-5000 characters (server-validated).
+ * @returns {Promise<Object>} The created CommentDto.
+ */
+function postProjectComment(projectId, body) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/projects/${projectId}/comments`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -667,6 +702,61 @@ function postComment(issueId, body) {
     });
   }
 
+  /**
+   * Attach or update the pull request link on the caller's own claim
+   * (API-03.3). Sets pullRequestState to 'open' server-side; GitHub sync is
+   * what later corrects it to 'merged'/'closed_unmerged'.
+   *
+   * @param {number|string} issueId
+   * @param {number|string} claimId
+   * @param {string} pullRequestUrl
+   * @returns {Promise<Object>} The updated ClaimDto.
+   * @throws {ApiError} status 403 if the caller doesn't own the claim, 404
+   *   if the issue or claim doesn't exist.
+   */
+  function attachPullRequest(issueId, claimId, pullRequestUrl) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/issues/${issueId}/claims/${claimId}`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      },
+      body: JSON.stringify({ pullRequestUrl }),
+    });
+  }
+
+  /**
+   * A maintainer's review decision on a claim's pull request (API-03.4):
+   * either request changes with feedback, or manually confirm completion
+   * (the fallback for cases GitHub sync can't verify itself). Maintainer of
+   * the claim's project only.
+   *
+   * @param {number|string} issueId
+   * @param {number|string} claimId
+   * @param {'request_changes'|'confirm_completed'} decision
+   * @param {string} [feedback] Required (non-blank) when decision is
+   *   'request_changes', up to 2000 characters.
+   * @returns {Promise<Object>} The updated ClaimDto.
+   * @throws {ApiError} status 400 (missing feedback), 403 (caller isn't a
+   *   maintainer of this project), 404, or 409 (CLAIM_NOT_REVIEWABLE — the
+   *   claim is released, or already completed and decision is
+   *   request_changes).
+   */
+  function reviewClaim(issueId, claimId, decision, feedback) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/issues/${issueId}/claims/${claimId}/review`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      },
+      body: JSON.stringify(feedback ? { decision, feedback } : { decision }),
+    });
+  }
+
 /**
  * Update an issue's difficulty and/or beginner-friendly status.
  * Maintainer-only. Only provided fields are changed.
@@ -792,6 +882,8 @@ module.exports = {
   getIssue,
   getIssueComments,
   postComment,
+  getProjectComments,
+  postProjectComment,
   updateComment,
   deleteComment,
   reportComment,
@@ -805,6 +897,8 @@ module.exports = {
   getMaintainerActivity,
   postClaim,
   deleteClaim,
+  attachPullRequest,
+  reviewClaim,
   logout,
   inviteMaintainer,
   removeMaintainer,

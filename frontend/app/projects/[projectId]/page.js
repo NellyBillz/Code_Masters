@@ -25,6 +25,7 @@ import MaintainersPanel from "../../components/MaintainersPanel";
 import SyncStatusBanner from "../../components/SyncStatusBanner";
 import EditProjectPanel from "../../components/EditProjectPanel";
 import ReportProjectPanel from "../../components/ReportProjectPanel";
+import ProjectComments from "../../components/ProjectComments";
 
 const TABS = ["Overview", "Issues", "Pull requests", "Contributors", "Discussions"];
 
@@ -513,9 +514,24 @@ function ContributorAvatars({ maintainers = [], count = 0 }) {
   );
 }
 
+const ISSUE_FILTER_SELECT_STYLE = {
+  borderRadius: "10px",
+  border: "0.5px solid var(--cm-border)",
+  background: "var(--cm-surface)",
+  color: "var(--cm-text-primary)",
+  fontSize: "12.5px",
+  padding: "8px 12px",
+  outline: "none",
+};
+
 function IssuesTab({ project }) {
+  const [filters, setFilters] = useState({ difficulty: "", status: "", label: "" });
   const [issues, setIssues] = useState(null);
   const [error, setError] = useState("");
+
+  function updateFilter(key, value) {
+    setFilters((current) => ({ ...current, [key]: value }));
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -524,7 +540,12 @@ function IssuesTab({ project }) {
     setIssues(null);
     setError("");
 
-    getProjectIssues(project.id, { size: 50 })
+    getProjectIssues(project.id, {
+      size: 50,
+      difficulty: filters.difficulty || undefined,
+      status: filters.status || undefined,
+      label: filters.label || undefined,
+    })
       .then((result) => {
         if (!cancelled) setIssues(result.items || []);
       })
@@ -535,14 +556,81 @@ function IssuesTab({ project }) {
     return () => {
       cancelled = true;
     };
-  }, [project.id]);
+  }, [project.id, filters.difficulty, filters.status, filters.label]);
 
-  if (error) return <StatusPanel title="Something went wrong" text={error} />;
-  if (issues === null) return <StatusPanel text="Loading issues…" />;
-  if (issues.length === 0) return <StatusPanel text="No issues found for this project yet." />;
+  const hasActiveFilters = Boolean(filters.difficulty || filters.status || filters.label);
+
+  const filterBar = (
+    <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "14px" }}>
+      <select
+        aria-label="Filter by difficulty"
+        value={filters.difficulty}
+        onChange={(e) => updateFilter("difficulty", e.target.value)}
+        style={ISSUE_FILTER_SELECT_STYLE}
+      >
+        <option value="">All difficulties</option>
+        <option value="beginner">Beginner</option>
+        <option value="intermediate">Intermediate</option>
+        <option value="advanced">Advanced</option>
+        <option value="unknown">Unknown</option>
+      </select>
+
+      <select
+        aria-label="Filter by status"
+        value={filters.status}
+        onChange={(e) => updateFilter("status", e.target.value)}
+        style={ISSUE_FILTER_SELECT_STYLE}
+      >
+        <option value="">All statuses</option>
+        <option value="open">Open</option>
+        <option value="closed">Closed</option>
+        <option value="claimed">Claimed</option>
+      </select>
+
+      <input
+        type="text"
+        aria-label="Filter by label"
+        placeholder="Filter by label…"
+        value={filters.label}
+        onChange={(e) => updateFilter("label", e.target.value)}
+        style={{ ...ISSUE_FILTER_SELECT_STYLE, flex: "1 1 160px" }}
+      />
+    </div>
+  );
+
+  if (error) {
+    return (
+      <div>
+        {filterBar}
+        <StatusPanel title="Something went wrong" text={error} />
+      </div>
+    );
+  }
+
+  if (issues === null) {
+    return (
+      <div>
+        {filterBar}
+        <StatusPanel text="Loading issues…" />
+      </div>
+    );
+  }
+
+  if (issues.length === 0) {
+    return (
+      <div>
+        {filterBar}
+        <StatusPanel
+          text={hasActiveFilters ? "No issues match these filters." : "No issues found for this project yet."}
+        />
+      </div>
+    );
+  }
 
   return (
-    <div className="cm-glass" style={{ borderRadius: "24px", padding: "8px" }}>
+    <div>
+      {filterBar}
+      <div className="cm-glass" style={{ borderRadius: "24px", padding: "8px" }}>
       {issues.map((issue, index) => (
         <Link
           key={issue.id ?? index}
@@ -578,6 +666,7 @@ function IssuesTab({ project }) {
           <ArrowUpRight size={14} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
         </Link>
       ))}
+      </div>
     </div>
   );
 }
@@ -650,21 +739,7 @@ function ContributorsTab({ project, isMaintainer, onMaintainerAdded, onMaintaine
 }
 
 function DiscussionsTab({ project }) {
-  const comments = project.recentComments || [];
-
-  if (comments.length === 0) {
-    return <StatusPanel text="No discussion yet on this project." />;
-  }
-
-  return (
-    <div className="cm-glass" style={{ borderRadius: "24px", padding: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
-      {comments.map((comment, index) => (
-        <p key={comment.id ?? index} style={{ fontSize: "13px", lineHeight: 1.6, color: "var(--cm-text-secondary)", margin: 0, padding: "10px 14px", borderRadius: "12px", background: "var(--cm-surface-alt)" }}>
-          {comment.body ?? comment.content ?? String(comment)}
-        </p>
-      ))}
-    </div>
-  );
+  return <ProjectComments projectId={project.id} />;
 }
 
 // There's no dedicated pull-request-listing endpoint on this backend — PR

@@ -15,6 +15,7 @@ export default function Projects() {
     q: "",
     language: "",
     category: "",
+    tag: "",
     hasBeginnerIssues: false,
     sort: "relevance",
   });
@@ -43,6 +44,7 @@ export default function Projects() {
           q: filters.q,
           language: filters.language,
           category: filters.category,
+          tag: filters.tag,
           hasBeginnerIssues: filters.hasBeginnerIssues ? true : undefined,
           sort: filters.sort,
         });
@@ -63,7 +65,7 @@ export default function Projects() {
     return () => {
       cancelled = true;
     };
-  }, [filters.q, filters.language, filters.category, filters.hasBeginnerIssues, filters.sort, meta.page]);
+  }, [filters.q, filters.language, filters.category, filters.tag, filters.hasBeginnerIssues, filters.sort, meta.page]);
 
   const totalPages = Math.ceil(meta.total / PAGE_SIZE);
   const canGoPrevious = meta.page > 0;
@@ -184,6 +186,20 @@ export default function Projects() {
               <option value="stars">Stars</option>
               <option value="contributors">Contributors</option>
             </Select>
+          </div>
+
+          <div>
+            <label htmlFor="tag" style={{ display: "block", fontSize: "11px", color: "var(--cm-text-secondary)", marginBottom: "6px" }}>
+              Tag
+            </label>
+            <input
+              id="tag"
+              type="text"
+              placeholder="e.g. react, django"
+              value={filters.tag}
+              onChange={(e) => updateFilter("tag", e.target.value)}
+              style={selectStyle}
+            />
           </div>
 
           <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "var(--cm-text-secondary)", cursor: "pointer" }}>
