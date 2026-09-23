@@ -5,13 +5,13 @@ import { usePathname } from "next/navigation";
 import { Home, Compass, GitPullRequest, BookOpen, Users, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
-// Only Home and Explore (→ /projects) map to real routes today. The rest
-// match the spec's icon set but render disabled until those pages exist,
-// so the sidebar looks complete without shipping dead links.
+// Home, Explore (→ /projects), and Contribute map to real routes today. The
+// rest match the spec's icon set but render disabled until those pages
+// exist, so the sidebar looks complete without shipping dead links.
 const NAV_ITEMS = [
   { href: "/", label: "Home", icon: Home, enabled: true },
   { href: "/projects", label: "Explore", icon: Compass, enabled: true },
-  { href: "/contribute", label: "Contribute", icon: GitPullRequest, enabled: false },
+  { href: "/contribute", label: "Contribute", icon: GitPullRequest, enabled: true },
   { href: "/learn", label: "Learn", icon: BookOpen, enabled: false },
   { href: "/community", label: "Community", icon: Users, enabled: false },
   { href: "/impact", label: "Impact", icon: Sparkles, enabled: false },

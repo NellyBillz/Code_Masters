@@ -1,649 +1,344 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useParams, useSearchParams } from "next/navigation";
-import {
-  ArrowLeft,
-  Star,
-  GitFork,
-  ArrowUpRight,
-  BadgeCheck,
-  Check,
-  Circle,
-  Minus,
-  Pencil,
-  Clock,
-  XCircle,
-} from "lucide-react";
-import { getProject, getProjectIssues } from "../../../lib/api";
-import { useAuth } from "../../context/AuthContext";
-import MaintainersPanel from "../../components/MaintainersPanel";
-import SyncStatusBanner from "../../components/SyncStatusBanner";
-import EditProjectPanel from "../../components/EditProjectPanel";
+import { ChevronDown, Plus } from "lucide-react";
+import { listProjects } from "../../lib/api";
+import ProjectCard from "../components/ProjectCard";
 
-const TABS = ["Overview", "Issues", "Pull requests", "Contributors", "Discussions"];
+const PAGE_SIZE = 20;
 
-export default function ProjectDetail() {
-  const params = useParams();
+const CATEGORIES = ["All", "Web", "Mobile", "AI", "Backend", "Game"];
+
+export default function Projects() {
   const searchParams = useSearchParams();
-  const projectId = params?.projectId;
-  const { user: currentUser } = useAuth();
 
-  const [project, setProject] = useState(null);
-  const [loading, setLoading] = useState(true);
+  // Read the initial filter state from the URL (e.g. a `?hasBeginnerIssues=true`
+  // link from /contribute) so a deep link actually applies the filter here
+  // instead of silently landing on the unfiltered default — this only reads
+  // params on first mount, matching how the rest of this page already treats
+  // `filters` as page-owned state rather than syncing back to the URL.
+  const [filters, setFilters] = useState(() => ({
+    q: searchParams.get("q") || "",
+    language: searchParams.get("language") || "",
+    category: searchParams.get("category") || "",
+    hasBeginnerIssues: searchParams.get("hasBeginnerIssues") === "true",
+    sort: searchParams.get("sort") || "relevance",
+  }));
+
+  const [projects, setProjects] = useState([]);
+  const [meta, setMeta] = useState({ page: 0, size: PAGE_SIZE, total: 0 });
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [activeTab, setActiveTab] = useState("Overview");
-  const [editing, setEditing] = useState(false);
 
-  const isMaintainer = Boolean(
-    currentUser &&
-      project?.maintainers?.some(
-        (maint) => maint.user?.id === currentUser.id || maint.user?.username === currentUser.username
-      )
-  );
+  const updateFilter = (key, value) => {
+    setFilters((current) => ({ ...current, [key]: value }));
+    setMeta((current) => ({ ...current, page: 0 }));
+  };
 
   useEffect(() => {
-    if (!projectId) return;
     let cancelled = false;
 
-    async function loadProject() {
+    async function loadProjects() {
       setLoading(true);
       setError("");
+
       try {
-        const result = await getProject(projectId);
-        if (!cancelled) setProject(result);
+        const result = await listProjects({
+          page: meta.page,
+          size: PAGE_SIZE,
+          q: filters.q,
+          language: filters.language,
+          category: filters.category,
+          hasBeginnerIssues: filters.hasBeginnerIssues ? true : undefined,
+          sort: filters.sort,
+        });
+
+        if (cancelled) return;
+        setProjects(result.items);
+        setMeta(result.meta);
       } catch (err) {
-        if (!cancelled) setError(err.message || "Failed to load project.");
+        if (cancelled) return;
+        setProjects([]);
+        setError(err.message || "Failed to load projects.");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    loadProject();
+    loadProjects();
     return () => {
       cancelled = true;
     };
-  }, [projectId]);
+  }, [filters.q, filters.language, filters.category, filters.hasBeginnerIssues, filters.sort, meta.page]);
 
-  const handleMaintainerAdded = () => {
-    if (projectId) getProject(projectId).then(setProject).catch(console.error);
+  const totalPages = Math.ceil(meta.total / PAGE_SIZE);
+  const canGoPrevious = meta.page > 0;
+  const canGoNext = meta.page + 1 < totalPages;
+
+  const selectStyle = {
+    borderRadius: "10px",
+    border: "0.5px solid var(--cm-border)",
+    background: "var(--cm-surface)",
+    color: "var(--cm-text-primary)",
+    fontSize: "13px",
+    padding: "9px 12px",
+    outline: "none",
   };
-
-  const handleMaintainerRemoved = (userId) => {
-    setProject((prev) => ({
-      ...prev,
-      maintainers: prev.maintainers.filter((m) => m.user?.id !== userId),
-    }));
-  };
-
-  if (loading) return <StatusPanel text="Loading project…" />;
-  if (error) return <StatusPanel title="Something went wrong" text={error} />;
-  if (!project) return <StatusPanel title="Project not found" text="This project may have been removed." />;
 
   return (
     <div style={{ padding: "8px 4px 40px" }}>
-      <Link
-        href="/projects"
-        style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "13px", color: "var(--cm-text-secondary)", marginBottom: "18px" }}
-      >
-        <ArrowLeft size={14} strokeWidth={2} aria-hidden="true" />
-        Back to projects
-      </Link>
+      <header style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "16px", flexWrap: "wrap", marginBottom: "24px" }}>
+        <div>
+          <p style={{ fontSize: "12px", fontWeight: 600, letterSpacing: "0.1em", color: "var(--cm-orange-text)", margin: "0 0 8px" }}>
+            OPEN-SOURCE DISCOVERY
+          </p>
+          <h1 style={{ fontSize: "32px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+            Projects
+          </h1>
+          <p style={{ fontSize: "14px", color: "var(--cm-text-secondary)", margin: "8px 0 0", maxWidth: "560px" }}>
+            Discover South African open-source projects making an impact.
+          </p>
+        </div>
 
-      {project.listingStatus !== "published" && (
-        <div
-          className="cm-glass"
+        <Link
+          href="/projects/new"
           style={{
-            display: "flex",
+            display: "inline-flex",
             alignItems: "center",
-            gap: "10px",
-            borderRadius: "16px",
-            padding: "12px 18px",
-            marginBottom: "20px",
-            background: project.listingStatus === "rejected" ? "var(--cm-orange-soft)" : "var(--cm-surface-alt)",
-            color: project.listingStatus === "rejected" ? "var(--cm-orange-text)" : "var(--cm-text-secondary)",
+            gap: "6px",
+            borderRadius: "999px",
+            padding: "10px 18px",
             fontSize: "13px",
-            fontWeight: 600,
+            fontWeight: 700,
+            background: "var(--cm-lime)",
+            color: "#0A0A0A",
+            flexShrink: 0,
           }}
         >
-          {project.listingStatus === "rejected" ? (
-            <XCircle size={16} strokeWidth={2} aria-hidden="true" />
-          ) : (
-            <Clock size={16} strokeWidth={2} aria-hidden="true" />
-          )}
-          {project.listingStatus === "rejected"
-            ? "This submission was rejected by a site admin and isn't visible to anyone else on Code Masters."
-            : "Pending review, only you and this project's maintainers can see this. It won't appear in search, the projects list, or platform stats until a site admin approves it."}
-        </div>
-      )}
-
-      <SyncStatusBanner
-        projectId={project.id}
-        initialJobId={searchParams.get("syncJobId")}
-        isMaintainer={isMaintainer}
-        onSynced={() => getProject(projectId).then(setProject).catch(() => {})}
-      />
-
-      {/* Header */}
-      <header className="cm-glass" style={{ borderRadius: "28px", padding: "24px 28px", marginBottom: "20px" }}>
-        <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "16px", flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "flex-start", gap: "14px", minWidth: 0 }}>
-            <span
-              aria-hidden="true"
-              style={{
-                width: "44px",
-                height: "44px",
-                borderRadius: "12px",
-                background: "var(--cm-sidebar)",
-                color: "var(--cm-lime)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontWeight: 700,
-                fontSize: "15px",
-                flexShrink: 0,
-              }}
-            >
-              {project.name?.[0]?.toUpperCase() || "?"}
-            </span>
-
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                <h1 style={{ fontSize: "22px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
-                  {project.name}
-                </h1>
-                {project.verified && (
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "4px",
-                      background: "var(--cm-lime-soft)",
-                      color: "var(--cm-lime-text)",
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      padding: "3px 9px",
-                      borderRadius: "999px",
-                    }}
-                  >
-                    <BadgeCheck size={12} strokeWidth={2} aria-hidden="true" />
-                    Verified
-                  </span>
-                )}
-              </div>
-              <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: "6px 0 0", maxWidth: "560px" }}>
-                {project.description}
-              </p>
-            </div>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
-            <span
-              className="cm-glass"
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px", borderRadius: "999px", padding: "8px 14px", fontSize: "13px", fontWeight: 600 }}
-            >
-              <Star size={14} strokeWidth={0} fill="var(--cm-orange)" aria-hidden="true" />
-              {project.stars ?? 0}
-            </span>
-            <span
-              className="cm-glass"
-              style={{ display: "inline-flex", alignItems: "center", gap: "6px", borderRadius: "999px", padding: "8px 14px", fontSize: "13px", fontWeight: 600 }}
-            >
-              <GitFork size={14} strokeWidth={1.8} aria-hidden="true" />
-              {project.forks ?? 0}
-            </span>
-
-            {isMaintainer && !editing && (
-              <button
-                type="button"
-                onClick={() => setEditing(true)}
-                className="cm-glass"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderRadius: "999px",
-                  padding: "8px 16px",
-                  fontSize: "13px",
-                  fontWeight: 600,
-                  color: "var(--cm-text-primary)",
-                  cursor: "pointer",
-                }}
-              >
-                <Pencil size={13} strokeWidth={2} aria-hidden="true" />
-                Edit
-              </button>
-            )}
-
-            {project.githubUrl && (
-              <a
-                href={project.githubUrl}
-                target="_blank"
-                rel="noreferrer"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "6px",
-                  borderRadius: "999px",
-                  padding: "9px 18px",
-                  fontSize: "13px",
-                  fontWeight: 700,
-                  background: "var(--cm-orange)",
-                  color: "#2B1108",
-                }}
-              >
-                Contribute
-                <ArrowUpRight size={14} strokeWidth={2} aria-hidden="true" />
-              </a>
-            )}
-          </div>
-        </div>
+          <Plus size={15} strokeWidth={2.2} aria-hidden="true" />
+          Submit a project
+        </Link>
       </header>
 
-      {editing && (
-        <EditProjectPanel
-          project={project}
-          onCancel={() => setEditing(false)}
-          onSaved={(updated) => {
-            setProject((prev) => ({ ...prev, ...updated }));
-            setEditing(false);
-          }}
+      {/* Filters */}
+      <section
+        aria-label="Project filters"
+        className="cm-glass"
+        style={{ borderRadius: "24px", padding: "20px", marginBottom: "24px" }}
+      >
+        <label htmlFor="search" style={{ display: "block", fontSize: "12px", fontWeight: 600, marginBottom: "8px", color: "var(--cm-text-primary)" }}>
+          Search projects
+        </label>
+        <input
+          id="search"
+          type="text"
+          placeholder="Search by project name or description..."
+          value={filters.q}
+          onChange={(e) => updateFilter("q", e.target.value)}
+          style={{ ...selectStyle, width: "100%", padding: "11px 14px", marginBottom: "16px" }}
         />
-      )}
 
-      {/* Tabs */}
-      <div style={{ display: "flex", gap: "4px", borderBottom: "0.5px solid var(--cm-border)", marginBottom: "24px", overflowX: "auto" }}>
-        {TABS.map((tab) => (
-          <button
-            key={tab}
-            type="button"
-            onClick={() => setActiveTab(tab)}
-            style={{
-              padding: "10px 16px",
-              fontSize: "13px",
-              fontWeight: 600,
-              whiteSpace: "nowrap",
-              background: "none",
-              border: "none",
-              cursor: "pointer",
-              color: activeTab === tab ? "var(--cm-text-primary)" : "var(--cm-text-secondary)",
-              borderBottom: activeTab === tab ? "2px solid var(--cm-lime)" : "2px solid transparent",
-            }}
-          >
-            {tab}
-          </button>
-        ))}
-      </div>
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+          {CATEGORIES.map((cat) => {
+            const value = cat === "All" ? "" : cat;
+            const active = filters.category === value;
 
-      {activeTab === "Overview" && <OverviewTab project={project} />}
-      {activeTab === "Issues" && <IssuesTab project={project} />}
-      {activeTab === "Pull requests" && <ComingSoonTab label="pull requests" />}
-      {activeTab === "Contributors" && (
-        <ContributorsTab
-          project={project}
-          isMaintainer={isMaintainer}
-          onMaintainerAdded={handleMaintainerAdded}
-          onMaintainerRemoved={handleMaintainerRemoved}
-        />
-      )}
-      {activeTab === "Discussions" && <DiscussionsTab project={project} />}
-    </div>
-  );
-}
-
-function OverviewTab({ project }) {
-  // Every check here reflects a real project field except README and
-  // Tests/CI, which have no backing signal anywhere in the API, those are
-  // explicitly "unknown", not silently marked done. hasContributingGuide/
-  // hasCodeOfConduct come from GitHub's community-profile endpoint via sync
-  // (confirmed present on GET /projects/{id}, this file previously ignored
-  // them and hardcoded both to done).
-  const checklist = [
-    { label: "License", status: project.license ? "yes" : "no" },
-    { label: "Contributing guide", status: project.hasContributingGuide ? "yes" : "no" },
-    { label: "Code of Conduct", status: project.hasCodeOfConduct ? "yes" : "no" },
-    { label: "Active maintainers", status: (project.maintainers?.length ?? 0) > 0 ? "yes" : "no" },
-    { label: "Good first issues", status: project.hasBeginnerFriendlyIssues ? "yes" : "no" },
-    { label: "README present", status: "unknown" },
-    { label: "Tests / CI", status: "unknown" },
-  ];
-  // Readiness is a percentage of known facts only, an "unknown" isn't a
-  // failure, and counting it as one would just trade one kind of made-up
-  // number for another.
-  const trackedChecks = checklist.filter((c) => c.status !== "unknown");
-  const readiness = trackedChecks.length > 0
-    ? Math.round((trackedChecks.filter((c) => c.status === "yes").length / trackedChecks.length) * 100)
-    : 0;
-
-  const circumference = 2 * Math.PI * 42;
-  const dash = (readiness / 100) * circumference;
-
-  return (
-    <div style={{ display: "grid", gridTemplateColumns: "1.4fr 1fr", gap: "20px", alignItems: "start" }}>
-      <div className="cm-glass" style={{ borderRadius: "24px", padding: "24px" }}>
-        <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 14px", color: "var(--cm-text-primary)" }}>About</h2>
-        <p style={{ fontSize: "13px", lineHeight: 1.6, color: "var(--cm-text-secondary)", margin: "0 0 18px" }}>
-          {project.description || "No description provided."}
-        </p>
-
-        <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-          <InfoRow label="README" status="unknown" />
-          <InfoRow label="Contributing Guide" status={project.hasContributingGuide ? "yes" : "no"} />
-          <InfoRow label="Code of Conduct" status={project.hasCodeOfConduct ? "yes" : "no"} />
-          <InfoRow label={project.license || "License unspecified"} status={project.license ? "yes" : "no"} />
-        </div>
-
-        <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "0.5px solid var(--cm-border)" }}>
-          <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--cm-text-primary)", margin: "0 0 10px" }}>
-            {project.contributors ?? 0} contributors from across South Africa
-          </p>
-          <ContributorAvatars maintainers={project.maintainers} count={project.contributors} />
-        </div>
-      </div>
-
-      <div className="cm-glass" style={{ borderRadius: "24px", padding: "24px" }}>
-        <h2 style={{ fontSize: "13px", fontWeight: 700, margin: "0 0 18px", color: "var(--cm-text-primary)" }}>
-          Contributor readiness
-        </h2>
-
-        <div style={{ display: "flex", alignItems: "center", gap: "20px", marginBottom: "20px" }}>
-          <div style={{ position: "relative", width: "96px", height: "96px", flexShrink: 0 }}>
-            <svg width="96" height="96" viewBox="0 0 96 96" aria-hidden="true">
-              <circle cx="48" cy="48" r="42" fill="none" stroke="var(--cm-surface-alt)" strokeWidth="8" />
-              <circle
-                cx="48"
-                cy="48"
-                r="42"
-                fill="none"
-                stroke="var(--cm-lime)"
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeDasharray={`${dash} ${circumference}`}
-                transform="rotate(-90 48 48)"
-              />
-            </svg>
-            <p
-              style={{
-                position: "absolute",
-                inset: 0,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: "22px",
-                fontWeight: 700,
-                margin: 0,
-                color: "var(--cm-text-primary)",
-              }}
-            >
-              {readiness}%
-            </p>
-          </div>
-          <p style={{ fontSize: "12.5px", color: "var(--cm-text-secondary)", margin: 0, lineHeight: 1.5 }}>
-            Based on known signals only, license, contributing guide, code of conduct, active maintainers, and open beginner issues. README and test coverage aren&rsquo;t tracked yet, so they&rsquo;re excluded rather than assumed.
-          </p>
-        </div>
-
-        <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "10px" }}>
-          {checklist.map((item) => (
-            <li key={item.label} style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: item.status === "unknown" ? "var(--cm-text-muted)" : "var(--cm-text-secondary)" }}>
-              {item.status === "yes" && <Check size={14} strokeWidth={2.2} color="var(--cm-lime-text)" aria-hidden="true" />}
-              {item.status === "no" && <Circle size={14} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />}
-              {item.status === "unknown" && <Minus size={14} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />}
-              {item.label}
-              {item.status === "unknown" && (
-                <span style={{ fontSize: "10.5px" }}>(not tracked yet)</span>
-              )}
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-function InfoRow({ label, status }) {
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: status === "unknown" ? "var(--cm-text-muted)" : "var(--cm-text-secondary)" }}>
-      {status === "yes" && <Check size={13} strokeWidth={2} color="var(--cm-lime-text)" aria-hidden="true" />}
-      {status === "no" && <Circle size={13} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />}
-      {status === "unknown" && <Minus size={13} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" />}
-      {label}
-      {status === "unknown" && <span style={{ fontSize: "10.5px" }}>(not tracked yet)</span>}
-    </div>
-  );
-}
-
-function ContributorAvatars({ maintainers = [], count = 0 }) {
-  const shown = maintainers.slice(0, 6);
-  const remainder = Math.max(count - shown.length, 0);
-
-  if (shown.length === 0) {
-    return <p style={{ fontSize: "12px", color: "var(--cm-text-muted)", margin: 0 }}>No contributors listed yet.</p>;
-  }
-
-  return (
-    <div style={{ display: "flex", alignItems: "center" }}>
-      {shown.map((m, i) => {
-        const label = m.user?.username ?? m.user?.name ?? "?";
-        const avatarStyle = {
-          width: "30px",
-          height: "30px",
-          borderRadius: "50%",
-          background: "var(--cm-sidebar)",
-          color: "var(--cm-lime)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: "11px",
-          fontWeight: 600,
-          border: "2px solid var(--cm-bg)",
-          marginLeft: i === 0 ? 0 : "-8px",
-        };
-
-        if (m.user?.username) {
-          return (
-            <Link key={m.user.id ?? i} href={`/users/${m.user.username}`} title={label} style={avatarStyle}>
-              {label[0]?.toUpperCase()}
-            </Link>
-          );
-        }
-
-        return (
-          <span key={m.user?.id ?? i} title={label} style={avatarStyle}>
-            {label[0]?.toUpperCase()}
-          </span>
-        );
-      })}
-      {remainder > 0 && (
-        <span
-          style={{
-            width: "30px",
-            height: "30px",
-            borderRadius: "50%",
-            background: "var(--cm-surface-alt)",
-            color: "var(--cm-text-secondary)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: "10px",
-            fontWeight: 600,
-            border: "2px solid var(--cm-bg)",
-            marginLeft: "-8px",
-          }}
-        >
-          +{remainder}
-        </span>
-      )}
-    </div>
-  );
-}
-
-function IssuesTab({ project }) {
-  const [issues, setIssues] = useState(null);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    let cancelled = false;
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount pattern; no derived-state alternative for reading server data
-    setIssues(null);
-    setError("");
-
-    getProjectIssues(project.id, { size: 50 })
-      .then((result) => {
-        if (!cancelled) setIssues(result.items || []);
-      })
-      .catch((err) => {
-        if (!cancelled) setError(err.message || "Failed to load issues.");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [project.id]);
-
-  if (error) return <StatusPanel title="Something went wrong" text={error} />;
-  if (issues === null) return <StatusPanel text="Loading issues…" />;
-  if (issues.length === 0) return <StatusPanel text="No issues found for this project yet." />;
-
-  return (
-    <div className="cm-glass" style={{ borderRadius: "24px", padding: "8px" }}>
-      {issues.map((issue, index) => (
-        <Link
-          key={issue.id ?? index}
-          href={`/issues/${issue.id}`}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: "12px",
-            padding: "14px 16px",
-            borderBottom: index < issues.length - 1 ? "0.5px solid var(--cm-border)" : "none",
-            fontSize: "13px",
-            color: "var(--cm-text-primary)",
-          }}
-        >
-          <span style={{ display: "flex", alignItems: "center", gap: "8px", minWidth: 0 }}>
-            <span
-              style={{
-                fontSize: "10.5px",
-                fontWeight: 600,
-                textTransform: "capitalize",
-                padding: "2px 8px",
-                borderRadius: "999px",
-                background: issue.status === "open" ? "var(--cm-lime-soft)" : "var(--cm-surface-alt)",
-                color: issue.status === "open" ? "var(--cm-lime-text)" : "var(--cm-text-secondary)",
-                flexShrink: 0,
-              }}
-            >
-              {issue.status || "unknown"}
-            </span>
-            {issue.title ?? `Issue #${issue.id}`}
-          </span>
-          <ArrowUpRight size={14} strokeWidth={2} color="var(--cm-text-muted)" aria-hidden="true" style={{ flexShrink: 0 }} />
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-function ContributorsTab({ project, isMaintainer, onMaintainerAdded, onMaintainerRemoved }) {
-  const maintainers = project.maintainers || [];
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-      <div className="cm-glass" style={{ borderRadius: "24px", padding: "20px" }}>
-        <h2 style={{ fontSize: "14px", fontWeight: 700, margin: "0 0 14px", color: "var(--cm-text-primary)" }}>
-          Maintainers
-        </h2>
-
-        {maintainers.length > 0 ? (
-          <ul style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: "8px" }}>
-            {maintainers.map((maintainer, index) => (
-              <li
-                key={maintainer.user?.id ?? index}
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => updateFilter("category", value)}
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "10px 14px",
-                  borderRadius: "12px",
-                  background: "var(--cm-surface-alt)",
-                  fontSize: "13px",
+                  padding: "7px 16px",
+                  borderRadius: "999px",
+                  fontSize: "12.5px",
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  background: active ? "var(--cm-lime)" : "transparent",
+                  color: active ? "#0A0A0A" : "var(--cm-text-secondary)",
+                  border: active ? "none" : "0.5px solid var(--cm-border)",
                 }}
               >
-                {maintainer.user?.username ? (
-                  <Link href={`/users/${maintainer.user.username}`} style={{ color: "var(--cm-text-primary)", fontWeight: 600 }}>
-                    {maintainer.user.username}
-                  </Link>
-                ) : (
-                  <span style={{ color: "var(--cm-text-primary)" }}>
-                    {maintainer.user?.login ?? maintainer.user?.name ?? "Unknown"}
-                  </span>
-                )}
-                {maintainer.role && (
-                  <span
-                    style={{
-                      fontSize: "11px",
-                      fontWeight: 600,
-                      color: "var(--cm-lime-text)",
-                      background: "var(--cm-lime-soft)",
-                      borderRadius: "999px",
-                      padding: "3px 10px",
-                      textTransform: "capitalize",
-                    }}
-                  >
-                    {maintainer.role}
-                  </span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p style={{ fontSize: "13px", color: "var(--cm-text-muted)", margin: 0 }}>No maintainers listed.</p>
+                {cat}
+              </button>
+            );
+          })}
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "12px" }}>
+          <div>
+            <label htmlFor="language" style={{ display: "block", fontSize: "11px", color: "var(--cm-text-secondary)", marginBottom: "6px" }}>
+              Language
+            </label>
+            <Select id="language" value={filters.language} onChange={(e) => updateFilter("language", e.target.value)}>
+              <option value="">All languages</option>
+              <option value="Java">Java</option>
+              <option value="Python">Python</option>
+              <option value="JavaScript">JavaScript</option>
+              <option value="TypeScript">TypeScript</option>
+              <option value="C++">C++</option>
+            </Select>
+          </div>
+
+          <div>
+            <label htmlFor="sort" style={{ display: "block", fontSize: "11px", color: "var(--cm-text-secondary)", marginBottom: "6px" }}>
+              Sort by
+            </label>
+            <Select id="sort" value={filters.sort} onChange={(e) => updateFilter("sort", e.target.value)}>
+              <option value="relevance">Most relevant</option>
+              <option value="recent">Recent</option>
+              <option value="stars">Stars</option>
+              <option value="contributors">Contributors</option>
+            </Select>
+          </div>
+
+          <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "var(--cm-text-secondary)", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={filters.hasBeginnerIssues}
+              onChange={(e) => updateFilter("hasBeginnerIssues", e.target.checked)}
+              style={{ width: "15px", height: "15px", accentColor: "var(--cm-lime)" }}
+            />
+            Beginner-friendly issues
+          </label>
+        </div>
+      </section>
+
+      {/* Results */}
+      <section aria-labelledby="projects-heading">
+        <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "8px" }}>
+          <h2 id="projects-heading" style={{ fontSize: "17px", fontWeight: 700, margin: 0, color: "var(--cm-text-primary)" }}>
+            Explore projects
+          </h2>
+
+          {!loading && !error && (
+            <p style={{ fontSize: "12.5px", color: "var(--cm-text-secondary)", margin: 0 }}>
+              {meta.total} {meta.total === 1 ? "project" : "projects"} found
+            </p>
+          )}
+        </div>
+
+        {loading && <StatusPanel text="Loading projects…" />}
+
+        {!loading && error && <StatusPanel title="Something went wrong" text={error} />}
+
+        {!loading && !error && projects.length === 0 && (
+          <StatusPanel title="No projects found" text="Try changing your search or filters." />
         )}
-      </div>
 
-      <MaintainersPanel
-        project={project}
-        isMaintainer={isMaintainer}
-        onMaintainerAdded={onMaintainerAdded}
-        onMaintainerRemoved={onMaintainerRemoved}
-      />
+        {!loading && !error && projects.length > 0 && (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: "16px" }}>
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Pagination */}
+      <nav aria-label="Project pagination" style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "16px", marginTop: "32px" }}>
+        <button
+          type="button"
+          disabled={!canGoPrevious || loading}
+          onClick={() => setMeta((current) => ({ ...current, page: current.page - 1 }))}
+          style={{
+            ...selectStyle,
+            padding: "9px 18px",
+            fontWeight: 600,
+            cursor: canGoPrevious ? "pointer" : "not-allowed",
+            opacity: canGoPrevious ? 1 : 0.4,
+          }}
+        >
+          Previous
+        </button>
+
+        <span style={{ fontSize: "13px", color: "var(--cm-text-secondary)" }}>
+          Page {meta.page + 1} of {Math.max(totalPages, 1)}
+        </span>
+
+        <button
+          type="button"
+          disabled={!canGoNext || loading}
+          onClick={() => setMeta((current) => ({ ...current, page: current.page + 1 }))}
+          style={{
+            borderRadius: "10px",
+            border: "none",
+            padding: "9px 18px",
+            fontSize: "13px",
+            fontWeight: 600,
+            background: "var(--cm-sidebar)",
+            color: "#FFFFFF",
+            cursor: canGoNext ? "pointer" : "not-allowed",
+            opacity: canGoNext ? 1 : 0.4,
+          }}
+        >
+          Next
+        </button>
+      </nav>
     </div>
   );
-}
-
-function DiscussionsTab({ project }) {
-  const comments = project.recentComments || [];
-
-  if (comments.length === 0) {
-    return <StatusPanel text="No discussion yet on this project." />;
-  }
-
-  return (
-    <div className="cm-glass" style={{ borderRadius: "24px", padding: "20px", display: "flex", flexDirection: "column", gap: "10px" }}>
-      {comments.map((comment, index) => (
-        <p key={comment.id ?? index} style={{ fontSize: "13px", lineHeight: 1.6, color: "var(--cm-text-secondary)", margin: 0, padding: "10px 14px", borderRadius: "12px", background: "var(--cm-surface-alt)" }}>
-          {comment.body ?? comment.content ?? String(comment)}
-        </p>
-      ))}
-    </div>
-  );
-}
-
-function ComingSoonTab({ label }) {
-  return <StatusPanel text={`Pull request tracking isn't wired up yet, this tab is a placeholder for ${label}.`} />;
 }
 
 function StatusPanel({ title, text }) {
   return (
     <div className="cm-glass" style={{ borderRadius: "24px", padding: "48px 24px", textAlign: "center" }}>
       {title && (
-        <p style={{ fontSize: "15px", fontWeight: 600, margin: "0 0 6px", color: "var(--cm-text-primary)" }}>{title}</p>
+        <p style={{ fontSize: "15px", fontWeight: 600, margin: "0 0 6px", color: "var(--cm-text-primary)" }}>
+          {title}
+        </p>
       )}
       <p style={{ fontSize: "13px", color: "var(--cm-text-secondary)", margin: 0 }}>{text}</p>
+    </div>
+  );
+}
+
+// A plain <select> renders each browser/OS's own dropdown chrome on top of
+// whatever styling we give it, on a dark card that shows up as a stray
+// light-grey native arrow/box that doesn't match anything else on the page.
+// `appearance: none` (with the -webkit/-moz prefixes for older engines)
+// strips that native rendering so our own chevron and border are the only
+// thing drawn; the <option> list itself still uses OS chrome (no CSS can
+// change that cross-browser), but that's a floating native menu the person
+// only sees for a moment, not part of the page's persistent look.
+function Select({ id, value, onChange, children }) {
+  return (
+    <div style={{ position: "relative" }}>
+      <select
+        id={id}
+        value={value}
+        onChange={onChange}
+        style={{
+          appearance: "none",
+          WebkitAppearance: "none",
+          MozAppearance: "none",
+          borderRadius: "10px",
+          border: "0.5px solid var(--cm-border)",
+          background: "var(--cm-surface)",
+          color: "var(--cm-text-primary)",
+          fontSize: "13px",
+          padding: "9px 34px 9px 12px",
+          outline: "none",
+          width: "100%",
+          cursor: "pointer",
+        }}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        size={15}
+        strokeWidth={2}
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          right: "10px",
+          top: "50%",
+          transform: "translateY(-50%)",
+          color: "var(--cm-text-secondary)",
+          pointerEvents: "none",
+        }}
+      />
     </div>
   );
 }
