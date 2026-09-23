@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Save, X } from "lucide-react";
+import { ChevronDown, Save, X } from "lucide-react";
 import { updateProject } from "../../lib/api";
+import { CATEGORIES, OTHER_CATEGORY as OTHER } from "../../lib/projectCategories";
 
 const CONNECTIONS = [
   { value: "south_african", label: "South African" },
@@ -25,12 +26,18 @@ const CONNECTIONS = [
  * so it's always sent as `["ZA"]`.
  */
 export default function EditProjectPanel({ project, onCancel, onSaved }) {
-  const [category, setCategory] = useState(project.category || "");
+  const currentCategoryIsListed = CATEGORIES.includes(project.category);
+  const [category, setCategory] = useState(
+    currentCategoryIsListed ? project.category : project.category ? OTHER : CATEGORIES[0]
+  );
+  const [customCategory, setCustomCategory] = useState(currentCategoryIsListed ? "" : project.category || "");
   const [tagsInput, setTagsInput] = useState((project.tags || []).join(", "));
   const [connection, setConnection] = useState(project.connection || "community_verified");
   const [acceptingContributions, setAcceptingContributions] = useState(project.acceptingContributions ?? true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const effectiveCategory = category === OTHER ? customCategory.trim() : category;
 
   function parseList(input) {
     return input
@@ -41,12 +48,18 @@ export default function EditProjectPanel({ project, onCancel, onSaved }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (!effectiveCategory) {
+      setError("category is required");
+      return;
+    }
+
     setSaving(true);
     setError("");
 
     try {
       const updated = await updateProject(project.id, {
-        category: category.trim(),
+        category: effectiveCategory,
         tags: parseList(tagsInput),
         connection,
         countryCodes: ["ZA"],
@@ -109,14 +122,32 @@ export default function EditProjectPanel({ project, onCancel, onSaved }) {
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px", marginBottom: "14px" }}>
           <div>
             <label htmlFor="edit-category" style={labelStyle}>Category</label>
-            <input
-              id="edit-category"
-              type="text"
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              placeholder="e.g. Developer Tools"
-              style={fieldStyle}
-            />
+            <div style={{ position: "relative" }}>
+              <select
+                id="edit-category"
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                style={{
+                  ...fieldStyle,
+                  appearance: "none",
+                  WebkitAppearance: "none",
+                  MozAppearance: "none",
+                  padding: "9px 30px 9px 12px",
+                  cursor: "pointer",
+                }}
+              >
+                {CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+                <option value={OTHER}>Other…</option>
+              </select>
+              <ChevronDown
+                size={14}
+                strokeWidth={2}
+                aria-hidden="true"
+                style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", color: "var(--cm-text-secondary)", pointerEvents: "none" }}
+              />
+            </div>
           </div>
 
           <div>
@@ -133,6 +164,20 @@ export default function EditProjectPanel({ project, onCancel, onSaved }) {
             </select>
           </div>
         </div>
+
+        {category === OTHER && (
+          <div style={{ marginBottom: "14px" }}>
+            <label htmlFor="edit-custom-category" style={labelStyle}>Custom category</label>
+            <input
+              id="edit-custom-category"
+              type="text"
+              value={customCategory}
+              onChange={(e) => setCustomCategory(e.target.value)}
+              placeholder="e.g. Developer Tools"
+              style={fieldStyle}
+            />
+          </div>
+        )}
 
         <div style={{ marginBottom: "14px" }}>
           <label htmlFor="edit-tags" style={labelStyle}>Tags (comma-separated)</label>

@@ -5,34 +5,13 @@ import { useRouter } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import { createProject, syncProject, getSyncJob, ApiError } from "../../../lib/api";
 import { useAuth } from "../../context/AuthContext";
+import { CATEGORIES, OTHER_CATEGORY as OTHER } from "../../../lib/projectCategories";
 
 // Mirrors CreateProjectRequest's own @Pattern regex exactly (backend:
 // dto/project/CreateProjectRequest.java) so an obviously-wrong URL is
 // caught before an API round-trip, not because the frontend re-derives
 // its own idea of what's valid.
 const GITHUB_URL_PATTERN = /^https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/?$/;
-
-// A general taxonomy covering common open-source project domains — not
-// limited to the handful of categories that happen to exist in today's
-// seed data (AgriTech, Civic Tech, FinTech, Machine Learning are kept,
-// since those are real). "Other" is still the escape hatch for anything
-// not covered here.
-const CATEGORIES = [
-  "AgriTech",
-  "AI",
-  "Civic Tech",
-  "Cybersecurity",
-  "Data Engineering",
-  "Data Science",
-  "Developer Tools",
-  "EdTech",
-  "FinTech",
-  "Health Tech",
-  "Machine Learning",
-  "Mobile",
-  "Web",
-];
-const OTHER = "__other__";
 
 // No automatic South-African-connection detection exists anywhere in the
 // platform yet (no algorithm in the sync pipeline, nothing in the product

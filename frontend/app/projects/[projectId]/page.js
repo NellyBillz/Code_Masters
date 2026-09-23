@@ -12,11 +12,13 @@ import {
   Check,
   Circle,
   Minus,
+  Pencil,
 } from "lucide-react";
 import { getProject } from "../../../lib/api";
 import { useAuth } from "../../context/AuthContext";
 import MaintainersPanel from "../../components/MaintainersPanel";
 import SyncStatusBanner from "../../components/SyncStatusBanner";
+import EditProjectPanel from "../../components/EditProjectPanel";
 
 const TABS = ["Overview", "Issues", "Pull requests", "Contributors", "Discussions"];
 
@@ -30,6 +32,7 @@ export default function ProjectDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTab, setActiveTab] = useState("Overview");
+  const [editing, setEditing] = useState(false);
 
   const isMaintainer = Boolean(
     currentUser &&
@@ -162,6 +165,28 @@ export default function ProjectDetail() {
               {project.forks ?? 0}
             </span>
 
+            {isMaintainer && !editing && (
+              <button
+                type="button"
+                onClick={() => setEditing(true)}
+                className="cm-glass"
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: "6px",
+                  borderRadius: "999px",
+                  padding: "8px 16px",
+                  fontSize: "13px",
+                  fontWeight: 600,
+                  color: "var(--cm-text-primary)",
+                  cursor: "pointer",
+                }}
+              >
+                <Pencil size={13} strokeWidth={2} aria-hidden="true" />
+                Edit
+              </button>
+            )}
+
             {project.githubUrl && (
               <a
                 href={project.githubUrl}
@@ -186,6 +211,17 @@ export default function ProjectDetail() {
           </div>
         </div>
       </header>
+
+      {editing && (
+        <EditProjectPanel
+          project={project}
+          onCancel={() => setEditing(false)}
+          onSaved={(updated) => {
+            setProject((prev) => ({ ...prev, ...updated }));
+            setEditing(false);
+          }}
+        />
+      )}
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: "4px", borderBottom: "0.5px solid var(--cm-border)", marginBottom: "24px", overflowX: "auto" }}>
