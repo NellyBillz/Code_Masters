@@ -451,6 +451,31 @@ function getCsrfToken() {
  *   in), 404 (comment doesn't exist), or 409 code REPORT_ALREADY_EXISTS
  *   (caller already reported this comment).
  */
+/**
+ * Edit a comment's body (API-02.4). Author-only; the backend rejects edits
+ * from anyone else with 403.
+ *
+ * @param {number|string} commentId
+ * @param {string} body Required, 1-5000 characters (server-validated).
+ * @returns {Promise<Object>} The updated CommentDto (id, author, body,
+ *   edited: true, createdAt, updatedAt).
+ * @throws {ApiError} status 400 (invalid/missing body), 401 (not signed
+ *   in), 403 code FORBIDDEN (caller isn't the comment's author), or 404
+ *   code COMMENT_NOT_FOUND.
+ */
+function updateComment(commentId, body) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/comments/${commentId}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ body }),
+  });
+}
+
 function reportComment(commentId, reason) {
   const csrfToken = getCsrfToken();
 
@@ -704,6 +729,7 @@ module.exports = {
   getIssue,
   getIssueComments,
   postComment,
+  updateComment,
   reportComment,
   ApiError,
   getIssueClaims,
