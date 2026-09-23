@@ -189,6 +189,17 @@ function listProjects(params) {
 }
 
 /**
+ * Public, non-personal, aggregate platform-impact metrics (GET /stats).
+ * `totalContributionsCompleted` is the headline figure per the backend's own
+ * doc comment, it only increments on an actually-verified merge/confirmation.
+ *
+ * @returns {Promise<{publishedProjects: number, activeProjectsAcceptingContributions: number, totalContributorsEngaged: number, totalActiveClaims: number, totalContributionsCompleted: number, generatedAt: string}>}
+ */
+function getStats() {
+  return apiFetch('/stats');
+}
+
+/**
  * Submit a new project. Creates it with listingStatus 'pending' and makes
  * the caller its owner, it won't appear in GET /projects or /search until
  * a site admin approves it. GitHub-derived fields (name, description,
@@ -769,6 +780,7 @@ function reviewReport(reportId, status, resolution) {
 
 module.exports = {
   listProjects,
+  getStats,
   createProject,
   syncProject,
   getSyncJob,
