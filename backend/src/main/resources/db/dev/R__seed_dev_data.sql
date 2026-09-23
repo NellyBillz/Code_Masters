@@ -10,12 +10,12 @@ DELETE FROM project_maintainers WHERE role IN ('owner', 'maintainer') AND projec
     SELECT id FROM projects WHERE github_owner = 'codemaster'
 );
 DELETE FROM projects WHERE github_owner = 'codemaster';
-DELETE FROM users WHERE username IN ('winter_dev', 'montic_codes');
+DELETE FROM users WHERE username IN ('winter_stone', 'montic_codes');
 
 -- 1. Seed 2 Users
 INSERT INTO users (id, github_id, username, display_name, email, bio, location, skills, reputation)
 VALUES 
-    (1001, 881001, 'winter_dev', 'Winter Dev', 'winter@codemaster.za', 'Full-stack builder', 'Johannesburg, ZA', ARRAY['Java', 'Spring Boot', 'PostgreSQL'], 120),
+    (1001, 881001, 'winter_stone', 'Winter Stone', 'winter@codemaster.za', 'Full-stack builder', 'Johannesburg, ZA', ARRAY['Java', 'Spring Boot', 'PostgreSQL'], 120),
     (1002, 881002, 'montic_codes', 'Montic Codes', 'montic@codemaster.za', 'Python & Data enthusiast', 'Cape Town, ZA', ARRAY['Python', 'FastAPI', 'React'], 85)
 ON CONFLICT (id) DO NOTHING;
 

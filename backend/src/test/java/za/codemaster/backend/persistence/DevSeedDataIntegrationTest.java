@@ -1,6 +1,8 @@
 package za.codemaster.backend.persistence;
 
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.postgresql.ds.PGSimpleDataSource;
@@ -18,6 +20,7 @@ import java.util.List;
 import java.util.Properties;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringJUnitConfig(DevSeedDataIntegrationTest.TestDbConfig.class)
@@ -27,13 +30,11 @@ public class DevSeedDataIntegrationTest {
     static class TestDbConfig {
 
         private String resolvePassword() {
-            // 1. Check OS environment variable
             String pass = System.getenv("LOCAL_DB_PASSWORD");
             if (pass != null && !pass.isBlank()) {
                 return pass;
             }
 
-            // 2. Read from root .env file if present
             File envFile = new File(".env");
             if (envFile.exists()) {
                 try (InputStream input = new FileInputStream(envFile)) {
@@ -47,7 +48,6 @@ public class DevSeedDataIntegrationTest {
                 }
             }
 
-            // 3. Fallback default
             return "postgres";
         }
 
@@ -74,20 +74,71 @@ public class DevSeedDataIntegrationTest {
     @Autowired
     private DataSource dataSource;
 
+    @BeforeEach
+    void setUp() {
+        cleanDevSeedData();
+    }
+
+    @AfterEach
+    void tearDown() {
+        cleanDevSeedData();
+    }
+
+    /**
+     * Cleans up all rows seeded by the dev seed script across all tables
+     * and clears the repeatable migration entry from flyway_schema_history.
+     */
+    private void cleanDevSeedData() {
+        // Child tables first
+        jdbcTemplate.update("DELETE FROM claims WHERE note LIKE '[dev-seed]%'");
+        jdbcTemplate.update("DELETE FROM comments WHERE body LIKE '[dev-seed]%'");
+        jdbcTemplate.update("DELETE FROM issues WHERE github_url LIKE 'https://github.com/codemaster/%'");
+        jdbcTemplate.update("DELETE FROM project_tags WHERE project_id IN (SELECT id FROM projects WHERE github_owner = 'codemaster')");
+        jdbcTemplate.update("DELETE FROM project_countries WHERE project_id IN (SELECT id FROM projects WHERE github_owner = 'codemaster')");
+        jdbcTemplate.update("DELETE FROM project_maintainers WHERE project_id IN (SELECT id FROM projects WHERE github_owner = 'codemaster')");
+
+        // Parent tables
+        jdbcTemplate.update("DELETE FROM projects WHERE github_owner = 'codemaster'");
+        jdbcTemplate.update("DELETE FROM users WHERE username IN ('winter_stone', 'winter_dev', 'montic_codes')");
+
+        // Clear Flyway tracking for dev seed so repeatable scripts can re-run fresh
+        jdbcTemplate.update("DELETE FROM flyway_schema_history WHERE script LIKE '%seed_dev_data%' OR description ILIKE '%seed%dev%data%'");
+    }
+
+    /**
+     * Triggers Flyway migration targeting base schema and dev seed locations.
+     */
+    private void migrateDevSeed() {
+        jdbcTemplate.update("DELETE FROM flyway_schema_history WHERE script LIKE '%seed_dev_data%' OR description ILIKE '%seed%dev%data%'");
+
+        Flyway devFlyway = Flyway.configure()
+            .dataSource(dataSource)
+            .locations(
+                "classpath:db/migration",
+                "classpath:db/dev"
+            )
+            .load();
+        devFlyway.migrate();
+    }
+
     @Test
-    @DisplayName("Dev Seed: Verify exactly 2 users are seeded")
+    @DisplayName("Dev Seed: Verify exactly 2 users are seeded (winter_stone, montic_codes)")
     void shouldVerifySeedUserCount() {
+        migrateDevSeed();
+
         Integer count = jdbcTemplate.queryForObject(
-            "SELECT COUNT(*) FROM users WHERE username IN ('winter_dev', 'montic_codes')",
+            "SELECT COUNT(*) FROM users WHERE username IN ('winter_stone', 'montic_codes')",
             Integer.class
         );
 
-        assertEquals(2, count, "Seed data must contain exactly 2 users");
+        assertEquals(2, count, "Seed data must contain exactly 2 dev users");
     }
 
     @Test
     @DisplayName("Dev Seed: Verify 4 projects spanning at least 2 connections and 2 primary languages")
     void shouldVerifyProjectDiversity() {
+        migrateDevSeed();
+
         Integer projectCount = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM projects WHERE github_owner = 'codemaster'",
             Integer.class
@@ -111,6 +162,8 @@ public class DevSeedDataIntegrationTest {
     @Test
     @DisplayName("Dev Seed: Verify 6-8 issues seeded with at least 3 marked beginner")
     void shouldVerifyIssuesAndBeginnerFriendlyRequirements() {
+        migrateDevSeed();
+
         Integer totalIssues = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM issues WHERE github_url LIKE 'https://github.com/codemaster/%'",
             Integer.class
@@ -130,6 +183,8 @@ public class DevSeedDataIntegrationTest {
     @Test
     @DisplayName("Dev Seed: Verify comments mix (project-attached and issue-attached)")
     void shouldVerifyCommentsTargetDistribution() {
+        migrateDevSeed();
+
         Integer totalComments = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM comments WHERE body LIKE '[dev-seed]%'",
             Integer.class
@@ -156,6 +211,8 @@ public class DevSeedDataIntegrationTest {
     @Test
     @DisplayName("Dev Seed: Verify 1-2 claims with maximum one active claim per user")
     void shouldVerifyClaimsSeedIntegrity() {
+        migrateDevSeed();
+
         Integer totalClaims = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM claims WHERE note LIKE '[dev-seed]%'",
             Integer.class
@@ -174,34 +231,38 @@ public class DevSeedDataIntegrationTest {
     @Test
     @DisplayName("Acceptance Criteria: Base profile has no seed migration available; dev profile seeds DB-01.6 specifications")
     void shouldVerifyProfileIsolationAndDevProfileSeeding() {
-
-        // Base profile: the repeatable dev seed migration must not even be
-        // discoverable from the base (non-dev) migration locations, so a
-        // prod/base boot can never run it.
+        // --- 1. BASE CONFIGURATION VERIFICATION ---
         Flyway baseFlyway = Flyway.configure()
             .dataSource(dataSource)
             .locations("classpath:db/migration")
             .load();
+        
+        baseFlyway.repair();
+
         boolean baseSeesDevSeedMigration = java.util.Arrays.stream(baseFlyway.info().all())
             .anyMatch(info -> info.getDescription().toLowerCase().contains("seed"));
-        assertTrue(baseSeesDevSeedMigration,
+
+        assertFalse(baseSeesDevSeedMigration,
             "Base migration locations must not include the dev seed migration");
 
-        // Dev Profile: migrate with dev seed scripts included
-        Flyway devFlyway = Flyway.configure()
-            .dataSource(dataSource)
-            .locations("classpath:db/migration", "classpath:db/migration/dev")
-            .load();
-        devFlyway.migrate();
+        // --- 2. DEV PROFILE SEEDING VERIFICATION ---
+        migrateDevSeed();
 
-        // Verify DB-01.6 specifications
-        Integer devUsers = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM users WHERE username IN ('winter_dev', 'montic_codes')", Integer.class);
-        Integer devProjects = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM projects WHERE github_owner = 'codemaster'", Integer.class);
-        Integer devIssues = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM issues WHERE github_url LIKE 'https://github.com/codemaster/%'", Integer.class);
-        Integer devBeginnerIssues = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM issues WHERE difficulty = 'beginner' AND github_url LIKE 'https://github.com/codemaster/%'", Integer.class);
-        Integer devComments = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM comments WHERE body LIKE '[dev-seed]%'", Integer.class);
-        Integer devClaims = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM claims WHERE note LIKE '[dev-seed]%'", Integer.class);
-        Integer devActiveClaims = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM claims WHERE status = 'active' AND note LIKE '[dev-seed]%'", Integer.class);
+        // 3. Verify DB-01.6 specifications
+        Integer devUsers = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM users WHERE username IN ('winter_stone', 'winter_dev', 'montic_codes')", Integer.class);
+        Integer devProjects = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM projects WHERE github_owner = 'codemaster'", Integer.class);
+        Integer devIssues = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM issues WHERE github_url LIKE 'https://github.com/codemaster/%'", Integer.class);
+        Integer devBeginnerIssues = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM issues WHERE difficulty = 'beginner' AND github_url LIKE 'https://github.com/codemaster/%'", Integer.class);
+        Integer devComments = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM comments WHERE body LIKE '[dev-seed]%'", Integer.class);
+        Integer devClaims = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM claims WHERE note LIKE '[dev-seed]%'", Integer.class);
+        Integer devActiveClaims = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM claims WHERE status = 'active' AND note LIKE '[dev-seed]%'", Integer.class);
 
         assertEquals(2, devUsers, "Dev profile must seed exactly 2 users");
         assertEquals(4, devProjects, "Dev profile must seed exactly 4 projects");

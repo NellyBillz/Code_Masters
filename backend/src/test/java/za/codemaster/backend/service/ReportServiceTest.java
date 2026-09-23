@@ -12,7 +12,6 @@ import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.domain.model.Comment;
 import za.codemaster.backend.domain.model.Issue;
-import za.codemaster.backend.domain.model.Project;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.report.PagedReports;
 import za.codemaster.backend.dto.report.ReportDto;
