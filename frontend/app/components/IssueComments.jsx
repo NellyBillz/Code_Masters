@@ -5,6 +5,7 @@ import Link from "next/link";
 import { AlertTriangle } from "lucide-react";
 import { getIssueComments, postComment } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
+import ReportCommentButton from "./ReportCommentButton";
 
 export default function IssueComments({ issueId }) {
   const { user, loading: authLoading } = useAuth();
@@ -125,16 +126,19 @@ export default function IssueComments({ issueId }) {
           {comments.map((comment) => (
             <article key={comment.id} style={{ background: "var(--cm-surface-alt)", borderRadius: "14px", padding: "12px 16px" }}>
               <p style={{ fontSize: "13px", color: "var(--cm-text-primary)", margin: "0 0 6px", lineHeight: 1.5 }}>{comment.body}</p>
-              <p style={{ fontSize: "11.5px", color: "var(--cm-text-muted)", margin: 0 }}>
-                {comment.author?.username ? (
-                  <Link href={`/users/${comment.author.username}`} style={{ fontWeight: 600 }}>
-                    {comment.author.username}
-                  </Link>
-                ) : (
-                  "User"
-                )}
-                {comment.createdAt ? ` · ${new Date(comment.createdAt).toLocaleString()}` : ""}
-              </p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", flexWrap: "wrap" }}>
+                <p style={{ fontSize: "11.5px", color: "var(--cm-text-muted)", margin: 0 }}>
+                  {comment.author?.username ? (
+                    <Link href={`/users/${comment.author.username}`} style={{ fontWeight: 600 }}>
+                      {comment.author.username}
+                    </Link>
+                  ) : (
+                    "User"
+                  )}
+                  {comment.createdAt ? ` · ${new Date(comment.createdAt).toLocaleString()}` : ""}
+                </p>
+                {user && <ReportCommentButton commentId={comment.id} />}
+              </div>
             </article>
           ))}
         </div>

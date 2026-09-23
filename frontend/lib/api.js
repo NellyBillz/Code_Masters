@@ -412,6 +412,32 @@ function getCsrfToken() {
   return cookie ? decodeURIComponent(cookie.split('=')[1]) : null;
 }
 
+/**
+ * Report a comment for moderation (API-03.9). Any authenticated user may
+ * flag a given comment once; a second report of the same comment by the
+ * same caller is rejected by the backend.
+ *
+ * @param {number|string} commentId
+ * @param {string} reason Required, 3-500 characters (server-validated).
+ * @returns {Promise<Object>} The created ReportDto (id, targetType: 'comment',
+ *   targetId, reason, status: 'open', createdAt, ...).
+ * @throws {ApiError} status 400 (invalid/missing reason), 401 (not signed
+ *   in), 404 (comment doesn't exist), or 409 code REPORT_ALREADY_EXISTS
+ *   (caller already reported this comment).
+ */
+function reportComment(commentId, reason) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/comments/${commentId}/reports`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+    },
+    body: JSON.stringify({ reason }),
+  });
+}
+
 function postComment(issueId, body) {
   const csrfToken = getCsrfToken();
 
@@ -651,6 +677,7 @@ module.exports = {
   getIssue,
   getIssueComments,
   postComment,
+  reportComment,
   ApiError,
   getIssueClaims,
   getCurrentUser,
