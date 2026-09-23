@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   MapPin,
   ArrowUpRight,
@@ -10,17 +11,31 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { getCurrentUser, getMaintainerActivity, ApiError } from "../../lib/api";
+import { useAuth } from "../context/AuthContext";
 import GitHubStats from "../components/GitHubStats";
 import StatTile from "../components/StatTile";
 import RecentContributions from "../components/RecentContributions";
 import EditProfilePanel from "../components/EditProfilePanel";
+import DeleteAccountPanel from "../components/DeleteAccountPanel";
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const { refresh: refreshAuth } = useAuth();
   const [user, setUser] = useState(null);
   const [maintainedProjects, setMaintainedProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editing, setEditing] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+
+  function handleAccountDeleted() {
+    // The account (and its session cookie) is already gone server-side.
+    // Resync AuthContext so the rest of the app (header, guarded pages)
+    // reflects "signed out" immediately, then leave the now-inaccessible
+    // profile page for the homepage.
+    refreshAuth();
+    router.push("/");
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -102,6 +117,18 @@ export default function ProfilePage() {
             setUser(updated);
             setEditing(false);
           }}
+        />
+      </div>
+    );
+  }
+
+  if (deletingAccount) {
+    return (
+      <div style={{ padding: "8px 4px 40px", maxWidth: "760px", margin: "0 auto" }}>
+        <DeleteAccountPanel
+          user={user}
+          onCancel={() => setDeletingAccount(false)}
+          onDeleted={handleAccountDeleted}
         />
       </div>
     );
@@ -258,6 +285,35 @@ export default function ProfilePage() {
       <div style={{ marginTop: maintainedProjects.length > 0 ? "20px" : 0 }}>
         <RecentContributions username={user.username} ownProfile />
       </div>
+
+      <section className="cm-glass" style={{ borderRadius: "24px", padding: "20px", marginTop: "20px" }}>
+        <h2 style={{ fontSize: "13px", fontWeight: 700, margin: "0 0 4px", color: "var(--cm-text-primary)" }}>
+          Danger zone
+        </h2>
+        <p style={{ fontSize: "12px", color: "var(--cm-text-secondary)", margin: "0 0 14px" }}>
+          Permanently delete your account. This cannot be undone.
+        </p>
+        <button
+          type="button"
+          onClick={() => setDeletingAccount(true)}
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: "6px",
+            borderRadius: "999px",
+            padding: "9px 18px",
+            fontSize: "12.5px",
+            fontWeight: 600,
+            border: "0.5px solid var(--cm-orange)",
+            background: "transparent",
+            color: "var(--cm-orange-text)",
+            cursor: "pointer",
+          }}
+        >
+          <AlertTriangle size={13} strokeWidth={2} aria-hidden="true" />
+          Delete account
+        </button>
+      </section>
     </div>
   );
 }

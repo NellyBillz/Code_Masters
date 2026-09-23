@@ -462,6 +462,25 @@ function postComment(issueId, body) {
   }
 
   /**
+   * Permanently delete (anonymize) the caller's own account (API-03.11).
+   * The backend also clears the session/CSRF cookies server-side as part of
+   * this call, so callers should treat a successful response as an implicit
+   * logout, there's no need to also call logout() afterwards. Irreversible;
+   * callers are responsible for getting explicit confirmation first, this
+   * function itself performs no confirmation.
+   *
+   * @returns {Promise<null>}
+   */
+  function deleteCurrentUser() {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch('/users/me', {
+      method: 'DELETE',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+  }
+
+  /**
    * A developer's public profile, never includes email, githubAccess, or
    * isSiteAdmin (those are only on GET /users/me). Throws ApiError with
    * status 404 (code USER_NOT_FOUND) if the username doesn't exist.
@@ -636,6 +655,7 @@ module.exports = {
   getIssueClaims,
   getCurrentUser,
   updateCurrentUser,
+  deleteCurrentUser,
   getPublicProfile,
   getUserContributions,
   getMaintainerActivity,
