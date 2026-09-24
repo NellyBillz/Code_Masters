@@ -9,7 +9,9 @@ import org.springframework.stereotype.Repository;
 
 import za.codemaster.backend.domain.model.ListingStatus;
 import za.codemaster.backend.domain.model.Project;
+import za.codemaster.backend.dto.stats.LanguageBreakdownEntry;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -45,6 +47,38 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
      * value. Backs {@code PlatformStats.activeProjectsAcceptingContributions} (API-03.12).
      */
     long countByListingStatusAndAcceptingContributions(ListingStatus listingStatus, boolean acceptingContributions);
+
+    /**
+     * Sums {@code stars} across every project in a given listing status. Backs
+     * {@code PlatformStats.totalStars} (Impact Dashboard wow-feature,
+     * 2026-09-24) — a plain {@code SUM()}, same "cheap regardless of table
+     * size" shape as this repository's other stats-backing counts.
+     * {@code COALESCE} avoids a {@code null} when there are zero matching rows.
+     */
+    @Query("SELECT COALESCE(SUM(p.stars), 0) FROM Project p WHERE p.listingStatus = :listingStatus")
+    long sumStarsByListingStatus(@Param("listingStatus") ListingStatus listingStatus);
+
+    /**
+     * Counts published projects grouped by {@code primaryLanguage}, sorted by
+     * count descending. Backs {@code PlatformStats.languageBreakdown} (Impact
+     * Dashboard wow-feature, 2026-09-24). Projects with no primary language
+     * recorded are excluded (see {@link LanguageBreakdownEntry}'s Javadoc).
+     */
+    @Query("""
+        SELECT new za.codemaster.backend.dto.stats.LanguageBreakdownEntry(p.primaryLanguage, COUNT(p))
+        FROM Project p
+        WHERE p.listingStatus = :listingStatus AND p.primaryLanguage IS NOT NULL
+        GROUP BY p.primaryLanguage
+        ORDER BY COUNT(p) DESC
+    """)
+    List<LanguageBreakdownEntry> countGroupedByPrimaryLanguage(@Param("listingStatus") ListingStatus listingStatus);
+
+    /**
+     * The 5 most-starred projects in a given listing status. Backs
+     * {@code PlatformStats.topProjects} (Impact Dashboard wow-feature,
+     * 2026-09-24) — a Spring Data derived query, no custom SQL needed.
+     */
+    List<Project> findTop5ByListingStatusOrderByStarsDesc(ListingStatus listingStatus);
 
     /**
      * Preserved legacy JPQL filter method to maintain backwards compatibility with existing tests.

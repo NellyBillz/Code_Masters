@@ -192,8 +192,10 @@ function listProjects(params) {
  * Public, non-personal, aggregate platform-impact metrics (GET /stats).
  * `totalContributionsCompleted` is the headline figure per the backend's own
  * doc comment, it only increments on an actually-verified merge/confirmation.
+ * `totalStars`/`languageBreakdown`/`topProjects` (Impact Dashboard
+ * wow-feature, 2026-09-24) are all derived from published projects only.
  *
- * @returns {Promise<{publishedProjects: number, activeProjectsAcceptingContributions: number, totalContributorsEngaged: number, totalActiveClaims: number, totalContributionsCompleted: number, generatedAt: string}>}
+ * @returns {Promise<{publishedProjects: number, activeProjectsAcceptingContributions: number, totalContributorsEngaged: number, totalActiveClaims: number, totalContributionsCompleted: number, totalStars: number, languageBreakdown: {language: string, projectCount: number}[], topProjects: {id: number, name: string, slug: string, primaryLanguage: string|null, stars: number}[], generatedAt: string}>}
  */
 function getStats() {
   return apiFetch('/stats');

@@ -35,6 +35,14 @@
 --cm-card-blur: none;
 --cm-card-bg: #FFFFFF;
 --cm-card-border: #E5E3DA;
+
+/* Chart categorical palette (dataviz skill's validated default, slots 1-6, light) */
+--cm-chart-1: #2a78d6;
+--cm-chart-2: #eb6834;
+--cm-chart-3: #1baf7a;
+--cm-chart-4: #eda100;
+--cm-chart-5: #e87ba4;
+--cm-chart-6: #008300;
 }
 
 .dark {
@@ -62,6 +70,14 @@
 --cm-card-blur: blur(20px);
 --cm-card-bg: rgba(255, 255, 255, 0.05);
 --cm-card-border: rgba(255, 255, 255, 0.08);
+
+/* Chart categorical palette (dataviz skill's validated default, slots 1-6, dark) */
+--cm-chart-1: #3987e5;
+--cm-chart-2: #d95926;
+--cm-chart-3: #199e70;
+--cm-chart-4: #c98500;
+--cm-chart-5: #d55181;
+--cm-chart-6: #008300;
 }
 
 html {

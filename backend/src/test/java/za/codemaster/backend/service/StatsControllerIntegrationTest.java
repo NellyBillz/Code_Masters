@@ -122,6 +122,9 @@ class StatsControllerIntegrationTest {
                 .andExpect(jsonPath("$.totalContributorsEngaged").exists())
                 .andExpect(jsonPath("$.totalActiveClaims").exists())
                 .andExpect(jsonPath("$.totalContributionsCompleted").exists())
+                .andExpect(jsonPath("$.totalStars").exists())
+                .andExpect(jsonPath("$.languageBreakdown").isArray())
+                .andExpect(jsonPath("$.topProjects").isArray())
                 .andExpect(jsonPath("$.generatedAt").exists());
     }
 

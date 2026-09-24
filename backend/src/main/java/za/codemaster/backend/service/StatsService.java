@@ -4,11 +4,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.ListingStatus;
+import za.codemaster.backend.domain.model.Project;
+import za.codemaster.backend.dto.stats.LanguageBreakdownEntry;
 import za.codemaster.backend.dto.stats.PlatformStats;
+import za.codemaster.backend.dto.stats.TopProjectSummary;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * {@code GET /stats} (API-03.12, design doc §17): public, non-personal,
@@ -38,6 +42,14 @@ public class StatsService {
         long totalContributorsEngaged = claimRepository.countDistinctUsersIncludingCollaborators();
         long totalActiveClaims = claimRepository.countByStatus(ClaimStatus.ACTIVE);
         long totalContributionsCompleted = claimRepository.countByStatus(ClaimStatus.COMPLETED);
+        long totalStars = projectRepository.sumStarsByListingStatus(ListingStatus.PUBLISHED);
+        List<LanguageBreakdownEntry> languageBreakdown =
+                projectRepository.countGroupedByPrimaryLanguage(ListingStatus.PUBLISHED);
+        List<TopProjectSummary> topProjects = projectRepository
+                .findTop5ByListingStatusOrderByStarsDesc(ListingStatus.PUBLISHED)
+                .stream()
+                .map(StatsService::toTopProjectSummary)
+                .toList();
 
         return new PlatformStats(
                 publishedProjects,
@@ -45,7 +57,16 @@ public class StatsService {
                 totalContributorsEngaged,
                 totalActiveClaims,
                 totalContributionsCompleted,
+                totalStars,
+                languageBreakdown,
+                topProjects,
                 OffsetDateTime.now()
         );
+    }
+
+    private static TopProjectSummary toTopProjectSummary(Project project) {
+        return new TopProjectSummary(
+                project.getId(), project.getName(), project.getSlug(),
+                project.getPrimaryLanguage(), project.getStars());
     }
 }

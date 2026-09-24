@@ -213,6 +213,76 @@ class StatsServiceTest {
     }
 
     @Test
+    void totalStarsSumsAcrossPublishedProjectsOnly() {
+        PlatformStats before = service.getStats();
+
+        Project pending = newProject(ListingStatus.PENDING, true, List.of("ZA"));
+        pending.setStars(500);
+        projectRepository.save(pending);
+        assertEquals(before.totalStars(), service.getStats().totalStars(),
+                "a pending project's stars must not count toward totalStars");
+
+        Project published = newProject(ListingStatus.PUBLISHED, true, List.of("ZA"));
+        published.setStars(42);
+        projectRepository.save(published);
+        assertEquals(before.totalStars() + 42, service.getStats().totalStars());
+    }
+
+    @Test
+    void languageBreakdownCountsPublishedProjectsGroupedByPrimaryLanguageOnly() {
+        PlatformStats before = service.getStats();
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String language = "StatsTestLang-" + suffix;
+
+        Project pending = newProject(ListingStatus.PENDING, true, List.of("ZA"));
+        pending.setPrimaryLanguage(language);
+        projectRepository.save(pending);
+        boolean pendingCounted = service.getStats().languageBreakdown().stream()
+                .anyMatch(entry -> entry.language().equals(language));
+        assertTrue(!pendingCounted, "a pending project must not appear in languageBreakdown");
+
+        Project publishedA = newProject(ListingStatus.PUBLISHED, true, List.of("ZA"));
+        publishedA.setPrimaryLanguage(language);
+        projectRepository.save(publishedA);
+        Project publishedB = newProject(ListingStatus.PUBLISHED, true, List.of("ZA"));
+        publishedB.setPrimaryLanguage(language);
+        projectRepository.save(publishedB);
+
+        long count = service.getStats().languageBreakdown().stream()
+                .filter(entry -> entry.language().equals(language))
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Expected a languageBreakdown entry for " + language))
+                .projectCount();
+        assertEquals(2, count);
+    }
+
+    @Test
+    void topProjectsExcludesPendingProjectsAndStaysSortedByStarsDescending() {
+        // Deliberately doesn't assert this test's own project appears in the top
+        // 5 — the shared dev database already has committed seed/other-test data
+        // (see class Javadoc), so a low-star project here could legitimately be
+        // pushed out of a top-5 window by pre-existing published projects. What's
+        // robust regardless of that: a pending project (however many stars) must
+        // never appear, and the returned list must always be stars-descending.
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+
+        Project pendingHighStars = newProject(ListingStatus.PENDING, true, List.of("ZA"));
+        pendingHighStars.setStars(999999);
+        pendingHighStars.setName("Pending-" + suffix);
+        projectRepository.save(pendingHighStars);
+
+        List<za.codemaster.backend.dto.stats.TopProjectSummary> topProjects = service.getStats().topProjects();
+
+        assertTrue(topProjects.stream().noneMatch(p -> p.name().equals("Pending-" + suffix)),
+                "a pending project must never appear in topProjects, regardless of stars");
+        assertTrue(topProjects.size() <= 5, "topProjects must never return more than 5 entries");
+        for (int i = 1; i < topProjects.size(); i++) {
+            assertTrue(topProjects.get(i - 1).stars() >= topProjects.get(i).stars(),
+                    "topProjects must be sorted by stars descending");
+        }
+    }
+
+    @Test
     void generatedAtIsPresentAndRecent() {
         OffsetDateTime beforeCall = OffsetDateTime.now().minusSeconds(5);
 
