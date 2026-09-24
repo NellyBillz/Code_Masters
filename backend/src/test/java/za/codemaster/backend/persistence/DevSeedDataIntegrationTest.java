@@ -23,6 +23,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Verifies the dev seed script's (db/dev/R__seed_dev_data.sql) actual
+ * content and idempotency.
+ * <p>
+ * Runs against a dedicated {@code codemaster_test_db}, not the shared
+ * {@code codemaster_db} — see the comment on {@link TestDbConfig#dataSource()}.
+ * This class's cleanup does real, non-transactional deletes and rewrites
+ * {@code flyway_schema_history} directly, since it has to exercise real
+ * Flyway migration behavior; none of that can be wrapped in a
+ * Spring-managed rollback the way the rest of this test suite's writes are.
+ */
 @SpringJUnitConfig(DevSeedDataIntegrationTest.TestDbConfig.class)
 public class DevSeedDataIntegrationTest {
 
@@ -78,7 +89,19 @@ public class DevSeedDataIntegrationTest {
             PGSimpleDataSource ds = new PGSimpleDataSource();
             ds.setServerNames(new String[]{"localhost"});
             ds.setPortNumbers(new int[]{5432});
-            ds.setDatabaseName("codemaster_db");
+            // A dedicated database, deliberately NOT codemaster_db (the shared
+            // local dev database): this test's cleanup deletes every
+            // github_owner = 'codemaster' project and manipulates
+            // flyway_schema_history directly, outside of any Spring-managed
+            // transaction (it has to be, to test real Flyway migration
+            // behavior) — running it against the shared dev database
+            // permanently wiped out real demo data once already. Create it
+            // once with `createdb codemaster_test_db` (or
+            // `psql -c "CREATE DATABASE codemaster_test_db;"`) and apply the
+            // base schema with
+            // `./mvnw flyway:migrate -Dflyway.user=<user> -Dflyway.password=<password> -Dflyway.url=jdbc:postgresql://localhost:5432/codemaster_test_db`
+            // — see DATABASE.md.
+            ds.setDatabaseName("codemaster_test_db");
             ds.setUser(resolveUsername());
             ds.setPassword(resolvePassword());
             return ds;

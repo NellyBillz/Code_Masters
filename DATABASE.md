@@ -27,9 +27,9 @@ inside the .env store your local postgre password
 
 ### Running Migrations
 
-# Run via Flyway
+# Run via Flyway (add -Dflyway.user=... too if your local Postgres role isn't "postgres")
 
-./mvnw flyway:migrate -Dflyway.password="your_password_here"
+./mvnw flyway:migrate -Dflyway.user="your_username_here" -Dflyway.password="your_password_here"
 
 # Run via Spring boot
 
@@ -55,3 +55,33 @@ WHERE datname = 'codemaster_db' AND pid <> pg_backend_pid();
 DROP DATABASE IF EXISTS codemaster_db;
 CREATE DATABASE codemaster_db;
 \c codemaster_db
+
+---
+
+## 2. Test database (required for `DevSeedDataIntegrationTest`)
+
+`DevSeedDataIntegrationTest` (`backend/src/test/java/.../persistence/`) verifies the
+dev seed script's actual content by running real, non-transactional deletes and
+rewriting `flyway_schema_history` directly — that can't be wrapped in a rollback
+the way the rest of the test suite's writes are, since it has to exercise real
+Flyway migration behavior. Running it against `codemaster_db` will delete every
+project with `github_owner = 'codemaster'` (the dev-seed projects) as a side
+effect and not restore them — it did exactly that once already.
+
+**It runs against its own dedicated database, `codemaster_test_db`, never
+`codemaster_db`.** One-time setup:
+
+```bash
+psql -U postgres -c "CREATE DATABASE codemaster_test_db;"
+
+./mvnw flyway:migrate \
+  -Dflyway.user="your_username_here" \
+  -Dflyway.password="your_password_here" \
+  -Dflyway.url="jdbc:postgresql://localhost:5432/codemaster_test_db"
+```
+
+This applies the base schema only (not the dev seed data — the test seeds and
+cleans that up itself, per test method). Every other test in the suite already
+runs against `codemaster_db` safely, wrapped in a Spring-managed transaction
+that's rolled back after each test — this is the one exception, because it
+specifically needs to test what happens *outside* a transaction.
