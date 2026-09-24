@@ -118,6 +118,41 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
     long countDistinctUsersIncludingCollaborators();
 
     /**
+     * Every credited contributor, platform-wide, with their contribution
+     * count — the raw material for the Recognition Leaderboard (wow-feature,
+     * 2026-09-24), before {@code LeaderboardService} assigns rank numbers.
+     * Same crediting rule as {@link #countCreditedContributions}, just
+     * computed for every user in one query instead of one at a time: a
+     * completed claim credits its owner, plus any accepted collaborator on
+     * that same completed claim. The two inner {@code SELECT}s are deduped
+     * by {@code UNION} on the {@code (user, claim)} pair, so a claim can
+     * never double-count the same user twice. Deliberately unbounded — this
+     * platform's real user count is small enough that ranking the full list
+     * in memory is simpler and safer to demo than DB-side pagination, same
+     * reasoning as {@code IssueRepository#findOpenIssuesOnPublishedAcceptingProjects}.
+     * Ties (equal counts) break on username alphabetically, so rank order is
+     * always deterministic across requests — not a "fair" tie-breaking rule,
+     * just a stable one.
+     */
+    @Query(value = """
+            SELECT u.id AS user_id, u.username AS username, u.display_name AS display_name,
+                   u.avatar_url AS avatar_url, COUNT(*) AS contribution_count
+            FROM (
+                SELECT c.user_id AS engaged_user_id, c.id AS claim_id
+                FROM claims c WHERE c.status = 'completed'
+                UNION
+                SELECT ccr.requester_user_id AS engaged_user_id, ccr.claim_id AS claim_id
+                FROM claim_collaboration_requests ccr
+                JOIN claims c ON c.id = ccr.claim_id
+                WHERE ccr.status = 'accepted' AND c.status = 'completed'
+            ) AS credited
+            JOIN users u ON u.id = credited.engaged_user_id
+            GROUP BY u.id, u.username, u.display_name, u.avatar_url
+            ORDER BY contribution_count DESC, u.username ASC
+            """, nativeQuery = true)
+    List<LeaderboardRow> findLeaderboardRows();
+
+    /**
      * A user's real, credited contribution count: claims they own with
      * status {@code completed}, plus claims they were an accepted
      * collaborator on with status {@code completed}. Backs

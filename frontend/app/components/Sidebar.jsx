@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, Compass, GitPullRequest, BookOpen, Users, Sparkles, ShieldCheck, ShieldAlert } from "lucide-react";
+import { Home, Compass, GitPullRequest, BookOpen, Users, Sparkles, Trophy, ShieldCheck, ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 // All primary nav items now map to real routes.
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/learn", label: "Learn", icon: BookOpen, enabled: true },
   { href: "/community", label: "Community", icon: Users, enabled: true },
   { href: "/impact", label: "Impact", icon: Sparkles, enabled: true },
+  { href: "/leaderboard", label: "Leaderboard", icon: Trophy, enabled: true },
 ];
 
 export default function Sidebar() {

@@ -721,6 +721,27 @@ function postProjectComment(projectId, body) {
   }
 
   /**
+   * Recognition Leaderboard (wow-feature, 2026-09-24): public, unauthenticated
+   * — the top 20 credited contributors, ranked, most contributions first.
+   *
+   * @returns {Promise<{rank: number, userId: number, username: string, displayName: string|null, avatarUrl: string|null, contributionCount: number}[]>}
+   */
+  function getLeaderboard() {
+    return apiFetch('/leaderboard');
+  }
+
+  /**
+   * The caller's own leaderboard rank, even if outside the public top 20.
+   * `rank` is `null` if the caller has zero credited contributions (not yet
+   * ranked) — never a made-up placement. Session-authenticated.
+   *
+   * @returns {Promise<{rank: number|null, userId: number, username: string, displayName: string|null, avatarUrl: string|null, contributionCount: number}>}
+   */
+  function getMyLeaderboardRank() {
+    return apiFetch('/users/me/leaderboard-rank');
+  }
+
+  /**
    * Log out the current session. Hits /auth/logout directly (not under
    * /api/v1, same as the /auth/github login link, see next.config.js's
    * rewrite for /auth/:path*), clearing the session and CSRF cookies.
@@ -1083,6 +1104,8 @@ module.exports = {
   getUserContributions,
   getMaintainerActivity,
   getRecommendedIssues,
+  getLeaderboard,
+  getMyLeaderboardRank,
   postClaim,
   deleteClaim,
   attachPullRequest,
