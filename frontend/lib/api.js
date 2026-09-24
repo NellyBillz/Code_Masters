@@ -420,6 +420,22 @@ function getIssue(issueId) {
 }
 
 /**
+ * Evidence-based contribution context for an issue (API-04.1) — plain
+ * facts and counts only (has a contributing guide, days since last
+ * activity, completed-contribution count, issue age, label count,
+ * in-flight claim count), deliberately no weighting, score, or AI
+ * judgment. Backs the "Contribution context" panel on the issue detail
+ * page.
+ *
+ * @param {number|string} issueId
+ * @returns {Promise<{project: {hasContributingGuide: boolean, hasCodeOfConduct: boolean, daysSinceLastActivity: number|null, completedContributionsCount: number}, issue: {ageInDays: number, labelCount: number, isBeginnerFriendly: boolean, inFlightClaimCount: number}}>}
+ * @throws {ApiError} status 404 if the issue doesn't exist.
+ */
+function getContributionContext(issueId) {
+  return apiFetch(`/issues/${issueId}/contribution-context`);
+}
+
+/**
  * Get paginated comments for an issue.
  *
  * @param {number|string} issueId
@@ -880,6 +896,7 @@ module.exports = {
   updateProject,
   reportProject,
   getIssue,
+  getContributionContext,
   getIssueComments,
   postComment,
   getProjectComments,

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowUpRight, Tag, Sparkles } from "lucide-react";
-import { getIssue } from "../../../lib/api";
+import { getIssue, getContributionContext } from "../../../lib/api";
 import IssueComments from "../../components/IssueComments";
 import ClaimPanel from "../../components/ClaimPanel";
 import IssueMaintainerOverride from "../../components/IssueMaintainerOverride";
+import ContributionContextPanel from "../../components/ContributionContextPanel";
 
 const STATUS_STYLES = {
   open: { bg: "var(--cm-lime-soft)", text: "var(--cm-lime-text)" },
@@ -36,6 +37,15 @@ export default async function IssueDetailPage({ params }) {
         </div>
       </div>
     );
+  }
+
+  // Bonus section, degrades gracefully: a failure here doesn't fail the
+  // whole page, same approach used for maintainer activity on /profile.
+  let contributionContext = null;
+  try {
+    contributionContext = await getContributionContext(issueId);
+  } catch {
+    contributionContext = null;
   }
 
   const statusStyle = STATUS_STYLES[String(issue.status).toLowerCase()] || STATUS_STYLES.closed;
@@ -155,6 +165,8 @@ export default async function IssueDetailPage({ params }) {
           <p style={{ fontSize: "12.5px", color: "var(--cm-text-secondary)", margin: 0 }}>{issue.project.description}</p>
         </Link>
       )}
+
+      <ContributionContextPanel context={contributionContext} />
 
       <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
         <ClaimPanel issueId={issueId} initialClaims={issue.claims || []} />
