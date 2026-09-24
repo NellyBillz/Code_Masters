@@ -708,6 +708,19 @@ function postProjectComment(projectId, body) {
   }
 
   /**
+   * Skill-Matching Recommendation Engine (wow-feature, 2026-09-24): up to 10
+   * open issues ranked by fit against the caller's own skills, each with the
+   * plain-language reasons it matched. No combined score is ever returned.
+   * Session-authenticated; there's no anonymous/public version since it's
+   * personalized to the caller.
+   *
+   * @returns {Promise<{issue: Object, project: {id: number, name: string, slug: string, primaryLanguage: string|null}, reasons: string[]}[]>}
+   */
+  function getRecommendedIssues() {
+    return apiFetch('/users/me/recommended-issues');
+  }
+
+  /**
    * Log out the current session. Hits /auth/logout directly (not under
    * /api/v1, same as the /auth/github login link, see next.config.js's
    * rewrite for /auth/:path*), clearing the session and CSRF cookies.
@@ -1069,6 +1082,7 @@ module.exports = {
   getPublicProfile,
   getUserContributions,
   getMaintainerActivity,
+  getRecommendedIssues,
   postClaim,
   deleteClaim,
   attachPullRequest,

@@ -5,7 +5,9 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import HeroVisual from "./components/HeroVisual";
 import ProjectCard from "./components/ProjectCard";
+import RecommendedIssues from "./components/RecommendedIssues";
 import { listProjects, getStats } from "../lib/api";
+import { useAuth } from "./context/AuthContext";
 
 // The headline numbers (Projects, Contributors) come from the real
 // platform-wide GET /stats endpoint, not from the featured-projects
@@ -14,6 +16,7 @@ import { listProjects, getStats } from "../lib/api";
 // beginner-issue count in the stats response.
 
 export default function Home() {
+  const { user } = useAuth();
   const [projects, setProjects] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -200,6 +203,10 @@ export default function Home() {
 
         <HeroVisual />
       </section>
+
+      <div style={{ padding: "28px 4px 0" }}>
+        <RecommendedIssues signedIn={Boolean(user)} limit={3} />
+      </div>
 
       {/* Featured projects */}
       <section style={{ padding: "48px 4px 24px" }}>

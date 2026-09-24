@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import za.codemaster.backend.domain.model.Issue;
 
+import java.util.List;
 import java.util.Optional;
 
 /**
@@ -25,6 +26,24 @@ public interface IssueRepository extends JpaRepository<Issue, Long> {
      * @return an Optional containing the issue if it already exists
      */
     Optional<Issue> findByProjectIdAndGithubIssueNumber(Long projectId, Integer githubIssueNumber);
+
+    /**
+     * The candidate pool for the Skill-Matching Recommendation Engine
+     * (wow-feature, 2026-09-24): every open issue on a published project
+     * that's currently accepting contributions. {@code JOIN FETCH} pulls the
+     * parent project in the same query — scoring needs {@code primaryLanguage}/
+     * {@code languages}/{@code tags} for every candidate, so this avoids an
+     * N+1 lazy-load per issue. Deliberately unbounded/unpaginated: this
+     * platform's real issue count is small enough that scoring the full
+     * candidate pool in memory (deterministic, explainable — see
+     * {@code RecommendationService}) is simpler and safer to demo than a
+     * paginated or DB-side ranking would be.
+     */
+    @Query("SELECT i FROM Issue i JOIN FETCH i.project p "
+            + "WHERE i.status = 'open' "
+            + "AND p.listingStatus = za.codemaster.backend.domain.model.ListingStatus.PUBLISHED "
+            + "AND p.acceptingContributions = true")
+    List<Issue> findOpenIssuesOnPublishedAcceptingProjects();
 
     /**
      * Contract method for API-01.5: dynamic filtering of issues scoped to a parent project.
