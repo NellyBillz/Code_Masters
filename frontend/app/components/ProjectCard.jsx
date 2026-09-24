@@ -1,6 +1,17 @@
 import Link from "next/link";
-import { Star, Users, ArrowUpRight, BadgeCheck } from "lucide-react";
+import { Star, Users, ArrowUpRight, BadgeCheck, AlertTriangle } from "lucide-react";
 import styles from "./ProjectCard.module.css";
+
+/**
+ * A project this thin on maintainers relative to its popularity is fragile
+ * infrastructure — one person leaving stalls everything (security-by-design
+ * signal, Project Health wow-feature, 2026-09-24). 20 stars is a deliberately
+ * low bar given this platform's real data currently ranges ~0-150 stars;
+ * documented here so the number is never just eyeballed again.
+ */
+function isThinlyMaintained(maintainerCount, stars) {
+  return maintainerCount <= 1 && stars >= 20;
+}
 
 const LANGUAGE_COLORS = {
   JavaScript: "#F48C3C",
@@ -57,7 +68,7 @@ export default function ProjectCard({ project }) {
     primaryLanguage,
     tags = [],
     stars = 0,
-    contributors = 0,
+    maintainerCount = 0,
     lastActivityAt,
     connection,
     verified = false,
@@ -65,6 +76,7 @@ export default function ProjectCard({ project }) {
 
   const languageColor = LANGUAGE_COLORS[primaryLanguage] || "var(--cm-teal)";
   const connectionLabel = CONNECTION_LABELS[connection];
+  const thinlyMaintained = isThinlyMaintained(maintainerCount, stars);
 
   return (
     <Link href={`/projects/${id}`} className={`${styles.card} cm-glass`}>
@@ -87,6 +99,16 @@ export default function ProjectCard({ project }) {
             <span className={styles.verifiedPill} title="Verified project">
               <BadgeCheck size={12} strokeWidth={2} aria-hidden="true" />
               Verified
+            </span>
+          )}
+
+          {thinlyMaintained && (
+            <span
+              className={styles.thinMaintainerPill}
+              title={`Only ${maintainerCount} maintainer${maintainerCount === 1 ? "" : "s"} for ${stars} stars — consider inviting a co-maintainer`}
+            >
+              <AlertTriangle size={11} strokeWidth={2} aria-hidden="true" />
+              Needs maintainers
             </span>
           )}
         </div>
@@ -113,9 +135,9 @@ export default function ProjectCard({ project }) {
               {primaryLanguage}
             </span>
           )}
-          <span className={styles.stat}>
+          <span className={styles.stat} title={`${maintainerCount} maintainer${maintainerCount === 1 ? "" : "s"}`}>
             <Users size={12} strokeWidth={1.8} aria-hidden="true" />
-            {formatCount(contributors)}
+            {formatCount(maintainerCount)}
           </span>
           <span className={styles.stat}>{formatRelativeTime(lastActivityAt)}</span>
         </div>

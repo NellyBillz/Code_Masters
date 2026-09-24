@@ -14,6 +14,12 @@ import java.util.List;
  * reference to a Code Masters {@link za.codemaster.backend.dto.user.PublicUserProfile}
  * — a project's GitHub owner and its Code Masters maintainers are two
  * different concepts (see {@link ProjectMaintainerDto}).
+ * <p>
+ * {@code contributors} is a dead column — GitHub sync never populates it, so
+ * it's always {@code 0}; kept only because removing it would be an unrelated
+ * breaking API change. {@code maintainerCount} (Project Health wow-feature,
+ * 2026-09-24) is the real, live signal: how many Code Masters maintainers
+ * this project actually has, any role.
  */
 public record ProjectDto(
         Long id,
@@ -33,6 +39,7 @@ public record ProjectDto(
         Integer forks,
         Integer openIssues,
         Integer contributors,
+        long maintainerCount,
         boolean hasBeginnerFriendlyIssues,
         boolean hasContributingGuide,
         boolean hasCodeOfConduct,

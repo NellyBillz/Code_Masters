@@ -308,6 +308,7 @@ public class ProjectQueryService {
                 entity.getForks(),
                 entity.getOpenIssues(),
                 entity.getContributors(),
+                projectMaintainerRepository.countByProjectId(entity.getId()),
                 Boolean.TRUE.equals(entity.getHasBeginnerFriendlyIssues()),
                 entity.isHasContributingGuide(),
                 entity.isHasCodeOfConduct(),

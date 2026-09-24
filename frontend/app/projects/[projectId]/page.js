@@ -18,6 +18,7 @@ import {
   GitPullRequest,
   GitMerge,
   Flag,
+  AlertTriangle,
 } from "lucide-react";
 import { getProject, getProjectIssues, getIssueClaims } from "../../../lib/api";
 import { useAuth } from "../../context/AuthContext";
@@ -327,6 +328,13 @@ export default function ProjectDetail() {
   );
 }
 
+// Kept in sync with the identical check in ProjectCard.jsx — a project
+// shouldn't read as fragile on one surface and fine on the other. See that
+// file for why 20 stars is the chosen bar.
+function isThinlyMaintained(maintainerCount, stars) {
+  return maintainerCount <= 1 && stars >= 20;
+}
+
 function OverviewTab({ project }) {
   // Every check here reflects a real project field except README and
   // Tests/CI, which have no backing signal anywhere in the API, those are
@@ -334,6 +342,8 @@ function OverviewTab({ project }) {
   // hasCodeOfConduct come from GitHub's community-profile endpoint via sync
   // (confirmed present on GET /projects/{id}, this file previously ignored
   // them and hardcoded both to done).
+  const maintainerCount = project.maintainers?.length ?? 0;
+  const thinlyMaintained = isThinlyMaintained(maintainerCount, project.stars ?? 0);
   const checklist = [
     { label: "License", status: project.license ? "yes" : "no" },
     { label: "Contributing guide", status: project.hasContributingGuide ? "yes" : "no" },
@@ -371,9 +381,27 @@ function OverviewTab({ project }) {
 
         <div style={{ marginTop: "22px", paddingTop: "18px", borderTop: "0.5px solid var(--cm-border)" }}>
           <p style={{ fontSize: "12px", fontWeight: 600, color: "var(--cm-text-primary)", margin: "0 0 10px" }}>
-            {project.contributors ?? 0} contributors from across South Africa
+            {maintainerCount} maintainer{maintainerCount === 1 ? "" : "s"}
           </p>
-          <ContributorAvatars maintainers={project.maintainers} count={project.contributors} />
+          <ContributorAvatars maintainers={project.maintainers} count={maintainerCount} />
+          {thinlyMaintained && (
+            <p
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "6px",
+                fontSize: "11.5px",
+                color: "var(--cm-orange-text)",
+                background: "var(--cm-orange-soft)",
+                borderRadius: "10px",
+                padding: "8px 10px",
+                margin: "12px 0 0",
+              }}
+            >
+              <AlertTriangle size={13} strokeWidth={2} aria-hidden="true" />
+              Only {maintainerCount} maintainer{maintainerCount === 1 ? "" : "s"} for {project.stars ?? 0} stars — this project could use a co-maintainer.
+            </p>
+          )}
         </div>
       </div>
 
@@ -454,7 +482,7 @@ function ContributorAvatars({ maintainers = [], count = 0 }) {
   const remainder = Math.max(count - shown.length, 0);
 
   if (shown.length === 0) {
-    return <p style={{ fontSize: "12px", color: "var(--cm-text-muted)", margin: 0 }}>No contributors listed yet.</p>;
+    return <p style={{ fontSize: "12px", color: "var(--cm-text-muted)", margin: 0 }}>No maintainers listed yet.</p>;
   }
 
   return (

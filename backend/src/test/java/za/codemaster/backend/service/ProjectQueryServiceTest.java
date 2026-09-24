@@ -56,6 +56,9 @@ class ProjectQueryServiceTest {
     @Autowired
     private ProjectMaintainerRepository projectMaintainerRepository;
 
+    @Autowired
+    private za.codemaster.backend.repository.UserRepository userRepository;
+
     private ProjectQueryService service;
 
     @BeforeEach
@@ -147,5 +150,30 @@ class ProjectQueryServiceTest {
                 null, 999, null, null, null, null, null, null, null));
 
         assertEquals(50, result.meta().size());
+    }
+
+    @Test
+    void maintainerCountReflectsActualMaintainerRows() {
+        ProjectQueryServiceFixtures fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
+        Long projectId = fixtures.projectId(0);
+
+        ProjectDto beforeAnyMaintainer = service.getProjectDetail(projectId, null).project();
+        assertEquals(0, beforeAnyMaintainer.maintainerCount());
+
+        za.codemaster.backend.domain.model.User newMaintainer = userRepository.save(
+                za.codemaster.backend.domain.model.User.builder()
+                        .githubId(System.nanoTime())
+                        .username("maintainercount_" + System.nanoTime())
+                        .displayName("Maintainer")
+                        .build());
+        za.codemaster.backend.domain.model.ProjectMaintainer maintainer =
+                new za.codemaster.backend.domain.model.ProjectMaintainer();
+        maintainer.setProject(projectRepository.findById(projectId).orElseThrow());
+        maintainer.setUser(newMaintainer);
+        maintainer.setRole("maintainer");
+        projectMaintainerRepository.save(maintainer);
+
+        ProjectDto afterOneMaintainer = service.getProjectDetail(projectId, null).project();
+        assertEquals(1, afterOneMaintainer.maintainerCount());
     }
 }

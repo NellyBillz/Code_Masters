@@ -58,4 +58,16 @@ public interface ProjectMaintainerRepository extends JpaRepository<ProjectMainta
      * @return how many maintainer rows on this project currently hold that role
      */
     long countByProjectIdAndRole(Long projectId, String role);
+
+    /**
+     * Counts every maintainer on a project, any role. Backs
+     * {@code ProjectDto.maintainerCount} (Project Health wow-feature,
+     * 2026-09-24) — the project list/card view only gets the lean
+     * {@code ProjectDto}, not the full maintainer list {@code ProjectDetail}
+     * carries, so this is the cheap signal card rendering actually needs.
+     *
+     * @param projectId the project identifier
+     * @return how many maintainer rows exist for this project, regardless of role
+     */
+    long countByProjectId(Long projectId);
 }
