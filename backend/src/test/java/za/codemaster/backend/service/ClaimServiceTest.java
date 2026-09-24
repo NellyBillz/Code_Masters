@@ -150,6 +150,56 @@ class ClaimServiceTest {
     }
 
     @Test
+    void createClaimOnClosedIssueThrowsIssueNotOpen() {
+        Long closedIssueId = fixtures.issueId(5); // "Investigate flaky ETL pipeline test", status = "closed"
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.createClaim(closedIssueId, null, claimant));
+
+        assertEquals("ISSUE_NOT_OPEN", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+    }
+
+    @Test
+    void createClaimOnNonOpenStatusIssueThrowsIssueNotOpen() {
+        Long claimedStatusIssueId = fixtures.issueId(2); // "Fix flag parsing edge case in CLI", status = "claimed"
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.createClaim(claimedStatusIssueId, null, claimant));
+
+        assertEquals("ISSUE_NOT_OPEN", ex.getCode());
+    }
+
+    @Test
+    void createClaimOnProjectNotAcceptingContributionsThrowsError() {
+        Long issueId = fixtures.issueId(0);
+        za.codemaster.backend.domain.model.Project project =
+                projectRepository.findById(fixtures.projectId(0)).orElseThrow();
+        project.setAcceptingContributions(false);
+        projectRepository.saveAndFlush(project);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.createClaim(issueId, null, claimant));
+
+        assertEquals("PROJECT_NOT_ACCEPTING_CONTRIBUTIONS", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+    }
+
+    @Test
+    void createClaimOnUnpublishedProjectThrowsError() {
+        Long issueId = fixtures.issueId(0);
+        za.codemaster.backend.domain.model.Project project =
+                projectRepository.findById(fixtures.projectId(0)).orElseThrow();
+        project.setListingStatus(za.codemaster.backend.domain.model.ListingStatus.PENDING);
+        projectRepository.saveAndFlush(project);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.createClaim(issueId, null, claimant));
+
+        assertEquals("PROJECT_NOT_ACCEPTING_CONTRIBUTIONS", ex.getCode());
+    }
+
+    @Test
     void twoDifferentUsersCanBothHoldActiveClaimsOnSameIssue() {
         Long issueId = fixtures.issueId(0);
         User userA = claimant;

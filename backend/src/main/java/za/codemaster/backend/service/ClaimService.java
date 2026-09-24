@@ -9,7 +9,9 @@ import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.CollaborationRequestStatus;
 import za.codemaster.backend.domain.model.CompletionSource;
 import za.codemaster.backend.domain.model.Issue;
+import za.codemaster.backend.domain.model.ListingStatus;
 import za.codemaster.backend.domain.model.NotificationType;
+import za.codemaster.backend.domain.model.Project;
 import za.codemaster.backend.domain.model.PullRequestState;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.claim.ClaimCompletionSourceDto;
@@ -71,7 +73,10 @@ public class ClaimService {
      * @return the created claim, in API shape
      * @throws ApiException with code {@code RATE_LIMITED} (429, API-03.10) if the caller has claimed
      *                       too many issues in the last hour,
-     *                       {@code ISSUE_NOT_FOUND} (404) if the issue doesn't exist, or
+     *                       {@code ISSUE_NOT_FOUND} (404) if the issue doesn't exist,
+     *                       {@code ISSUE_NOT_OPEN} (409) if the issue is not open (e.g. already closed),
+     *                       {@code PROJECT_NOT_ACCEPTING_CONTRIBUTIONS} (409) if the parent project isn't
+     *                       published and accepting contributions, or
      *                       {@code CLAIM_ALREADY_ACTIVE} (409) if the caller already holds an active
      *                       claim on this issue
      */
@@ -82,6 +87,21 @@ public class ClaimService {
         Issue issue = issueRepository.findById(issueId)
                 .orElseThrow(() -> new ApiException(
                         "ISSUE_NOT_FOUND", "No issue exists with id " + issueId, HttpStatus.NOT_FOUND));
+
+        if (!"open".equalsIgnoreCase(issue.getStatus())) {
+            throw new ApiException(
+                    "ISSUE_NOT_OPEN",
+                    "This issue is not open and can no longer be claimed.",
+                    HttpStatus.CONFLICT);
+        }
+
+        Project project = issue.getProject();
+        if (!project.isAcceptingContributions() || project.getListingStatus() != ListingStatus.PUBLISHED) {
+            throw new ApiException(
+                    "PROJECT_NOT_ACCEPTING_CONTRIBUTIONS",
+                    "This project is not currently accepting contributions.",
+                    HttpStatus.CONFLICT);
+        }
 
         Claim claim = new Claim();
         claim.setIssue(issue);

@@ -211,6 +211,19 @@ class ClaimControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("POST claim on a closed issue -> 409 ISSUE_NOT_OPEN")
+    void claimOnClosedIssueIsConflict() throws Exception {
+        Session session = createActiveSession();
+        Long closedIssueId = fixtures.issueId(5); // "Investigate flaky ETL pipeline test", status = "closed"
+
+        mockMvc.perform(post("/api/v1/issues/{issueId}/claim", closedIssueId)
+                        .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
+                        .header(CSRF_HEADER, session.getCsrToken()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ISSUE_NOT_OPEN"));
+    }
+
+    @Test
     @DisplayName("A note over 280 chars -> 400 VALIDATION_ERROR")
     void noteOverMaxLengthIsRejectedWith400() throws Exception {
         Session session = createActiveSession();
