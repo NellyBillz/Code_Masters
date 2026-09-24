@@ -9,6 +9,7 @@ import za.codemaster.backend.domain.model.CompletionSource;
 import za.codemaster.backend.domain.model.PullRequestState;
 import za.codemaster.backend.domain.model.SyncJob;
 import za.codemaster.backend.domain.model.User;
+import za.codemaster.backend.repository.ClaimCollaborationRequestRepository;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueSyncRepository;
 import za.codemaster.backend.repository.ProjectSyncRepository;
@@ -38,6 +39,7 @@ class ProjectSyncWorkerGitHubIntegrationTest {
         IssueSyncRepository issues = mock(IssueSyncRepository.class);
         SyncJobRepository jobs = mock(SyncJobRepository.class);
         ClaimRepository claims = mock(ClaimRepository.class);
+        ClaimCollaborationRequestRepository collaborationRequests = mock(ClaimCollaborationRequestRepository.class);
 
         UUID jobId = UUID.randomUUID();
         SyncJob job = new SyncJob(1L);
@@ -60,7 +62,7 @@ class ProjectSyncWorkerGitHubIntegrationTest {
                 42L, List.of(ClaimStatus.ACTIVE, ClaimStatus.CHANGES_REQUESTED)))
                 .thenReturn(List.of(claim));
 
-        new ProjectSyncWorker(github, projects, issues, jobs, claims).run(jobId);
+        new ProjectSyncWorker(github, projects, issues, jobs, claims, collaborationRequests).run(jobId);
 
         assertEquals("completed", job.getStatus());
         assertEquals(1, job.getContributionsVerifiedCount());

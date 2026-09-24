@@ -405,7 +405,7 @@ public class ProjectQueryService {
                 user.getLocation(),
                 user.getSkills() == null ? List.of() : List.of(user.getSkills()),
                 null,
-                (int) claimRepository.countByUserIdAndStatus(user.getId(), ClaimStatus.COMPLETED),
+                (int) claimRepository.countCreditedContributions(user.getId()),
                 user.getReputation()
         );
     }

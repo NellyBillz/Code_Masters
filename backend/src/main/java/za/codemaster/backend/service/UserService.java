@@ -6,7 +6,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.domain.model.Claim;
-import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.claim.ClaimCompletionSourceDto;
 import za.codemaster.backend.dto.claim.ClaimStatusDto;
@@ -169,8 +168,8 @@ public class UserService {
         int resolvedPage = clampPage(page);
         int resolvedSize = clampSize(size);
 
-        Page<Claim> result = claimRepository.findByUserIdAndStatusOrderByCompletedAtDesc(
-                user.getId(), ClaimStatus.COMPLETED, PageRequest.of(resolvedPage, resolvedSize));
+        Page<Claim> result = claimRepository.findCreditedContributions(
+                user.getId(), PageRequest.of(resolvedPage, resolvedSize));
 
         List<Contribution> items = result.getContent().stream().map(this::toContribution).toList();
         return new PagedContributions(items, new PageMeta(resolvedPage, resolvedSize, (int) result.getTotalElements()));
@@ -223,7 +222,7 @@ public class UserService {
                 user.getLocation(),
                 user.getSkills() == null ? List.of() : List.of(user.getSkills()),
                 null,
-                (int) claimRepository.countByUserIdAndStatus(user.getId(), ClaimStatus.COMPLETED),
+                (int) claimRepository.countCreditedContributions(user.getId()),
                 user.getReputation()
         );
     }

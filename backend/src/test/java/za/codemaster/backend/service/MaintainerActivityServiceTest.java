@@ -20,6 +20,7 @@ import za.codemaster.backend.domain.model.PullRequestState;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.user.MaintainerActivitySummary;
 import za.codemaster.backend.dto.user.MaintainerProjectActivity;
+import za.codemaster.backend.repository.ClaimCollaborationRequestRepository;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.CommentRepository;
 import za.codemaster.backend.repository.IssueRepository;
@@ -71,6 +72,9 @@ class MaintainerActivityServiceTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ClaimCollaborationRequestRepository claimCollaborationRequestRepository;
+
     private MaintainerActivityService service;
     private ClaimService claimService;
     private CommentService commentService;
@@ -80,8 +84,9 @@ class MaintainerActivityServiceTest {
     void setUp() {
         projectQueryService = new ProjectQueryService(projectRepository, issueRepository, claimRepository, projectMaintainerRepository);
         // A generous limit — this class isn't testing API-03.10's rate limiting.
-        RateLimitService unlimitedRateLimitService = new RateLimitService(1_000_000, 1_000_000, 1_000_000);
-        claimService = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository, unlimitedRateLimitService);
+        RateLimitService unlimitedRateLimitService = new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000);
+        claimService = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository, unlimitedRateLimitService,
+                claimCollaborationRequestRepository);
         commentService = new CommentService(commentRepository, projectRepository, issueRepository, projectMaintainerRepository,
                 claimRepository, unlimitedRateLimitService);
         service = new MaintainerActivityService(

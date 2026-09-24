@@ -17,7 +17,7 @@ class RateLimitServiceTest {
 
     @Test
     void requestsUnderTheLimitAreUnaffected() {
-        RateLimitService service = new RateLimitService(3, 3, 3);
+        RateLimitService service = new RateLimitService(3, 3, 3, 3);
 
         assertDoesNotThrow(() -> {
             service.checkCommentLimit(1L);
@@ -28,7 +28,7 @@ class RateLimitServiceTest {
 
     @Test
     void theRequestThatExceedsTheLimitIsRejectedWith429RateLimited() {
-        RateLimitService service = new RateLimitService(3, 3, 3);
+        RateLimitService service = new RateLimitService(3, 3, 3, 3);
         service.checkCommentLimit(1L);
         service.checkCommentLimit(1L);
         service.checkCommentLimit(1L);
@@ -41,7 +41,7 @@ class RateLimitServiceTest {
 
     @Test
     void claimLimitIsEnforcedIndependentlyFromCommentLimit() {
-        RateLimitService service = new RateLimitService(3, 1, 3);
+        RateLimitService service = new RateLimitService(3, 1, 3, 3);
 
         service.checkClaimLimit(1L);
         ApiException ex = assertThrows(ApiException.class, () -> service.checkClaimLimit(1L));
@@ -57,7 +57,7 @@ class RateLimitServiceTest {
 
     @Test
     void reportLimitIsEnforcedIndependentlyFromOtherActions() {
-        RateLimitService service = new RateLimitService(3, 3, 1);
+        RateLimitService service = new RateLimitService(3, 3, 1, 3);
 
         service.checkReportLimit(1L);
         ApiException ex = assertThrows(ApiException.class, () -> service.checkReportLimit(1L));
@@ -65,8 +65,24 @@ class RateLimitServiceTest {
     }
 
     @Test
+    void collaborationLimitIsEnforcedIndependentlyFromOtherActions() {
+        RateLimitService service = new RateLimitService(3, 3, 3, 1);
+
+        service.checkCollaborationLimit(1L);
+        ApiException ex = assertThrows(ApiException.class, () -> service.checkCollaborationLimit(1L));
+        assertEquals("RATE_LIMITED", ex.getCode());
+
+        // The same user's other buckets are untouched by exhausting the collaboration bucket.
+        assertDoesNotThrow(() -> {
+            service.checkCommentLimit(1L);
+            service.checkClaimLimit(1L);
+            service.checkReportLimit(1L);
+        });
+    }
+
+    @Test
     void differentUsersHaveIndependentBuckets() {
-        RateLimitService service = new RateLimitService(1, 1, 1);
+        RateLimitService service = new RateLimitService(1, 1, 1, 1);
 
         service.checkCommentLimit(1L);
         ApiException ex = assertThrows(ApiException.class, () -> service.checkCommentLimit(1L));

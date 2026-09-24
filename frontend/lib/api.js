@@ -773,6 +773,87 @@ function postProjectComment(projectId, body) {
     });
   }
 
+  /**
+   * Request to join another contributor's claim as a collaborator (not a
+   * merge of two claims — the claim keeps exactly one owner, who a pull
+   * request is expected to be attached to on GitHub). Allowed regardless of
+   * whether the caller already holds their own separate claim on the same
+   * issue; if the owner later accepts, that separate claim is released
+   * automatically.
+   *
+   * @param {number|string} issueId
+   * @param {number|string} claimId
+   * @returns {Promise<Object>} The created ClaimCollaborationRequestDto (status: 'pending').
+   * @throws {ApiError} status 400 (the caller owns this claim), 404, 409
+   *   (CLAIM_NOT_JOINABLE — the claim is completed/released, or
+   *   COLLABORATION_ALREADY_REQUESTED — a pending/accepted request already
+   *   exists from this caller), or 429 (RATE_LIMITED).
+   */
+  function requestCollaboration(issueId, claimId) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/issues/${issueId}/claims/${claimId}/collaboration-requests`, {
+      method: 'POST',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+  }
+
+  /**
+   * Every collaboration request on a claim, regardless of status, oldest
+   * first. Public, no auth required, same visibility as the claim itself.
+   *
+   * @param {number|string} issueId
+   * @param {number|string} claimId
+   * @returns {Promise<Object[]>} ClaimCollaborationRequestDto[].
+   */
+  function listCollaborationRequests(issueId, claimId) {
+    return apiFetch(`/issues/${issueId}/claims/${claimId}/collaboration-requests`);
+  }
+
+  /**
+   * The claim owner's accept/decline decision on a pending collaboration
+   * request. Accepting releases the requester's own separate active claim
+   * on the same issue, if they hold one.
+   *
+   * @param {number|string} issueId
+   * @param {number|string} claimId
+   * @param {number|string} requestId
+   * @param {'accept'|'decline'} decision
+   * @returns {Promise<Object>} The updated ClaimCollaborationRequestDto.
+   * @throws {ApiError} status 403 (caller isn't the claim's owner), 404, or
+   *   409 (COLLABORATION_NOT_PENDING — already responded to).
+   */
+  function respondToCollaborationRequest(issueId, claimId, requestId, decision) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/issues/${issueId}/claims/${claimId}/collaboration-requests/${requestId}/response`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+      },
+      body: JSON.stringify({ decision }),
+    });
+  }
+
+  /**
+   * Withdraws the caller's own still-pending collaboration request.
+   *
+   * @param {number|string} issueId
+   * @param {number|string} claimId
+   * @param {number|string} requestId
+   * @throws {ApiError} status 403 (caller isn't the request's own author),
+   *   404, or 409 (COLLABORATION_NOT_PENDING — already responded to).
+   */
+  function cancelCollaborationRequest(issueId, claimId, requestId) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/issues/${issueId}/claims/${claimId}/collaboration-requests/${requestId}`, {
+      method: 'DELETE',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+  }
+
 /**
  * Update an issue's difficulty and/or beginner-friendly status.
  * Maintainer-only. Only provided fields are changed.
@@ -916,6 +997,10 @@ module.exports = {
   deleteClaim,
   attachPullRequest,
   reviewClaim,
+  requestCollaboration,
+  listCollaborationRequests,
+  respondToCollaborationRequest,
+  cancelCollaborationRequest,
   logout,
   inviteMaintainer,
   removeMaintainer,

@@ -6,6 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.domain.model.Claim;
 import za.codemaster.backend.domain.model.ClaimStatus;
+import za.codemaster.backend.domain.model.CollaborationRequestStatus;
 import za.codemaster.backend.domain.model.CompletionSource;
 import za.codemaster.backend.domain.model.Issue;
 import za.codemaster.backend.domain.model.PullRequestState;
@@ -18,6 +19,7 @@ import za.codemaster.backend.dto.claim.ClaimStatusDto;
 import za.codemaster.backend.dto.claim.PullRequestStateDto;
 import za.codemaster.backend.dto.user.PublicUserProfile;
 import za.codemaster.backend.exception.ApiException;
+import za.codemaster.backend.repository.ClaimCollaborationRequestRepository;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
 import za.codemaster.backend.repository.ProjectMaintainerRepository;
@@ -37,14 +39,17 @@ public class ClaimService {
     private final IssueRepository issueRepository;
     private final ProjectMaintainerRepository projectMaintainerRepository;
     private final RateLimitService rateLimitService;
+    private final ClaimCollaborationRequestRepository collaborationRequestRepository;
 
     public ClaimService(ClaimRepository claimRepository, IssueRepository issueRepository,
                          ProjectMaintainerRepository projectMaintainerRepository,
-                         RateLimitService rateLimitService) {
+                         RateLimitService rateLimitService,
+                         ClaimCollaborationRequestRepository collaborationRequestRepository) {
         this.claimRepository = claimRepository;
         this.issueRepository = issueRepository;
         this.projectMaintainerRepository = projectMaintainerRepository;
         this.rateLimitService = rateLimitService;
+        this.collaborationRequestRepository = collaborationRequestRepository;
     }
 
     /**
@@ -283,7 +288,11 @@ public class ClaimService {
                         : ClaimCompletionSourceDto.valueOf(entity.getCompletionSource().name()),
                 entity.getCompletedAt(),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                collaborationRequestRepository.findByClaimIdAndStatus(entity.getId(), CollaborationRequestStatus.ACCEPTED)
+                        .stream()
+                        .map(request -> toPublicProfile(request.getRequester()))
+                        .toList()
         );
     }
 
@@ -303,7 +312,7 @@ public class ClaimService {
                 user.getLocation(),
                 user.getSkills() == null ? List.of() : List.of(user.getSkills()),
                 null,
-                (int) claimRepository.countByUserIdAndStatus(user.getId(), ClaimStatus.COMPLETED),
+                (int) claimRepository.countCreditedContributions(user.getId()),
                 user.getReputation()
         );
     }

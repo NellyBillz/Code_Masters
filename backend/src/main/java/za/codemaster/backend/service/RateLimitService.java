@@ -34,18 +34,22 @@ public class RateLimitService {
     private final int commentsPerHour;
     private final int claimsPerHour;
     private final int reportsPerHour;
+    private final int collaborationRequestsPerHour;
 
     private final ConcurrentHashMap<Long, TokenBucket> commentBuckets = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, TokenBucket> claimBuckets = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, TokenBucket> reportBuckets = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, TokenBucket> collaborationRequestBuckets = new ConcurrentHashMap<>();
 
     public RateLimitService(
             @Value("${app.rate-limit.comments-per-hour:20}") int commentsPerHour,
             @Value("${app.rate-limit.claims-per-hour:10}") int claimsPerHour,
-            @Value("${app.rate-limit.reports-per-hour:5}") int reportsPerHour) {
+            @Value("${app.rate-limit.reports-per-hour:5}") int reportsPerHour,
+            @Value("${app.rate-limit.collaboration-requests-per-hour:10}") int collaborationRequestsPerHour) {
         this.commentsPerHour = commentsPerHour;
         this.claimsPerHour = claimsPerHour;
         this.reportsPerHour = reportsPerHour;
+        this.collaborationRequestsPerHour = collaborationRequestsPerHour;
     }
 
     /**
@@ -70,6 +74,14 @@ public class RateLimitService {
      */
     public void checkReportLimit(Long userId) {
         enforce(reportBuckets, userId, reportsPerHour, "report");
+    }
+
+    /**
+     * @throws ApiException with code {@code RATE_LIMITED} (429) if the caller has
+     *                       sent too many collaboration requests in the last hour
+     */
+    public void checkCollaborationLimit(Long userId) {
+        enforce(collaborationRequestBuckets, userId, collaborationRequestsPerHour, "collaboration request");
     }
 
     private void enforce(ConcurrentHashMap<Long, TokenBucket> buckets, Long userId, int limit, String actionName) {

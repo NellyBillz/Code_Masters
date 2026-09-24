@@ -58,13 +58,38 @@ public class CheckConstraintTest {
             return "postgres";
         }
 
+        private String resolveUsername() {
+            // 1. Check OS environment variable
+            String user = System.getenv("LOCAL_DB_USERNAME");
+            if (user != null && !user.isBlank()) {
+                return user;
+            }
+
+            // 2. Read from root .env file if present
+            File envFile = new File(".env");
+            if (envFile.exists()) {
+                try (InputStream input = new FileInputStream(envFile)) {
+                    Properties props = new Properties();
+                    props.load(input);
+                    String fileUser = props.getProperty("LOCAL_DB_USERNAME");
+                    if (fileUser != null && !fileUser.isBlank()) {
+                        return fileUser.replace("'", "").replace("\"", "").trim();
+                    }
+                } catch (Exception ignored) {
+                }
+            }
+
+            // 3. Fallback default
+            return "postgres";
+        }
+
         @Bean
         public DataSource dataSource() {
             PGSimpleDataSource ds = new PGSimpleDataSource();
             ds.setServerNames(new String[]{"localhost"});
             ds.setPortNumbers(new int[]{5432});
             ds.setDatabaseName("codemaster_db");
-            ds.setUser("postgres");
+            ds.setUser(resolveUsername());
             ds.setPassword(resolvePassword());
             return ds;
         }

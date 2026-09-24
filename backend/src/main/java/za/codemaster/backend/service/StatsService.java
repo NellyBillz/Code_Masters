@@ -35,7 +35,7 @@ public class StatsService {
         long publishedProjects = projectRepository.countByListingStatus(ListingStatus.PUBLISHED);
         long activeProjectsAcceptingContributions =
                 projectRepository.countByListingStatusAndAcceptingContributions(ListingStatus.PUBLISHED, true);
-        long totalContributorsEngaged = claimRepository.countDistinctUsers();
+        long totalContributorsEngaged = claimRepository.countDistinctUsersIncludingCollaborators();
         long totalActiveClaims = claimRepository.countByStatus(ClaimStatus.ACTIVE);
         long totalContributionsCompleted = claimRepository.countByStatus(ClaimStatus.COMPLETED);
 

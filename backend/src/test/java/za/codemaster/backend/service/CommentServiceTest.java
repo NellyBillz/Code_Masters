@@ -71,7 +71,7 @@ class CommentServiceTest {
     void setUp() {
         // A generous limit — this class isn't testing API-03.10's rate limiting.
         service = new CommentService(commentRepository, projectRepository, issueRepository, projectMaintainerRepository,
-                claimRepository, new RateLimitService(1_000_000, 1_000_000, 1_000_000));
+                claimRepository, new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000));
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         author = userRepository.save(User.builder()
                 .githubId(System.nanoTime())

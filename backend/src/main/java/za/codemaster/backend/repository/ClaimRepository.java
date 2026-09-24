@@ -4,6 +4,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import za.codemaster.backend.domain.model.Claim;
 import za.codemaster.backend.domain.model.ClaimStatus;
@@ -71,20 +72,6 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
     long countByIssueIdAndStatusIn(Long issueId, Collection<ClaimStatus> statuses);
 
     /**
-     * Counts a user's claims in a given status. Backs
-     * {@code PublicUserProfile.contributionsCount} (API-03.5): verified
-     * contributions only, i.e. status {@code completed} — not a raw claim count.
-     */
-    long countByUserIdAndStatus(Long userId, ClaimStatus status);
-
-    /**
-     * Finds a user's claims in a given status, most recent {@code completedAt}
-     * first, paginated. Backs {@code GET /users/{username}/contributions}
-     * (API-03.6) — always called with {@code ClaimStatus.COMPLETED}.
-     */
-    Page<Claim> findByUserIdAndStatusOrderByCompletedAtDesc(Long userId, ClaimStatus status, Pageable pageable);
-
-    /**
      * Finds a project's claims in a given status (via {@code claim.issue.project}).
      * Backs {@code activeClaims} in {@code GET /users/me/maintainer-activity} (API-03.7).
      */
@@ -116,9 +103,56 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
     long countByStatus(ClaimStatus status);
 
     /**
-     * Counts distinct users who have ever held a claim, in any status. Backs
-     * {@code PlatformStats.totalContributorsEngaged} (API-03.12).
+     * Counts distinct users who have ever held a claim (any status) OR were
+     * ever an accepted collaborator on someone else's claim (any status of
+     * that claim). Backs {@code PlatformStats.totalContributorsEngaged}
+     * (API-03.12) — a collaborator did real work and should count as an
+     * engaged contributor even on the (uncommon) path where they never
+     * separately owned a claim of their own.
      */
-    @Query("SELECT COUNT(DISTINCT c.user.id) FROM Claim c")
-    long countDistinctUsers();
+    @Query(value = "SELECT COUNT(DISTINCT engaged_user_id) FROM ("
+            + "SELECT user_id AS engaged_user_id FROM claims "
+            + "UNION "
+            + "SELECT requester_user_id AS engaged_user_id FROM claim_collaboration_requests WHERE status = 'accepted'"
+            + ") AS engaged_users", nativeQuery = true)
+    long countDistinctUsersIncludingCollaborators();
+
+    /**
+     * A user's real, credited contribution count: claims they own with
+     * status {@code completed}, plus claims they were an accepted
+     * collaborator on with status {@code completed}. Backs
+     * {@code PublicUserProfile.contributionsCount} — superseding a plain
+     * {@code countByUserIdAndStatus(userId, COMPLETED)}, which only ever
+     * counted ownership.
+     */
+    @Query("SELECT COUNT(DISTINCT c) FROM Claim c WHERE c.status = za.codemaster.backend.domain.model.ClaimStatus.COMPLETED "
+            + "AND (c.user.id = :userId OR EXISTS ("
+            + "  SELECT 1 FROM ClaimCollaborationRequest ccr "
+            + "  WHERE ccr.claim = c AND ccr.requester.id = :userId "
+            + "  AND ccr.status = za.codemaster.backend.domain.model.CollaborationRequestStatus.ACCEPTED"
+            + "))")
+    long countCreditedContributions(@Param("userId") Long userId);
+
+    /**
+     * A user's real, credited contribution history: claims they own with
+     * status {@code completed}, plus claims they were an accepted
+     * collaborator on with status {@code completed}, most recent
+     * {@code completedAt} first, paginated. Backs
+     * {@code GET /users/{username}/contributions} (API-03.6) — superseding
+     * {@link #findByUserIdAndStatusOrderByCompletedAtDesc}, which only ever
+     * returned owned claims.
+     */
+    @Query(value = "SELECT DISTINCT c FROM Claim c WHERE c.status = za.codemaster.backend.domain.model.ClaimStatus.COMPLETED "
+            + "AND (c.user.id = :userId OR EXISTS ("
+            + "  SELECT 1 FROM ClaimCollaborationRequest ccr "
+            + "  WHERE ccr.claim = c AND ccr.requester.id = :userId "
+            + "  AND ccr.status = za.codemaster.backend.domain.model.CollaborationRequestStatus.ACCEPTED"
+            + ")) ORDER BY c.completedAt DESC",
+            countQuery = "SELECT COUNT(DISTINCT c) FROM Claim c WHERE c.status = za.codemaster.backend.domain.model.ClaimStatus.COMPLETED "
+            + "AND (c.user.id = :userId OR EXISTS ("
+            + "  SELECT 1 FROM ClaimCollaborationRequest ccr "
+            + "  WHERE ccr.claim = c AND ccr.requester.id = :userId "
+            + "  AND ccr.status = za.codemaster.backend.domain.model.CollaborationRequestStatus.ACCEPTED"
+            + "))")
+    Page<Claim> findCreditedContributions(@Param("userId") Long userId, Pageable pageable);
 }

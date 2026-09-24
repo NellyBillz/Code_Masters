@@ -12,11 +12,14 @@ import za.codemaster.backend.client.github.dto.GitHubFetchResult;
 import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
 import za.codemaster.backend.client.github.dto.GitHubProjectMetadata;
 import za.codemaster.backend.domain.model.Claim;
+import za.codemaster.backend.domain.model.ClaimCollaborationRequest;
 import za.codemaster.backend.domain.model.ClaimStatus;
+import za.codemaster.backend.domain.model.CollaborationRequestStatus;
 import za.codemaster.backend.domain.model.CompletionSource;
 import za.codemaster.backend.domain.model.PullRequestState;
 import za.codemaster.backend.domain.model.SyncJob;
 import za.codemaster.backend.domain.model.User;
+import za.codemaster.backend.repository.ClaimCollaborationRequestRepository;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueSyncRepository;
 import za.codemaster.backend.repository.ProjectSyncRepository;
@@ -43,6 +46,7 @@ class ProjectSyncWorkerClaimVerificationTest {
     @Mock private IssueSyncRepository issues;
     @Mock private SyncJobRepository jobs;
     @Mock private ClaimRepository claims;
+    @Mock private ClaimCollaborationRequestRepository collaborationRequests;
 
     private ProjectSyncWorker worker;
     private UUID jobId;
@@ -50,7 +54,7 @@ class ProjectSyncWorkerClaimVerificationTest {
 
     @BeforeEach
     void setUp() {
-        worker = new ProjectSyncWorker(github, projects, issues, jobs, claims);
+        worker = new ProjectSyncWorker(github, projects, issues, jobs, claims, collaborationRequests);
         jobId = UUID.randomUUID();
         job = new SyncJob(1L);
         when(jobs.findById(jobId)).thenReturn(Optional.of(job));
@@ -91,6 +95,43 @@ class ProjectSyncWorkerClaimVerificationTest {
         assertNotNull(claim.getCompletedAt());
         assertEquals(1, job.getContributionsVerifiedCount());
         verify(issues).markClosed(42L);
+        verify(claims).save(claim);
+    }
+
+    @Test
+    void verifiesClaimWhenClosingAuthorMatchesAnAcceptedCollaboratorInstead() {
+        var issue = new IssueSyncRepository.ExistingIssue(42L, 17, null);
+        when(issues.findOpenByProjectId(1L)).thenReturn(List.of(issue));
+        when(issues.markClosed(42L)).thenReturn(true);
+        when(github.fetchClosingPullRequest("owner", "repo", 17))
+                .thenReturn(new ClosingPullRequestResult.Found(99, true, "collaborator", 5678L));
+
+        // The claim's owner's GitHub identity does NOT match the merged PR's
+        // author — only an accepted collaborator's does.
+        Claim claim = Claim.builder()
+                .id(7L)
+                .status(ClaimStatus.ACTIVE)
+                .user(User.builder().githubId(1234L).username("owner").build())
+                .build();
+        when(claims.findByIssueIdAndStatusIn(42L,
+                List.of(ClaimStatus.ACTIVE, ClaimStatus.CHANGES_REQUESTED)))
+                .thenReturn(List.of(claim));
+
+        ClaimCollaborationRequest accepted = new ClaimCollaborationRequest();
+        accepted.setClaim(claim);
+        accepted.setRequester(User.builder().githubId(5678L).username("collaborator").build());
+        accepted.setStatus(CollaborationRequestStatus.ACCEPTED);
+        when(collaborationRequests.findByClaimIdAndStatus(7L, CollaborationRequestStatus.ACCEPTED))
+                .thenReturn(List.of(accepted));
+
+        worker.run(jobId);
+
+        // The claim itself is what gets marked completed — crediting both
+        // the owner and the accepted collaborator falls out of
+        // ClaimRepository.countCreditedContributions, not out of anything
+        // this worker does directly.
+        assertEquals(ClaimStatus.COMPLETED, claim.getStatus());
+        assertEquals(CompletionSource.GITHUB_VERIFIED, claim.getCompletionSource());
         verify(claims).save(claim);
     }
 

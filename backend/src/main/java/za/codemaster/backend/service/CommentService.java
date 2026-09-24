@@ -6,7 +6,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.Comment;
 import za.codemaster.backend.domain.model.Issue;
 import za.codemaster.backend.domain.model.Project;
@@ -302,7 +301,7 @@ public class CommentService {
                 user.getLocation(),
                 user.getSkills() == null ? List.of() : List.of(user.getSkills()),
                 null,
-                (int) claimRepository.countByUserIdAndStatus(user.getId(), ClaimStatus.COMPLETED),
+                (int) claimRepository.countCreditedContributions(user.getId()),
                 user.getReputation()
         );
     }

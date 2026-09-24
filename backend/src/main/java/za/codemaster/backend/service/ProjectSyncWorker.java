@@ -11,9 +11,11 @@ import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
 import za.codemaster.backend.client.github.dto.GitHubProjectMetadata;
 import za.codemaster.backend.domain.model.Claim;
 import za.codemaster.backend.domain.model.ClaimStatus;
+import za.codemaster.backend.domain.model.CollaborationRequestStatus;
 import za.codemaster.backend.domain.model.CompletionSource;
 import za.codemaster.backend.domain.model.PullRequestState;
 import za.codemaster.backend.domain.model.SyncJob;
+import za.codemaster.backend.repository.ClaimCollaborationRequestRepository;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueSyncRepository;
 import za.codemaster.backend.repository.ProjectSyncRepository;
@@ -38,18 +40,21 @@ public class ProjectSyncWorker {
     private final IssueSyncRepository issues;
     private final SyncJobRepository jobs;
     private final ClaimRepository claims;
+    private final ClaimCollaborationRequestRepository collaborationRequests;
 
     public ProjectSyncWorker(
             GitHubClient github,
             ProjectSyncRepository projects,
             IssueSyncRepository issues,
             SyncJobRepository jobs,
-            ClaimRepository claims) {
+            ClaimRepository claims,
+            ClaimCollaborationRequestRepository collaborationRequests) {
         this.github = github;
         this.projects = projects;
         this.issues = issues;
         this.jobs = jobs;
         this.claims = claims;
+        this.collaborationRequests = collaborationRequests;
     }
 
     @Async
@@ -164,9 +169,7 @@ public class ProjectSyncWorker {
 
         Claim matchingClaim = claims.findByIssueIdAndStatusIn(issue.id(), VERIFIABLE_STATUSES)
                 .stream()
-                .filter(claim -> claim.getUser() != null
-                        && claim.getUser().getGithubId() != null
-                        && claim.getUser().getGithubId() == found.authorId())
+                .filter(claim -> claimMatchesGithubAuthor(claim, found.authorId()))
                 .findFirst()
                 .orElse(null);
         if (matchingClaim == null) {
@@ -185,6 +188,25 @@ public class ProjectSyncWorker {
         }
         claims.save(matchingClaim);
         return true;
+    }
+
+    /**
+     * True if the merged PR's GitHub author is either the claim's owner, or
+     * an accepted collaborator on the claim — either way, the whole claim
+     * (owner and every accepted collaborator) is credited when it completes,
+     * see {@link ClaimRepository#countCreditedContributions}.
+     */
+    private boolean claimMatchesGithubAuthor(Claim claim, long authorId) {
+        if (claim.getUser() != null
+                && claim.getUser().getGithubId() != null
+                && claim.getUser().getGithubId() == authorId) {
+            return true;
+        }
+        return collaborationRequests.findByClaimIdAndStatus(claim.getId(), CollaborationRequestStatus.ACCEPTED)
+                .stream()
+                .anyMatch(request -> request.getRequester() != null
+                        && request.getRequester().getGithubId() != null
+                        && request.getRequester().getGithubId() == authorId);
     }
 
     private void failRate(SyncJob job, Instant retry) {

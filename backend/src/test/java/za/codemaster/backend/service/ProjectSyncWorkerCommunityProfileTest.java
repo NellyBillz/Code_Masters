@@ -7,6 +7,7 @@ import za.codemaster.backend.client.github.dto.GitHubFetchResult;
 import za.codemaster.backend.client.github.dto.GitHubIssueMetadata;
 import za.codemaster.backend.client.github.dto.GitHubProjectMetadata;
 import za.codemaster.backend.domain.model.SyncJob;
+import za.codemaster.backend.repository.ClaimCollaborationRequestRepository;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueSyncRepository;
 import za.codemaster.backend.repository.ProjectSyncRepository;
@@ -30,6 +31,7 @@ class ProjectSyncWorkerCommunityProfileTest {
         IssueSyncRepository issues = mock(IssueSyncRepository.class);
         SyncJobRepository jobs = mock(SyncJobRepository.class);
         ClaimRepository claims = mock(ClaimRepository.class);
+        ClaimCollaborationRequestRepository collaborationRequests = mock(ClaimCollaborationRequestRepository.class);
         UUID jobId = UUID.randomUUID();
         SyncJob job = new SyncJob(1L);
         GitHubCommunityProfile profile = new GitHubCommunityProfile(true, true);
@@ -45,7 +47,7 @@ class ProjectSyncWorkerCommunityProfileTest {
         when(github.fetchIssues("owner", "repo", "issues-v1"))
                 .thenReturn(GitHubFetchResult.<List<GitHubIssueMetadata>>notModified());
 
-        new ProjectSyncWorker(github, projects, issues, jobs, claims).run(jobId);
+        new ProjectSyncWorker(github, projects, issues, jobs, claims, collaborationRequests).run(jobId);
 
         verify(projects).updateCommunityProfile(1L, profile);
         assertEquals("completed", job.getStatus());

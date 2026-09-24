@@ -15,6 +15,7 @@ import za.codemaster.backend.dto.claim.ClaimDto;
 import za.codemaster.backend.dto.claim.ClaimStatusDto;
 import za.codemaster.backend.dto.claim.PullRequestStateDto;
 import za.codemaster.backend.exception.ApiException;
+import za.codemaster.backend.repository.ClaimCollaborationRequestRepository;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
 import za.codemaster.backend.repository.ProjectMaintainerRepository;
@@ -69,6 +70,9 @@ class ClaimServiceTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private ClaimCollaborationRequestRepository claimCollaborationRequestRepository;
+
     private ClaimService service;
     private ProjectQueryServiceFixtures fixtures;
     private User claimant;
@@ -77,7 +81,7 @@ class ClaimServiceTest {
     void setUp() {
         // A generous limit — this class isn't testing API-03.10's rate limiting.
         service = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository,
-                new RateLimitService(1_000_000, 1_000_000, 1_000_000));
+                new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000), claimCollaborationRequestRepository);
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         claimant = userRepository.save(User.builder()
                 .githubId(System.nanoTime())
