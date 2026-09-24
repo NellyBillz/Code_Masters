@@ -205,7 +205,7 @@ public class DevSeedDataIntegrationTest {
     }
 
     @Test
-    @DisplayName("Dev Seed: Verify 6-8 issues seeded with at least 3 marked beginner")
+    @DisplayName("Dev Seed: Verify 18-20 issues seeded with at least 8 marked beginner")
     void shouldVerifyIssuesAndBeginnerFriendlyRequirements() {
         migrateDevSeed();
 
@@ -219,10 +219,10 @@ public class DevSeedDataIntegrationTest {
             Integer.class
         );
 
-        assertTrue(totalIssues != null && totalIssues >= 6 && totalIssues <= 8, 
-            "Issues count must be between 6 and 8, found: " + totalIssues);
-        assertTrue(beginnerIssues != null && beginnerIssues >= 3, 
-            "At least 3 issues must have difficulty = 'beginner', found: " + beginnerIssues);
+        assertTrue(totalIssues != null && totalIssues >= 18 && totalIssues <= 20,
+            "Issues count must be between 18 and 20, found: " + totalIssues);
+        assertTrue(beginnerIssues != null && beginnerIssues >= 8,
+            "At least 8 issues must have difficulty = 'beginner', found: " + beginnerIssues);
     }
 
     @Test
@@ -245,8 +245,8 @@ public class DevSeedDataIntegrationTest {
             Integer.class
         );
 
-        assertTrue(totalComments != null && totalComments >= 3 && totalComments <= 4, 
-            "Must seed 3 to 4 comments, found: " + totalComments);
+        assertTrue(totalComments != null && totalComments >= 5 && totalComments <= 7,
+            "Must seed 5 to 7 comments, found: " + totalComments);
         assertTrue(projectComments != null && projectComments >= 1, 
             "Must contain at least 1 project-attached comment");
         assertTrue(issueComments != null && issueComments >= 1, 
@@ -254,7 +254,7 @@ public class DevSeedDataIntegrationTest {
     }
 
     @Test
-    @DisplayName("Dev Seed: Verify 1-2 claims with maximum one active claim per user")
+    @DisplayName("Dev Seed: Verify 18-20 claims with exactly 2 active claims (different users/issues, doesn't violate the partial index)")
     void shouldVerifyClaimsSeedIntegrity() {
         migrateDevSeed();
 
@@ -268,9 +268,9 @@ public class DevSeedDataIntegrationTest {
             Integer.class
         );
 
-        assertTrue(totalClaims != null && totalClaims >= 1 && totalClaims <= 2, 
-            "Must seed 1 to 2 claims, found: " + totalClaims);
-        assertEquals(1, activeClaims, "Should contain exactly 1 active claim adhering to partial index");
+        assertTrue(totalClaims != null && totalClaims >= 18 && totalClaims <= 20,
+            "Must seed 18 to 20 claims, found: " + totalClaims);
+        assertEquals(2, activeClaims, "Should contain exactly 2 active claims (distinct issue/user pairs)");
     }
 
     @Test
@@ -311,10 +311,10 @@ public class DevSeedDataIntegrationTest {
 
         assertEquals(2, devUsers, "Dev profile must seed exactly 2 users");
         assertEquals(4, devProjects, "Dev profile must seed exactly 4 projects");
-        assertTrue(devIssues != null && devIssues >= 6 && devIssues <= 8, "Expected 6–8 issues");
-        assertTrue(devBeginnerIssues != null && devBeginnerIssues >= 3, "Expected at least 3 beginner issues");
-        assertTrue(devComments != null && devComments >= 3 && devComments <= 4, "Expected 3–4 comments");
-        assertTrue(devClaims != null && devClaims >= 1 && devClaims <= 2, "Expected 1–2 claims");
-        assertEquals(1, devActiveClaims, "Expected exactly 1 active claim");
+        assertTrue(devIssues != null && devIssues >= 18 && devIssues <= 20, "Expected 18–20 issues");
+        assertTrue(devBeginnerIssues != null && devBeginnerIssues >= 8, "Expected at least 8 beginner issues");
+        assertTrue(devComments != null && devComments >= 5 && devComments <= 7, "Expected 5–7 comments");
+        assertTrue(devClaims != null && devClaims >= 18 && devClaims <= 20, "Expected 18–20 claims");
+        assertEquals(2, devActiveClaims, "Expected exactly 2 active claims");
     }
 }
