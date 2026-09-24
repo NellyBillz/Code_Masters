@@ -15,6 +15,7 @@ import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 
+import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Locale;
 import java.util.regex.Matcher;
@@ -53,6 +54,34 @@ public class ProjectService {
      * badly). GitHub-derived fields (name is a placeholder from the repo slug, description,
      * stars, license, etc. are left unset) are filled in later by the submitter triggering
      * {@code POST /projects/{id}/issues/sync} (GH-02.3), not fetched synchronously here.
+     * <p>
+     * {@code verified}/{@code verifiedAt} (security audit finding, 2026-09-24) are set when
+     * the submitted URL's owner segment matches the submitter's own GitHub username — free,
+     * no API call, and covers the common "I'm submitting my own personal repo" case. This is
+     * deliberately the *only* automated signal: GitHub's collaborator-permission endpoint
+     * (which would otherwise cover org-owned repos and real co-maintainers who aren't the
+     * literal repo owner) was investigated and ruled out — confirmed live, it 403s with
+     * "Must have push access to view collaborator permission" regardless of token type
+     * (tested against both a fine-grained and a classic PAT with {@code repo} scope).
+     * That's not a config problem, it's GitHub's actual design for that endpoint: the
+     * *calling* token must already have push access to the target repo before it can check
+     * anyone's permission on it, which a general-purpose server-side credential never will
+     * for an arbitrary third-party repo. The only way to check that at all is with the
+     * submitter's *own* OAuth token, not a server-wide one — a bigger change (wider login
+     * scope, persisting a user access token) deliberately deferred past the hackathon.
+     * Org repos and genuine co-maintainers therefore land unverified today and route to a
+     * site admin, same as any other unverified submission — see below.
+     * <p>
+     * The submitter is only made the project's {@code owner} maintainer when
+     * {@code ownershipVerified} — this is the actual access-control decision the
+     * verification check exists to gate (security audit finding, 2026-09-24): an
+     * unverified submission still gets listed (discovery isn't blocked), but sits with
+     * zero maintainers until either (a) a later resync/resubmit signal verifies it, or
+     * (b) a site admin confirms real ownership out-of-band and assigns the first owner
+     * via {@code POST /projects/{id}/maintainers/assign-owner}
+     * ({@link MaintainerService#assignOwner}) — the normal owner-only invite endpoint
+     * can't help here since, by definition, an unverified project has no owner yet to
+     * call it.
      *
      * @param request   the submission; githubUrl/connection/category required, tags/countryCodes optional
      * @param submitter the authenticated caller, injected via {@code @AuthenticatedUser}
@@ -73,6 +102,8 @@ public class ProjectService {
         String owner = matcher.group(1);
         String repo = matcher.group(2);
 
+        boolean ownershipVerified = owner.equalsIgnoreCase(submitter.getUsername());
+
         Project project = new Project();
         project.setGithubOwner(owner);
         project.setGithubRepo(repo);
@@ -84,6 +115,10 @@ public class ProjectService {
         project.setSlug((owner + "-" + repo).toLowerCase(Locale.ROOT));
         project.setCategory(request.category());
         project.setConnection(request.connection().getWireValue());
+        project.setVerified(ownershipVerified);
+        if (ownershipVerified) {
+            project.setVerifiedAt(OffsetDateTime.now());
+        }
         if (request.tags() != null) {
             project.setTags(new ArrayList<>(request.tags()));
         }
@@ -104,11 +139,13 @@ public class ProjectService {
                     HttpStatus.CONFLICT);
         }
 
-        ProjectMaintainer maintainer = new ProjectMaintainer();
-        maintainer.setProject(saved);
-        maintainer.setUser(submitter);
-        maintainer.setRole(MaintainerRole.OWNER.getWireValue());
-        projectMaintainerRepository.save(maintainer);
+        if (ownershipVerified) {
+            ProjectMaintainer maintainer = new ProjectMaintainer();
+            maintainer.setProject(saved);
+            maintainer.setUser(submitter);
+            maintainer.setRole(MaintainerRole.OWNER.getWireValue());
+            projectMaintainerRepository.save(maintainer);
+        }
 
         return projectQueryService.toDto(saved);
     }

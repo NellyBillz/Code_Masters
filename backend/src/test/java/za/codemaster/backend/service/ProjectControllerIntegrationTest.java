@@ -67,6 +67,18 @@ class ProjectControllerIntegrationTest {
         return "https://github.com/example-org/repo-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
+    /**
+     * A submission URL whose owner segment matches {@code ownerUsername} — the free,
+     * no-API-call verification signal (security audit finding, 2026-09-24), so the
+     * submitter actually ends up as the project's owner maintainer. Tests exercising
+     * post-submission maintainer/ownership behavior need this instead of
+     * {@link #uniqueGithubUrl()}, whose {@code example-org} owner never matches any
+     * test session's username and so now leaves the project maintainer-less.
+     */
+    private String uniqueGithubUrl(String ownerUsername) {
+        return "https://github.com/" + ownerUsername + "/repo-" + UUID.randomUUID().toString().substring(0, 8);
+    }
+
     private String createProjectJson(String githubUrl) {
         return "{\"githubUrl\":\"" + githubUrl + "\",\"connection\":\"south_african\",\"category\":\"Developer Tools\"}";
     }
@@ -93,7 +105,7 @@ class ProjectControllerIntegrationTest {
     @DisplayName("A successful POST /projects immediately shows the caller in the maintainer list")
     void successfulSubmissionShowsCallerAsMaintainer() throws Exception {
         Session session = createActiveSession();
-        String githubUrl = uniqueGithubUrl();
+        String githubUrl = uniqueGithubUrl(session.getUser().getUsername());
 
         String response = mockMvc.perform(post("/api/v1/projects")
                         .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
@@ -172,7 +184,7 @@ class ProjectControllerIntegrationTest {
                         .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
                         .header(CSRF_HEADER, session.getCsrToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createProjectJson(uniqueGithubUrl())))
+                        .content(createProjectJson(uniqueGithubUrl(session.getUser().getUsername()))))
                 .andReturn().getResponse().getContentAsString();
         Long projectId = extractId(response);
 
@@ -193,7 +205,7 @@ class ProjectControllerIntegrationTest {
                         .cookie(new Cookie(SESSION_COOKIE, session.getId().toString()))
                         .header(CSRF_HEADER, session.getCsrToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(createProjectJson(uniqueGithubUrl())))
+                        .content(createProjectJson(uniqueGithubUrl(session.getUser().getUsername()))))
                 .andExpect(jsonPath("$.acceptingContributions").value(true))
                 .andReturn().getResponse().getContentAsString();
         Long projectId = extractId(response);

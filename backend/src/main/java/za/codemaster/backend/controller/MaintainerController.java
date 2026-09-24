@@ -43,6 +43,20 @@ public class MaintainerController {
     }
 
     /**
+     * {@code POST /api/v1/projects/{projectId}/maintainers/assign-owner}: site-admin-only,
+     * assigns the first owner to a project that currently has zero maintainers (see
+     * {@link MaintainerService#assignOwner}'s Javadoc for why this exists).
+     */
+    @PostMapping("/api/v1/projects/{projectId}/maintainers/assign-owner")
+    public ResponseEntity<ProjectMaintainerDto> assignOwner(
+            @PathVariable Long projectId,
+            @Valid @RequestBody AddMaintainerRequest request,
+            @AuthenticatedUser User currentUser) {
+        ProjectMaintainerDto created = maintainerService.assignOwner(projectId, request, currentUser);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    /**
      * {@code DELETE /api/v1/projects/{projectId}/maintainers/{userId}}: remove a maintainer.
      * Owner-only; refuses to remove the last remaining owner.
      */

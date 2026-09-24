@@ -81,9 +81,23 @@ class ProjectServiceTest {
                 .build());
     }
 
+    /**
+     * Owner segment matches {@code submitter}'s own username — the only automated
+     * verification signal (security audit finding, 2026-09-24; see
+     * {@code ProjectService.createProject}'s Javadoc for why the GitHub API-based
+     * check was ruled out). None of the tests below this point are about
+     * verification itself, so they all need a verified submission to keep testing
+     * what they were actually written to test (maintainer/update/search behavior).
+     */
     private String uniqueGithubUrl() {
         String suffix = UUID.randomUUID().toString().substring(0, 8);
-        return "https://github.com/example-org/repo-" + suffix;
+        return "https://github.com/" + submitter.getUsername() + "/repo-" + suffix;
+    }
+
+    /** A submission URL whose owner does NOT match {@code submitter} — stays unverified. */
+    private String uniqueUnownedGithubUrl() {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        return "https://github.com/some-other-org/repo-" + suffix;
     }
 
     @Test
@@ -115,6 +129,40 @@ class ProjectServiceTest {
         assertEquals(1, detail.maintainers().size());
         assertEquals(submitter.getUsername(), detail.maintainers().get(0).user().username());
         assertEquals(za.codemaster.backend.dto.project.MaintainerRole.OWNER, detail.maintainers().get(0).role());
+    }
+
+    @Test
+    void createProjectVerifiesViaUsernameMatch() {
+        // The only automated signal: submitting your own personal repo (URL owner
+        // segment == your GitHub username) verifies on its own.
+        CreateProjectRequest request = new CreateProjectRequest(
+                uniqueGithubUrl(), ProjectConnection.SOUTH_AFRICAN, "Data", null, null);
+
+        ProjectDto created = service.createProject(request, submitter);
+
+        assertTrue(created.verified());
+        assertNotNull(created.verifiedAt());
+    }
+
+    @Test
+    void createProjectLeavesUnverifiedProjectWithoutAnOwnerMaintainer() {
+        CreateProjectRequest request = new CreateProjectRequest(
+                uniqueUnownedGithubUrl(), ProjectConnection.SOUTH_AFRICAN, "Data", null, null);
+
+        ProjectDto created = service.createProject(request, submitter);
+
+        assertFalse(created.verified());
+        assertNull(created.verifiedAt());
+        // The actual access-control decision the verification check exists to gate
+        // (security audit finding, 2026-09-24): an unverified submission is still
+        // listed (discovery isn't blocked) but gets zero maintainers, not an
+        // auto-granted owner role — see MaintainerService#assignOwner for how a
+        // site admin can later confirm real ownership and fill this gap.
+        // (Not read via getProjectDetail: a freshly submitted project defaults to
+        // `pending`, and its visibility gate only admits maintainers or the
+        // submitter-as-maintainer — neither of which the submitter is here, by
+        // design, so that call would itself 404.)
+        assertTrue(projectMaintainerRepository.findByProjectId(created.id()).isEmpty());
     }
 
     @Test

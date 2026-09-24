@@ -14,6 +14,9 @@ import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.UserRepository;
+import za.codemaster.backend.security.SiteAdminGuard;
+
+import java.time.OffsetDateTime;
 
 /**
  * Service for owner-only maintainer invite/removal (API-02.8, design doc §8's
@@ -26,15 +29,18 @@ public class MaintainerService {
     private final ProjectMaintainerRepository projectMaintainerRepository;
     private final UserRepository userRepository;
     private final ProjectQueryService projectQueryService;
+    private final SiteAdminGuard siteAdminGuard;
 
     public MaintainerService(ProjectRepository projectRepository,
                               ProjectMaintainerRepository projectMaintainerRepository,
                               UserRepository userRepository,
-                              ProjectQueryService projectQueryService) {
+                              ProjectQueryService projectQueryService,
+                              SiteAdminGuard siteAdminGuard) {
         this.projectRepository = projectRepository;
         this.projectMaintainerRepository = projectMaintainerRepository;
         this.userRepository = userRepository;
         this.projectQueryService = projectQueryService;
+        this.siteAdminGuard = siteAdminGuard;
     }
 
     /**
@@ -130,6 +136,68 @@ public class MaintainerService {
         }
 
         projectMaintainerRepository.delete(toRemove);
+    }
+
+    /**
+     * Site-admin-only: assigns the first {@code owner} to a project that currently has
+     * zero maintainers. Exists specifically for {@code ProjectService.createProject}'s
+     * verification gate (security audit finding, 2026-09-24) — an unverified submission
+     * gets listed with no maintainer at all, and since {@link #inviteMaintainer} requires
+     * an existing owner to call it, that project could otherwise never get one through
+     * the normal API. Refuses to run if the project already has any maintainer, so this
+     * can never be used to override or contest an already-established owner — only to
+     * fill a genuine gap.
+     *
+     * @param projectId the project id from the path
+     * @param request   the username to make owner ({@code role}, if provided, is ignored — always owner)
+     * @param caller    the authenticated caller, injected via {@code @AuthenticatedUser}
+     * @return the new owner relationship, in API shape
+     * @throws ApiException with code {@code PROJECT_NOT_FOUND} (404) if the project doesn't exist,
+     *                       {@code FORBIDDEN} (403) if the caller isn't a site admin,
+     *                       {@code USER_NOT_FOUND} (404) if no user has that username, or
+     *                       {@code PROJECT_ALREADY_HAS_MAINTAINER} (409) if the project already has one
+     */
+    @Transactional
+    public ProjectMaintainerDto assignOwner(Long projectId, AddMaintainerRequest request, User caller) {
+        siteAdminGuard.requireSiteAdmin(caller);
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new ApiException(
+                        "PROJECT_NOT_FOUND", "No project exists with id " + projectId, HttpStatus.NOT_FOUND));
+
+        if (!projectMaintainerRepository.findByProjectId(projectId).isEmpty()) {
+            throw new ApiException(
+                    "PROJECT_ALREADY_HAS_MAINTAINER",
+                    "This project already has a maintainer — use the owner-invite endpoint instead.",
+                    HttpStatus.CONFLICT);
+        }
+
+        User newOwner = userRepository.findByUsername(request.username())
+                .orElseThrow(() -> new ApiException(
+                        "USER_NOT_FOUND", "No user exists with username " + request.username(), HttpStatus.NOT_FOUND));
+
+        ProjectMaintainer maintainer = new ProjectMaintainer();
+        maintainer.setProject(project);
+        maintainer.setUser(newOwner);
+        maintainer.setRole(MaintainerRole.OWNER.getWireValue());
+
+        ProjectMaintainer saved;
+        try {
+            saved = projectMaintainerRepository.saveAndFlush(maintainer);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ApiException(
+                    "PROJECT_ALREADY_HAS_MAINTAINER",
+                    "This project already has a maintainer — use the owner-invite endpoint instead.",
+                    HttpStatus.CONFLICT);
+        }
+
+        // A site admin hand-confirming real ownership out-of-band is itself a
+        // verification event, same as the automated checks in createProject.
+        project.setVerified(true);
+        project.setVerifiedAt(OffsetDateTime.now());
+        projectRepository.save(project);
+
+        return projectQueryService.toDto(saved);
     }
 
     /** Shared owner check for both operations: caller must be a maintainer with role owner. */

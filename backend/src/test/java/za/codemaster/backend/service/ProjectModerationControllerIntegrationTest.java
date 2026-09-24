@@ -66,8 +66,17 @@ class ProjectModerationControllerIntegrationTest {
                 .build());
     }
 
-    private String uniqueGithubUrl() {
-        return "https://github.com/example-org/repo-" + UUID.randomUUID().toString().substring(0, 8);
+    /**
+     * A submission URL whose owner segment matches the submitting session's own
+     * username — the free, no-API-call verification signal (security audit finding,
+     * 2026-09-24), so {@code submitProject}'s caller actually ends up as the owner
+     * maintainer. None of this class's tests are about verification itself; they all
+     * need a real owner to exist for the moderation/notification/PATCH flows they do
+     * test.
+     */
+    private String ownGithubUrl(Session submitter) {
+        return "https://github.com/" + submitter.getUser().getUsername()
+                + "/repo-" + UUID.randomUUID().toString().substring(0, 8);
     }
 
     private String uniqueMarker() {
@@ -90,7 +99,7 @@ class ProjectModerationControllerIntegrationTest {
                         .cookie(new Cookie(SESSION_COOKIE, submitter.getId().toString()))
                         .header(CSRF_HEADER, submitter.getCsrToken())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"githubUrl\":\"" + uniqueGithubUrl()
+                        .content("{\"githubUrl\":\"" + ownGithubUrl(submitter)
                                 + "\",\"connection\":\"south_african\",\"category\":\"" + category + "\"" + tagsJson + "}"))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.listingStatus").value("pending"))

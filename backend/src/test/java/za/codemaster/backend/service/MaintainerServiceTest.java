@@ -69,7 +69,8 @@ class MaintainerServiceTest {
     void setUp() {
         ProjectQueryService projectQueryService =
                 new ProjectQueryService(projectRepository, issueRepository, claimRepository, projectMaintainerRepository);
-        service = new MaintainerService(projectRepository, projectMaintainerRepository, userRepository, projectQueryService);
+        service = new MaintainerService(projectRepository, projectMaintainerRepository, userRepository,
+                projectQueryService, new za.codemaster.backend.security.SiteAdminGuard());
 
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         projectId = fixtures.projectId(0);
@@ -235,6 +236,76 @@ class MaintainerServiceTest {
     void removeOnMissingProjectThrowsProjectNotFound() {
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.removeMaintainer(-999L, owner.getId(), owner));
+
+        assertEquals("PROJECT_NOT_FOUND", ex.getCode());
+    }
+
+    private User siteAdmin() {
+        return userRepository.save(User.builder()
+                .githubId(System.nanoTime())
+                .username("admin_" + System.nanoTime())
+                .displayName("Site Admin")
+                .isSiteAdmin(true)
+                .build());
+    }
+
+    @Test
+    void siteAdminCanAssignOwnerToAMaintainerlessProject() {
+        Long maintainerlessProjectId = fixtures.projectId(1); // no maintainer added in setUp — only projectId(0) got one
+        User realOwner = newUser();
+        AddMaintainerRequest request = new AddMaintainerRequest(realOwner.getUsername(), null);
+
+        ProjectMaintainerDto created = service.assignOwner(maintainerlessProjectId, request, siteAdmin());
+
+        assertEquals(MaintainerRole.OWNER, created.role());
+        assertEquals(realOwner.getUsername(), created.user().username());
+        Project reloaded = projectRepository.findById(maintainerlessProjectId).orElseThrow();
+        assertTrue(reloaded.getVerified(), "a site admin assigning an owner is itself a verification event");
+        assertNotNull(reloaded.getVerifiedAt());
+    }
+
+    @Test
+    void assignOwnerByNonSiteAdminIsForbidden() {
+        Long maintainerlessProjectId = fixtures.projectId(1);
+        User realOwner = newUser();
+        AddMaintainerRequest request = new AddMaintainerRequest(realOwner.getUsername(), null);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.assignOwner(maintainerlessProjectId, request, owner));
+
+        assertEquals("FORBIDDEN", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, ex.getStatus());
+    }
+
+    @Test
+    void assignOwnerRefusesWhenProjectAlreadyHasAMaintainer() {
+        // projectId(0), from setUp, already has `owner` as its maintainer.
+        User someone = newUser();
+        AddMaintainerRequest request = new AddMaintainerRequest(someone.getUsername(), null);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.assignOwner(projectId, request, siteAdmin()));
+
+        assertEquals("PROJECT_ALREADY_HAS_MAINTAINER", ex.getCode());
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, ex.getStatus());
+    }
+
+    @Test
+    void assignOwnerUnknownUsernameThrowsUserNotFound() {
+        Long maintainerlessProjectId = fixtures.projectId(1);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.assignOwner(maintainerlessProjectId, new AddMaintainerRequest("no-such-user-xyz", null), siteAdmin()));
+
+        assertEquals("USER_NOT_FOUND", ex.getCode());
+    }
+
+    @Test
+    void assignOwnerOnMissingProjectThrowsProjectNotFound() {
+        User realOwner = newUser();
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.assignOwner(-999L, new AddMaintainerRequest(realOwner.getUsername(), null), siteAdmin()));
 
         assertEquals("PROJECT_NOT_FOUND", ex.getCode());
     }

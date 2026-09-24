@@ -138,7 +138,10 @@ public class Project {
     @Builder.Default
     private Boolean verified = false;
 
-    @Column(name = "verified_at", insertable = false, updatable = false)
+    // Unlike created_at/updated_at, this has no DB-side default or trigger
+    // (V2__projects.sql: a plain nullable timestamptz) — it must be written
+    // by the app when verification actually happens (ProjectService.createProject).
+    @Column(name = "verified_at")
     private OffsetDateTime verifiedAt;
 
     @Column(name = "created_at", insertable = false, updatable = false)
