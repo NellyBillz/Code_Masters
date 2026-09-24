@@ -76,6 +76,20 @@ public class Comment {
     private OffsetDateTime deletedAt;
 
     /**
+     * Flags this comment as a blocking question — "I need this answered
+     * before I can start" — distinct from general discussion. Only
+     * meaningful on an issue comment (never set by
+     * {@code CommentService#createProjectComment}); surfaces in the
+     * maintainer activity rollup as its own triaged queue until resolved.
+     */
+    @Column(name = "is_question", nullable = false)
+    private Boolean isQuestion = false;
+
+    /** When a maintainer marked this question resolved. Null while still open. */
+    @Column(name = "resolved_at")
+    private OffsetDateTime resolvedAt;
+
+    /**
      * Creation timestamp generated automatically by the database default.
      */
     @Column(name = "created_at", insertable = false, updatable = false)

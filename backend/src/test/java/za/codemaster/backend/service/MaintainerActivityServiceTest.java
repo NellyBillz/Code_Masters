@@ -75,6 +75,9 @@ class MaintainerActivityServiceTest {
     @Autowired
     private ClaimCollaborationRequestRepository claimCollaborationRequestRepository;
 
+    @Autowired
+    private NotificationService notificationService;
+
     private MaintainerActivityService service;
     private ClaimService claimService;
     private CommentService commentService;
@@ -86,7 +89,7 @@ class MaintainerActivityServiceTest {
         // A generous limit — this class isn't testing API-03.10's rate limiting.
         RateLimitService unlimitedRateLimitService = new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000);
         claimService = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository, unlimitedRateLimitService,
-                claimCollaborationRequestRepository);
+                claimCollaborationRequestRepository, notificationService);
         commentService = new CommentService(commentRepository, projectRepository, issueRepository, projectMaintainerRepository,
                 claimRepository, unlimitedRateLimitService);
         service = new MaintainerActivityService(
@@ -236,5 +239,60 @@ class MaintainerActivityServiceTest {
         List<Long> maintainedProjectIds = summary.projects().stream().map(p -> p.project().id()).toList();
         assertTrue(maintainedProjectIds.contains(projectA.getId()));
         assertTrue(maintainedProjectIds.contains(projectB.getId()));
+    }
+
+    private Comment issueComment(Issue issue, User author, boolean isQuestion, boolean resolved) {
+        Comment comment = new Comment();
+        comment.setIssue(issue);
+        comment.setUser(author);
+        comment.setBody("A comment");
+        comment.setIsQuestion(isQuestion);
+        if (resolved) {
+            comment.setResolvedAt(java.time.OffsetDateTime.now());
+        }
+        return commentRepository.save(comment);
+    }
+
+    @Test
+    void unresolvedFlaggedQuestionAppearsInUnansweredQuestions() {
+        ProjectQueryServiceFixtures fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
+        Issue issue = issueRepository.findById(fixtures.issueId(0)).orElseThrow();
+        User maintainer = newUser("maintainer");
+        addMaintainer(issue.getProject(), maintainer);
+        User contributor = newUser("contributor");
+        Comment question = issueComment(issue, contributor, true, false);
+
+        MaintainerProjectActivity activity = service.getActivity(maintainer).projects().get(0);
+
+        assertEquals(1, activity.unansweredQuestions().size());
+        assertEquals(question.getId(), activity.unansweredQuestions().get(0).id());
+    }
+
+    @Test
+    void resolvedQuestionDoesNotAppearInUnansweredQuestions() {
+        ProjectQueryServiceFixtures fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
+        Issue issue = issueRepository.findById(fixtures.issueId(0)).orElseThrow();
+        User maintainer = newUser("maintainer");
+        addMaintainer(issue.getProject(), maintainer);
+        User contributor = newUser("contributor");
+        issueComment(issue, contributor, true, true);
+
+        MaintainerProjectActivity activity = service.getActivity(maintainer).projects().get(0);
+
+        assertTrue(activity.unansweredQuestions().isEmpty());
+    }
+
+    @Test
+    void plainCommentNeverAppearsInUnansweredQuestions() {
+        ProjectQueryServiceFixtures fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
+        Issue issue = issueRepository.findById(fixtures.issueId(0)).orElseThrow();
+        User maintainer = newUser("maintainer");
+        addMaintainer(issue.getProject(), maintainer);
+        User contributor = newUser("contributor");
+        issueComment(issue, contributor, false, false);
+
+        MaintainerProjectActivity activity = service.getActivity(maintainer).projects().get(0);
+
+        assertTrue(activity.unansweredQuestions().isEmpty());
     }
 }

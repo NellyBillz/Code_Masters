@@ -8,6 +8,7 @@ import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
 import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration;
 import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.domain.model.Claim;
@@ -21,6 +22,7 @@ import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimCollaborationRequestRepository;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.NotificationRepository;
 import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.UserRepository;
@@ -71,6 +73,12 @@ class ClaimCollaborationServiceTest {
     @Autowired
     private UserRepository userRepository;
 
+    @Autowired
+    private NotificationService notificationService;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
+
     private ClaimCollaborationService service;
     private ClaimService claimService;
     private ProjectQueryServiceFixtures fixtures;
@@ -83,9 +91,10 @@ class ClaimCollaborationServiceTest {
         // A generous limit — this class isn't testing API-03.10's rate limiting.
         RateLimitService unlimitedRateLimitService = new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000);
         service = new ClaimCollaborationService(
-                collaborationRequestRepository, claimRepository, issueRepository, unlimitedRateLimitService);
+                collaborationRequestRepository, claimRepository, issueRepository, unlimitedRateLimitService,
+                notificationService);
         claimService = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository,
-                unlimitedRateLimitService, collaborationRequestRepository);
+                unlimitedRateLimitService, collaborationRequestRepository, notificationService);
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         issueId = fixtures.issueId(0);
         owner = newUser("owner");
@@ -304,5 +313,57 @@ class ClaimCollaborationServiceTest {
         List<ClaimCollaborationRequestDto> history = service.listRequests(issueId, claim.getId());
 
         assertEquals(2, history.size());
+    }
+
+    @Test
+    void requestingCollaborationNotifiesTheClaimOwner() {
+        Claim claim = ownedClaim(owner, ClaimStatus.ACTIVE);
+
+        service.requestCollaboration(issueId, claim.getId(), requester);
+
+        var notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(owner.getId(), PageRequest.of(0, 10));
+        assertEquals(1, notifications.getTotalElements());
+        assertEquals("collaboration_requested", notifications.getContent().get(0).getType().getValue());
+        assertEquals("/issues/" + issueId, notifications.getContent().get(0).getLink());
+    }
+
+    @Test
+    void acceptingNotifiesTheRequester() {
+        Claim claim = ownedClaim(owner, ClaimStatus.ACTIVE);
+        ClaimCollaborationRequestDto pending = service.requestCollaboration(issueId, claim.getId(), requester);
+
+        service.respondToRequest(issueId, claim.getId(), pending.id(), CollaborationResponseDecision.ACCEPT, owner);
+
+        var notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(requester.getId(), PageRequest.of(0, 10));
+        assertEquals(1, notifications.getTotalElements());
+        assertEquals("collaboration_responded", notifications.getContent().get(0).getType().getValue());
+        assertTrue(notifications.getContent().get(0).getMessage().contains("accepted"));
+    }
+
+    @Test
+    void decliningNotifiesTheRequester() {
+        Claim claim = ownedClaim(owner, ClaimStatus.ACTIVE);
+        ClaimCollaborationRequestDto pending = service.requestCollaboration(issueId, claim.getId(), requester);
+
+        service.respondToRequest(issueId, claim.getId(), pending.id(), CollaborationResponseDecision.DECLINE, owner);
+
+        var notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(requester.getId(), PageRequest.of(0, 10));
+        assertEquals(1, notifications.getTotalElements());
+        assertTrue(notifications.getContent().get(0).getMessage().contains("declined"));
+    }
+
+    @Test
+    void bothOwnerAndCollaboratorAreNotifiedWhenTheClaimCompletes() {
+        Claim claim = ownedClaim(owner, ClaimStatus.ACTIVE);
+        ClaimCollaborationRequestDto pending = service.requestCollaboration(issueId, claim.getId(), requester);
+        service.respondToRequest(issueId, claim.getId(), pending.id(), CollaborationResponseDecision.ACCEPT, owner);
+        notificationRepository.deleteAll(); // isolate: only care about notifications from completion itself
+
+        claim.setStatus(ClaimStatus.COMPLETED);
+        claimRepository.save(claim);
+        claimService.notifyClaimCompleted(claim, issueRepository.findById(issueId).orElseThrow());
+
+        assertEquals(1, notificationRepository.findByUserIdOrderByCreatedAtDesc(owner.getId(), PageRequest.of(0, 10)).getTotalElements());
+        assertEquals(1, notificationRepository.findByUserIdOrderByCreatedAtDesc(requester.getId(), PageRequest.of(0, 10)).getTotalElements());
     }
 }

@@ -105,7 +105,7 @@ class CommentServiceTest {
     void createIssueCommentPersistsAndReturnsAuthorAndBody() {
         Long issueId = fixtures.issueId(0);
 
-        CommentDto created = service.createIssueComment(issueId, "I can help with this.", author);
+        CommentDto created = service.createIssueComment(issueId, "I can help with this.", false, author);
 
         assertNotNull(created.id());
         assertEquals("I can help with this.", created.body());
@@ -115,7 +115,7 @@ class CommentServiceTest {
     @Test
     void createIssueCommentOnMissingIssueThrowsIssueNotFound() {
         ApiException ex = assertThrows(ApiException.class,
-                () -> service.createIssueComment(-999L, "hello", author));
+                () -> service.createIssueComment(-999L, "hello", false, author));
 
         assertEquals("ISSUE_NOT_FOUND", ex.getCode());
         assertEquals(org.springframework.http.HttpStatus.NOT_FOUND, ex.getStatus());
@@ -136,7 +136,7 @@ class CommentServiceTest {
     @Test
     void createdIssueCommentAppearsInIssueCommentList() {
         Long issueId = fixtures.issueId(0);
-        service.createIssueComment(issueId, "Second comment", author);
+        service.createIssueComment(issueId, "Second comment", false, author);
 
         PagedComments page = service.getIssueComments(issueId, null, null);
 
@@ -166,7 +166,7 @@ class CommentServiceTest {
         Long projectId = fixtures.projectId(0);
         Long issueId = fixtures.issueId(0);
 
-        service.createIssueComment(issueId, "Issue-only comment", author);
+        service.createIssueComment(issueId, "Issue-only comment", false, author);
 
         PagedComments projectComments = service.getProjectComments(projectId, null, null);
 
@@ -279,6 +279,105 @@ class CommentServiceTest {
 
         ApiException ex = assertThrows(ApiException.class,
                 () -> service.deleteComment(created.id(), author));
+
+        assertEquals("COMMENT_NOT_FOUND", ex.getCode());
+    }
+
+    private ProjectMaintainer addMaintainer(Long projectId, User maintainerUser) {
+        Project project = projectRepository.findById(projectId).orElseThrow();
+        ProjectMaintainer maintainer = new ProjectMaintainer();
+        maintainer.setProject(project);
+        maintainer.setUser(maintainerUser);
+        maintainer.setRole("maintainer");
+        return projectMaintainerRepository.save(maintainer);
+    }
+
+    @Test
+    void issueCommentFlaggedAsQuestionIsMarkedUnresolvedByDefault() {
+        Long issueId = fixtures.issueId(0);
+
+        CommentDto created = service.createIssueComment(issueId, "Does this need auth too?", true, author);
+
+        assertTrue(created.isQuestion());
+        assertFalse(created.resolved());
+    }
+
+    @Test
+    void issueCommentNotFlaggedIsNeverAQuestion() {
+        Long issueId = fixtures.issueId(0);
+
+        CommentDto created = service.createIssueComment(issueId, "Just a comment.", false, author);
+
+        assertFalse(created.isQuestion());
+        assertFalse(created.resolved());
+    }
+
+    @Test
+    void projectCommentsCanNeverBeFlaggedAsQuestions() {
+        Long projectId = fixtures.projectId(0);
+
+        // createProjectComment has no isQuestion parameter at all — the only
+        // way "before you claim" makes sense is against an issue.
+        CommentDto created = service.createProjectComment(projectId, "General discussion.", author);
+
+        assertFalse(created.isQuestion());
+    }
+
+    @Test
+    void maintainerCanResolveAFlaggedQuestion() {
+        Long issueId = fixtures.issueId(0);
+        CommentDto question = service.createIssueComment(issueId, "Which branch should I target?", true, author);
+        User maintainerUser = otherUser();
+        addMaintainer(fixtures.projectId(0), maintainerUser);
+
+        CommentDto resolved = service.resolveQuestion(question.id(), maintainerUser);
+
+        assertTrue(resolved.resolved());
+        assertTrue(resolved.isQuestion());
+    }
+
+    @Test
+    void resolvingAnAlreadyResolvedQuestionIsIdempotent() {
+        Long issueId = fixtures.issueId(0);
+        CommentDto question = service.createIssueComment(issueId, "Still relevant?", true, author);
+        User maintainerUser = otherUser();
+        addMaintainer(fixtures.projectId(0), maintainerUser);
+        service.resolveQuestion(question.id(), maintainerUser);
+
+        CommentDto resolvedAgain = service.resolveQuestion(question.id(), maintainerUser);
+
+        assertTrue(resolvedAgain.resolved());
+    }
+
+    @Test
+    void resolvingByNonMaintainerIsForbidden() {
+        Long issueId = fixtures.issueId(0);
+        CommentDto question = service.createIssueComment(issueId, "Anyone free to review?", true, author);
+        User stranger = otherUser();
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.resolveQuestion(question.id(), stranger));
+
+        assertEquals("FORBIDDEN", ex.getCode());
+    }
+
+    @Test
+    void resolvingAPlainCommentThatWasNeverAQuestionIsRejected() {
+        Long issueId = fixtures.issueId(0);
+        CommentDto plain = service.createIssueComment(issueId, "Not a question.", false, author);
+        User maintainerUser = otherUser();
+        addMaintainer(fixtures.projectId(0), maintainerUser);
+
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.resolveQuestion(plain.id(), maintainerUser));
+
+        assertEquals("COMMENT_NOT_A_QUESTION", ex.getCode());
+    }
+
+    @Test
+    void resolvingMissingCommentThrowsCommentNotFound() {
+        ApiException ex = assertThrows(ApiException.class,
+                () -> service.resolveQuestion(-999L, author));
 
         assertEquals("COMMENT_NOT_FOUND", ex.getCode());
     }

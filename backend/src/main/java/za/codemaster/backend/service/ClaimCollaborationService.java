@@ -8,6 +8,7 @@ import za.codemaster.backend.domain.model.Claim;
 import za.codemaster.backend.domain.model.ClaimCollaborationRequest;
 import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.CollaborationRequestStatus;
+import za.codemaster.backend.domain.model.NotificationType;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.collaboration.ClaimCollaborationRequestDto;
 import za.codemaster.backend.dto.collaboration.CollaborationRequestStatusDto;
@@ -48,15 +49,18 @@ public class ClaimCollaborationService {
     private final ClaimRepository claimRepository;
     private final IssueRepository issueRepository;
     private final RateLimitService rateLimitService;
+    private final NotificationService notificationService;
 
     public ClaimCollaborationService(ClaimCollaborationRequestRepository collaborationRequestRepository,
                                       ClaimRepository claimRepository,
                                       IssueRepository issueRepository,
-                                      RateLimitService rateLimitService) {
+                                      RateLimitService rateLimitService,
+                                      NotificationService notificationService) {
         this.collaborationRequestRepository = collaborationRequestRepository;
         this.claimRepository = claimRepository;
         this.issueRepository = issueRepository;
         this.rateLimitService = rateLimitService;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -106,7 +110,12 @@ public class ClaimCollaborationService {
         try {
             // saveAndFlush forces the insert (and any constraint violation) to happen
             // right here, same reasoning as ClaimService.createClaim.
-            return toDto(collaborationRequestRepository.saveAndFlush(request));
+            ClaimCollaborationRequestDto created = toDto(collaborationRequestRepository.saveAndFlush(request));
+            notificationService.notify(claim.getUser(), NotificationType.COLLABORATION_REQUESTED,
+                    (caller.getDisplayName() != null ? caller.getDisplayName() : caller.getUsername())
+                            + " wants to collaborate on your claim for \"" + claim.getIssue().getTitle() + "\"",
+                    "/issues/" + issueId);
+            return created;
         } catch (DataIntegrityViolationException ex) {
             throw new ApiException(
                     "COLLABORATION_ALREADY_REQUESTED",
@@ -161,7 +170,15 @@ public class ClaimCollaborationService {
         }
 
         request.setRespondedAt(OffsetDateTime.now());
-        return toDto(collaborationRequestRepository.save(request));
+        ClaimCollaborationRequestDto updated = toDto(collaborationRequestRepository.save(request));
+
+        notificationService.notify(request.getRequester(), NotificationType.COLLABORATION_RESPONDED,
+                decision == CollaborationResponseDecision.ACCEPT
+                        ? "Your request to collaborate on \"" + claim.getIssue().getTitle() + "\" was accepted!"
+                        : "Your request to collaborate on \"" + claim.getIssue().getTitle() + "\" was declined.",
+                "/issues/" + issueId);
+
+        return updated;
     }
 
     /**

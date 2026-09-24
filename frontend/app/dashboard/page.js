@@ -2,8 +2,8 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowUpRight, HandHeart, Inbox, MessageCircle } from "lucide-react";
-import { getMaintainerActivity } from "../../lib/api";
+import { AlertTriangle, ArrowUpRight, HandHeart, HelpCircle, Inbox, MessageCircle } from "lucide-react";
+import { getMaintainerActivity, resolveQuestion } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 import ClaimReviewActions from "../components/ClaimReviewActions";
 
@@ -105,6 +105,10 @@ export default function MaintainerDashboardPage() {
     (entry.claimsAwaitingReview || []).map((claim) => ({ claim, project: entry.project }))
   );
 
+  const needsAnswer = projects.flatMap((entry) =>
+    (entry.unansweredQuestions || []).map((question) => ({ question, project: entry.project }))
+  );
+
   return (
     <div style={{ padding: "8px 4px 40px", maxWidth: "760px", margin: "0 auto" }}>
       <DashboardHeader />
@@ -121,6 +125,23 @@ export default function MaintainerDashboardPage() {
           <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
             {needsReview.map(({ claim, project }, index) => (
               <ClaimRow key={claim.id ?? index} claim={claim} project={project} highlight onReviewed={loadActivity} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {needsAnswer.length > 0 && (
+        <section
+          className="cm-glass"
+          style={{ borderRadius: "24px", padding: "20px", marginBottom: "24px", background: "var(--cm-orange-soft)" }}
+        >
+          <h2 style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "14px", fontWeight: 700, margin: "0 0 14px", color: "var(--cm-orange-text)" }}>
+            <HelpCircle size={16} strokeWidth={2} aria-hidden="true" />
+            Unanswered questions ({needsAnswer.length})
+          </h2>
+          <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+            {needsAnswer.map(({ question, project }, index) => (
+              <QuestionRow key={question.id ?? index} question={question} project={project} onResolved={loadActivity} />
             ))}
           </div>
         </section>
@@ -257,6 +278,79 @@ function ClaimRow({ claim, project, highlight, onReviewed }) {
       {highlight && (
         <ClaimReviewActions issueId={claim.issueId} claimId={claim.id} onReviewed={onReviewed} />
       )}
+    </div>
+  );
+}
+
+function QuestionRow({ question, project, onResolved }) {
+  const [resolving, setResolving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function handleResolve() {
+    try {
+      setResolving(true);
+      setError("");
+      await resolveQuestion(question.id);
+      await onResolved?.();
+    } catch (err) {
+      setError(err.message || "Failed to mark this question answered.");
+    } finally {
+      setResolving(false);
+    }
+  }
+
+  return (
+    <div style={{ background: "var(--cm-surface)", borderRadius: "12px", padding: "10px 14px", fontSize: "12.5px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+        <span style={{ color: "var(--cm-text-primary)" }}>
+          {question.author?.username ? (
+            <Link href={`/users/${question.author.username}`} style={{ fontWeight: 600 }}>
+              {question.author?.displayName || question.author.username}
+            </Link>
+          ) : (
+            <strong>{question.author?.displayName || "A contributor"}</strong>
+          )}
+          {" on "}
+          {question.issueId ? (
+            <Link href={`/issues/${question.issueId}`} style={{ fontWeight: 600, color: "var(--cm-lime-text)" }}>
+              issue #{question.issueId}
+            </Link>
+          ) : (
+            "an issue"
+          )}
+          {project?.name ? ` (${project.name})` : ""}
+        </span>
+        {question.createdAt && (
+          <span style={{ color: "var(--cm-text-muted)", fontSize: "11px" }}>{formatDate(question.createdAt)}</span>
+        )}
+      </div>
+      {question.body && (
+        <p style={{ margin: "6px 0 0", color: "var(--cm-text-secondary)" }}>{question.body}</p>
+      )}
+      {error && (
+        <p role="alert" style={{ margin: "6px 0 0", color: "var(--cm-orange-text)" }}>{error}</p>
+      )}
+      <button
+        type="button"
+        onClick={handleResolve}
+        disabled={resolving}
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: "4px",
+          marginTop: "8px",
+          background: "none",
+          border: "none",
+          padding: 0,
+          fontSize: "11.5px",
+          fontWeight: 700,
+          color: "var(--cm-lime-text)",
+          cursor: resolving ? "not-allowed" : "pointer",
+          opacity: resolving ? 0.6 : 1,
+        }}
+      >
+        {resolving ? "Marking answered…" : "Mark answered"}
+      </button>
     </div>
   );
 }

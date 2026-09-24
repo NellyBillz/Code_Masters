@@ -71,7 +71,8 @@ public class CommentController {
             @PathVariable Long issueId,
             @Valid @RequestBody CreateCommentRequest request,
             @AuthenticatedUser User currentUser) {
-        CommentDto created = commentService.createIssueComment(issueId, request.body(), currentUser);
+        CommentDto created = commentService.createIssueComment(
+                issueId, request.body(), Boolean.TRUE.equals(request.isQuestion()), currentUser);
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
@@ -107,5 +108,17 @@ public class CommentController {
             @AuthenticatedUser User currentUser) {
         commentService.deleteComment(commentId, currentUser);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * {@code POST /api/v1/comments/{commentId}/resolve}: a maintainer marks a
+     * flagged blocking question answered. Only meaningful on a comment
+     * created with {@code isQuestion: true}.
+     */
+    @PostMapping("/api/v1/comments/{commentId}/resolve")
+    public CommentDto resolveQuestion(
+            @PathVariable Long commentId,
+            @AuthenticatedUser User currentUser) {
+        return commentService.resolveQuestion(commentId, currentUser);
     }
 }

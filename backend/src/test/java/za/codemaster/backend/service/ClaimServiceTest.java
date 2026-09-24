@@ -8,6 +8,7 @@ import org.springframework.boot.security.autoconfigure.SecurityAutoConfiguration
 import org.springframework.boot.security.oauth2.client.autoconfigure.OAuth2ClientAutoConfiguration;
 import org.springframework.boot.security.oauth2.server.resource.autoconfigure.OAuth2ResourceServerAutoConfiguration;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.BackendApplication;
 import za.codemaster.backend.domain.model.User;
@@ -18,6 +19,7 @@ import za.codemaster.backend.exception.ApiException;
 import za.codemaster.backend.repository.ClaimCollaborationRequestRepository;
 import za.codemaster.backend.repository.ClaimRepository;
 import za.codemaster.backend.repository.IssueRepository;
+import za.codemaster.backend.repository.NotificationRepository;
 import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.repository.UserRepository;
@@ -73,6 +75,12 @@ class ClaimServiceTest {
     @Autowired
     private ClaimCollaborationRequestRepository claimCollaborationRequestRepository;
 
+    @Autowired
+    private NotificationService notificationService;
+
+    @Autowired
+    private NotificationRepository notificationRepository;
+
     private ClaimService service;
     private ProjectQueryServiceFixtures fixtures;
     private User claimant;
@@ -81,7 +89,8 @@ class ClaimServiceTest {
     void setUp() {
         // A generous limit — this class isn't testing API-03.10's rate limiting.
         service = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository,
-                new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000), claimCollaborationRequestRepository);
+                new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000), claimCollaborationRequestRepository,
+                notificationService);
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
         claimant = userRepository.save(User.builder()
                 .githubId(System.nanoTime())
@@ -325,6 +334,29 @@ class ClaimServiceTest {
 
         assertEquals(ClaimStatusDto.CHANGES_REQUESTED, reviewed.status());
         assertEquals("Please add a test for the edge case.", reviewed.maintainerFeedback());
+
+        var notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(claimant.getId(), PageRequest.of(0, 10));
+        assertEquals(1, notifications.getTotalElements());
+        assertEquals("claim_reviewed", notifications.getContent().get(0).getType().getValue());
+        assertFalse(notifications.getContent().get(0).getReadAt() != null);
+    }
+
+    @Test
+    void confirmingCompletedNotifiesTheClaimOwner() {
+        Long issueId = fixtures.issueId(0);
+        ClaimDto created = service.createClaim(issueId, null, claimant);
+        User maintainer = otherUser();
+        addMaintainer(issueId, maintainer);
+
+        service.reviewClaim(issueId, created.id(),
+                new za.codemaster.backend.dto.claim.ClaimReviewRequest(
+                        za.codemaster.backend.dto.claim.ClaimReviewDecision.CONFIRM_COMPLETED, null),
+                maintainer);
+
+        var notifications = notificationRepository.findByUserIdOrderByCreatedAtDesc(claimant.getId(), PageRequest.of(0, 10));
+        assertEquals(1, notifications.getTotalElements());
+        assertEquals("claim_reviewed", notifications.getContent().get(0).getType().getValue());
+        assertEquals("/issues/" + issueId, notifications.getContent().get(0).getLink());
     }
 
     @Test

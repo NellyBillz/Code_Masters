@@ -32,6 +32,7 @@ class ProjectSyncWorkerCommunityProfileTest {
         SyncJobRepository jobs = mock(SyncJobRepository.class);
         ClaimRepository claims = mock(ClaimRepository.class);
         ClaimCollaborationRequestRepository collaborationRequests = mock(ClaimCollaborationRequestRepository.class);
+        ClaimService claimService = mock(ClaimService.class);
         UUID jobId = UUID.randomUUID();
         SyncJob job = new SyncJob(1L);
         GitHubCommunityProfile profile = new GitHubCommunityProfile(true, true);
@@ -47,7 +48,7 @@ class ProjectSyncWorkerCommunityProfileTest {
         when(github.fetchIssues("owner", "repo", "issues-v1"))
                 .thenReturn(GitHubFetchResult.<List<GitHubIssueMetadata>>notModified());
 
-        new ProjectSyncWorker(github, projects, issues, jobs, claims, collaborationRequests).run(jobId);
+        new ProjectSyncWorker(github, projects, issues, jobs, claims, collaborationRequests, claimService).run(jobId);
 
         verify(projects).updateCommunityProfile(1L, profile);
         assertEquals("completed", job.getStatus());

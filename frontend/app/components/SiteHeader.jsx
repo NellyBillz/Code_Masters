@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Search, Cloud, ChevronDown } from "lucide-react";
 import Logo from "./Logo";
 import AuthStatus from "./AuthStatus";
+import NotificationBell from "./NotificationBell";
 import ThemeToggle from "./ThemeToggle";
 import LiveClock from "./LiveClock";
 
@@ -114,6 +115,8 @@ export default function SiteHeader() {
         <LiveClock />
 
         <ThemeToggle />
+
+        <NotificationBell />
 
         <AuthStatus />
       </div>

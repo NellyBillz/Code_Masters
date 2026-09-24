@@ -171,7 +171,7 @@ export default async function IssueDetailPage({ params }) {
       <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
         <ClaimPanel issueId={issueId} initialClaims={issue.claims || []} />
         <IssueMaintainerOverride issue={issue} />
-        <IssueComments issueId={issueId} />
+        <IssueComments issueId={issueId} projectId={issue.project?.id} />
       </div>
     </div>
   );

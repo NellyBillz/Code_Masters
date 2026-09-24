@@ -552,7 +552,16 @@ function reportComment(commentId, reason) {
   });
 }
 
-function postComment(issueId, body) {
+/**
+ * Post a comment on an issue.
+ *
+ * @param {number|string} issueId
+ * @param {string} body
+ * @param {boolean} [isQuestion] Flags this as a blocking question — "I need
+ *   this answered before I can start" — surfaced to the issue's project
+ *   maintainers as a triaged queue until resolved. Defaults to false.
+ */
+function postComment(issueId, body, isQuestion) {
   const csrfToken = getCsrfToken();
 
   return apiFetch(`/issues/${issueId}/comments`, {
@@ -561,7 +570,22 @@ function postComment(issueId, body) {
       'Content-Type': 'application/json',
       ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
     },
-    body: JSON.stringify({ body }),
+    body: JSON.stringify(isQuestion ? { body, isQuestion: true } : { body }),
+  });
+}
+
+/**
+ * A maintainer marks a flagged blocking question answered.
+ *
+ * @param {number|string} commentId
+ * @returns {Promise<Object>} The updated comment.
+ */
+function resolveQuestion(commentId) {
+  const csrfToken = getCsrfToken();
+
+  return apiFetch(`/comments/${commentId}/resolve`, {
+    method: 'POST',
+    headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
   });
 }
 
@@ -854,6 +878,55 @@ function postProjectComment(projectId, body) {
     });
   }
 
+  /**
+   * The caller's own in-app notifications, most recent first — a small,
+   * fixed set of state-change events (a claim reviewed, a collaboration
+   * request received/responded to, a project submission moderated), not a
+   * general activity feed.
+   *
+   * @param {Object} [params]
+   * @param {number} [params.page]
+   * @param {number} [params.size]
+   * @returns {Promise<{items: Object[], meta: PageMeta}>}
+   */
+  function getNotifications(params) {
+    return apiFetch(`/users/me/notifications${buildQuery(params)}`);
+  }
+
+  /**
+   * Backs the bell icon's unread badge — a cheap count, not the full list.
+   *
+   * @returns {Promise<{count: number}>}
+   */
+  function getUnreadNotificationCount() {
+    return apiFetch('/users/me/notifications/unread-count');
+  }
+
+  /**
+   * Marks one of the caller's own notifications read. Idempotent.
+   *
+   * @param {number|string} notificationId
+   * @returns {Promise<Object>} The updated notification.
+   */
+  function markNotificationRead(notificationId) {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch(`/users/me/notifications/${notificationId}/read`, {
+      method: 'POST',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+  }
+
+  /** Marks every one of the caller's unread notifications read in one call. */
+  function markAllNotificationsRead() {
+    const csrfToken = getCsrfToken();
+
+    return apiFetch('/users/me/notifications/read-all', {
+      method: 'POST',
+      headers: csrfToken ? { 'X-CSRF-Token': csrfToken } : {},
+    });
+  }
+
 /**
  * Update an issue's difficulty and/or beginner-friendly status.
  * Maintainer-only. Only provided fields are changed.
@@ -980,6 +1053,7 @@ module.exports = {
   getContributionContext,
   getIssueComments,
   postComment,
+  resolveQuestion,
   getProjectComments,
   postProjectComment,
   updateComment,
@@ -1001,6 +1075,10 @@ module.exports = {
   listCollaborationRequests,
   respondToCollaborationRequest,
   cancelCollaborationRequest,
+  getNotifications,
+  getUnreadNotificationCount,
+  markNotificationRead,
+  markAllNotificationsRead,
   logout,
   inviteMaintainer,
   removeMaintainer,

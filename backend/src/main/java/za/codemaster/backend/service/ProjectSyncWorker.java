@@ -41,6 +41,7 @@ public class ProjectSyncWorker {
     private final SyncJobRepository jobs;
     private final ClaimRepository claims;
     private final ClaimCollaborationRequestRepository collaborationRequests;
+    private final ClaimService claimService;
 
     public ProjectSyncWorker(
             GitHubClient github,
@@ -48,13 +49,15 @@ public class ProjectSyncWorker {
             IssueSyncRepository issues,
             SyncJobRepository jobs,
             ClaimRepository claims,
-            ClaimCollaborationRequestRepository collaborationRequests) {
+            ClaimCollaborationRequestRepository collaborationRequests,
+            ClaimService claimService) {
         this.github = github;
         this.projects = projects;
         this.issues = issues;
         this.jobs = jobs;
         this.claims = claims;
         this.collaborationRequests = collaborationRequests;
+        this.claimService = claimService;
     }
 
     @Async
@@ -187,6 +190,7 @@ public class ProjectSyncWorker {
                             + found.pullRequestNumber());
         }
         claims.save(matchingClaim);
+        claimService.notifyClaimCompleted(matchingClaim, matchingClaim.getIssue());
         return true;
     }
 

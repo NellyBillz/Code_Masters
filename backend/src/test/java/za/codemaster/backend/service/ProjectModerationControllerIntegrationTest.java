@@ -229,6 +229,49 @@ class ProjectModerationControllerIntegrationTest {
     }
 
     @Test
+    @DisplayName("Approving a submission notifies its submitter")
+    void approvingNotifiesSubmitter() throws Exception {
+        Session admin = createSession(true);
+        Session submitter = createSession(false);
+        Long projectId = submitProject(submitter, "Developer Tools");
+
+        mockMvc.perform(post("/api/v1/admin/projects/{projectId}/moderation", projectId)
+                        .cookie(new Cookie(SESSION_COOKIE, admin.getId().toString()))
+                        .header(CSRF_HEADER, admin.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"approve\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/users/me/notifications")
+                        .cookie(new Cookie(SESSION_COOKIE, submitter.getId().toString())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].type").value("project_moderated"))
+                .andExpect(jsonPath("$.items[0].read").value(false))
+                .andExpect(jsonPath("$.items[0].link").value("/projects/" + projectId));
+    }
+
+    @Test
+    @DisplayName("Rejecting a submission also notifies its submitter")
+    void rejectingNotifiesSubmitter() throws Exception {
+        Session admin = createSession(true);
+        Session submitter = createSession(false);
+        Long projectId = submitProject(submitter, "Developer Tools");
+
+        mockMvc.perform(post("/api/v1/admin/projects/{projectId}/moderation", projectId)
+                        .cookie(new Cookie(SESSION_COOKIE, admin.getId().toString()))
+                        .header(CSRF_HEADER, admin.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"reject\"}"))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(get("/api/v1/users/me/notifications")
+                        .cookie(new Cookie(SESSION_COOKIE, submitter.getId().toString())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.items[0].type").value("project_moderated"))
+                .andExpect(jsonPath("$.items[0].link").value("/projects/" + projectId));
+    }
+
+    @Test
     @DisplayName("Moderating a missing project -> 404 PROJECT_NOT_FOUND")
     void moderatingMissingProjectIs404() throws Exception {
         Session admin = createSession(true);

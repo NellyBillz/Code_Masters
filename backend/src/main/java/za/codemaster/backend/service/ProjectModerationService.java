@@ -6,6 +6,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import za.codemaster.backend.domain.model.ListingStatus;
+import za.codemaster.backend.domain.model.NotificationType;
 import za.codemaster.backend.domain.model.Project;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.common.PageMeta;
@@ -14,6 +15,7 @@ import za.codemaster.backend.dto.project.PagedProjects;
 import za.codemaster.backend.dto.project.ProjectDto;
 import za.codemaster.backend.dto.project.ProjectModerationRequest;
 import za.codemaster.backend.exception.ApiException;
+import za.codemaster.backend.repository.ProjectMaintainerRepository;
 import za.codemaster.backend.repository.ProjectRepository;
 import za.codemaster.backend.security.SiteAdminGuard;
 
@@ -35,13 +37,19 @@ public class ProjectModerationService {
     private final ProjectRepository projectRepository;
     private final ProjectQueryService projectQueryService;
     private final SiteAdminGuard siteAdminGuard;
+    private final ProjectMaintainerRepository projectMaintainerRepository;
+    private final NotificationService notificationService;
 
     public ProjectModerationService(ProjectRepository projectRepository,
                                      ProjectQueryService projectQueryService,
-                                     SiteAdminGuard siteAdminGuard) {
+                                     SiteAdminGuard siteAdminGuard,
+                                     ProjectMaintainerRepository projectMaintainerRepository,
+                                     NotificationService notificationService) {
         this.projectRepository = projectRepository;
         this.projectQueryService = projectQueryService;
         this.siteAdminGuard = siteAdminGuard;
+        this.projectMaintainerRepository = projectMaintainerRepository;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -79,13 +87,22 @@ public class ProjectModerationService {
                 .orElseThrow(() -> new ApiException(
                         "PROJECT_NOT_FOUND", "No project exists with id " + projectId, HttpStatus.NOT_FOUND));
 
-        ListingStatus newStatus = request.decision() == ModerationDecision.APPROVE
-                ? ListingStatus.PUBLISHED
-                : ListingStatus.REJECTED;
+        boolean approved = request.decision() == ModerationDecision.APPROVE;
+        ListingStatus newStatus = approved ? ListingStatus.PUBLISHED : ListingStatus.REJECTED;
         project.setListingStatus(newStatus);
 
         Project saved = projectRepository.save(project);
-        return projectQueryService.toDto(saved);
+        ProjectDto dto = projectQueryService.toDto(saved);
+
+        String message = approved
+                ? "Your project \"" + saved.getName() + "\" was approved and is now live!"
+                : "Your project \"" + saved.getName() + "\" was not approved.";
+        projectMaintainerRepository.findByProjectId(saved.getId()).stream()
+                .filter(maintainer -> "owner".equals(maintainer.getRole()))
+                .forEach(maintainer -> notificationService.notify(
+                        maintainer.getUser(), NotificationType.PROJECT_MODERATED, message, "/projects/" + saved.getId()));
+
+        return dto;
     }
 
     private int clampSize(Integer size) {

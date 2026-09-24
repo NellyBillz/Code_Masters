@@ -15,6 +15,7 @@ public record MaintainerProjectActivity(
         ProjectDto project,
         List<ClaimDto> activeClaims,
         List<ClaimDto> claimsAwaitingReview,
-        List<CommentDto> recentComments
+        List<CommentDto> recentComments,
+        List<CommentDto> unansweredQuestions
 ) {
 }

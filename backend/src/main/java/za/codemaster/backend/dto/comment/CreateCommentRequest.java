@@ -14,6 +14,14 @@ import jakarta.validation.constraints.Size;
 public record CreateCommentRequest(
         @NotBlank(message = "body must not be blank")
         @Size(min = 1, max = 5000, message = "body must be between 1 and 5000 characters")
-        String body
+        String body,
+
+        /**
+         * Flags this as a blocking question. Only honored on
+         * {@code POST /issues/{issueId}/comments} — ignored on
+         * {@code POST /projects/{projectId}/comments}, since "before you
+         * claim" is specifically about an issue. Optional; defaults to false.
+         */
+        Boolean isQuestion
 ) {
 }

@@ -60,4 +60,13 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
         ORDER BY c.createdAt DESC
     """)
     List<Comment> findRecentByProjectOrItsIssues(@Param("projectId") Long projectId, Pageable pageable);
+
+    /**
+     * Unresolved blocking questions across a project's issues, oldest first
+     * (a maintainer should clear the longest-waiting one first) — the "Ask
+     * before you claim" triage queue. Backs {@code unansweredQuestions} in
+     * {@code GET /users/me/maintainer-activity} (mirrors
+     * {@code claimsAwaitingReview}'s "flagged, not yet actioned" shape).
+     */
+    List<Comment> findByIssueProjectIdAndIsQuestionTrueAndResolvedAtIsNullAndDeletedAtIsNullOrderByCreatedAtAsc(Long projectId);
 }

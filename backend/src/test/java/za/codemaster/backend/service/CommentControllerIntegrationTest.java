@@ -338,4 +338,56 @@ class CommentControllerIntegrationTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("COMMENT_NOT_FOUND"));
     }
+
+    @Test
+    @DisplayName("Posting an issue comment with isQuestion:true flags it, and a maintainer can resolve it")
+    void flaggedQuestionCanBeResolvedByAMaintainer() throws Exception {
+        Session contributorSession = createActiveSession();
+        Session maintainerSession = createActiveSession();
+        makeMaintainer(maintainerSession);
+
+        String response = mockMvc.perform(post("/api/v1/issues/{issueId}/comments", issueId)
+                        .cookie(new Cookie(SESSION_COOKIE, contributorSession.getId().toString()))
+                        .header(CSRF_HEADER, contributorSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"body\":\"Does this need a DB migration too?\",\"isQuestion\":true}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.isQuestion").value(true))
+                .andExpect(jsonPath("$.resolved").value(false))
+                .andReturn().getResponse().getContentAsString();
+
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\"id\":(\\d+)").matcher(response);
+        matcher.find();
+        Long commentId = Long.valueOf(matcher.group(1));
+
+        mockMvc.perform(post("/api/v1/comments/{commentId}/resolve", commentId)
+                        .cookie(new Cookie(SESSION_COOKIE, maintainerSession.getId().toString()))
+                        .header(CSRF_HEADER, maintainerSession.getCsrToken()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.resolved").value(true));
+    }
+
+    @Test
+    @DisplayName("A non-maintainer resolving a flagged question -> 403 FORBIDDEN")
+    void resolvingByNonMaintainerIsForbidden() throws Exception {
+        Session contributorSession = createActiveSession();
+        Session strangerSession = createActiveSession();
+
+        String response = mockMvc.perform(post("/api/v1/issues/{issueId}/comments", issueId)
+                        .cookie(new Cookie(SESSION_COOKIE, contributorSession.getId().toString()))
+                        .header(CSRF_HEADER, contributorSession.getCsrToken())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"body\":\"Which branch?\",\"isQuestion\":true}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        java.util.regex.Matcher matcher = java.util.regex.Pattern.compile("\"id\":(\\d+)").matcher(response);
+        matcher.find();
+        Long commentId = Long.valueOf(matcher.group(1));
+
+        mockMvc.perform(post("/api/v1/comments/{commentId}/resolve", commentId)
+                        .cookie(new Cookie(SESSION_COOKIE, strangerSession.getId().toString()))
+                        .header(CSRF_HEADER, strangerSession.getCsrToken()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"));
+    }
 }

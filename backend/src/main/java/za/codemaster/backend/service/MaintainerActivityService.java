@@ -83,7 +83,13 @@ public class MaintainerActivityService {
                 .map(commentService::toDto)
                 .toList();
 
+        List<CommentDto> unansweredQuestions = commentRepository
+                .findByIssueProjectIdAndIsQuestionTrueAndResolvedAtIsNullAndDeletedAtIsNullOrderByCreatedAtAsc(project.getId())
+                .stream()
+                .map(commentService::toDto)
+                .toList();
+
         return new MaintainerProjectActivity(
-                projectQueryService.toDto(project), activeClaims, claimsAwaitingReview, recentComments);
+                projectQueryService.toDto(project), activeClaims, claimsAwaitingReview, recentComments, unansweredQuestions);
     }
 }

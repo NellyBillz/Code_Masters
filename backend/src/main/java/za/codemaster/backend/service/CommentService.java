@@ -87,16 +87,19 @@ public class CommentService {
     /**
      * Creates a comment on an issue.
      *
-     * @param issueId the issue id from the path
-     * @param body    the comment text, already length-validated by {@code @Valid} on the request DTO
-     * @param author  the authenticated caller, injected via {@code @AuthenticatedUser}
+     * @param issueId    the issue id from the path
+     * @param body       the comment text, already length-validated by {@code @Valid} on the request DTO
+     * @param isQuestion flags this as a blocking question — "I need this answered before I can
+     *                   start" — surfaced to the issue's project maintainers as a triaged queue
+     *                   (see {@code MaintainerActivityService}) until resolved
+     * @param author     the authenticated caller, injected via {@code @AuthenticatedUser}
      * @return the created comment, in API shape
      * @throws ApiException with code {@code RATE_LIMITED} (429, API-03.10) if the caller has posted
      *                       too many comments in the last hour, or
      *                       {@code ISSUE_NOT_FOUND} (404) if the issue doesn't exist
      */
     @Transactional
-    public CommentDto createIssueComment(Long issueId, String body, User author) {
+    public CommentDto createIssueComment(Long issueId, String body, boolean isQuestion, User author) {
         rateLimitService.checkCommentLimit(author.getId());
 
         Issue issue = issueRepository.findById(issueId)
@@ -107,6 +110,7 @@ public class CommentService {
         comment.setUser(author);
         comment.setIssue(issue);
         comment.setBody(body);
+        comment.setIsQuestion(isQuestion);
 
         return toDto(persist(comment));
     }
@@ -199,6 +203,44 @@ public class CommentService {
     }
 
     /**
+     * {@code POST /comments/{commentId}/resolve}: a maintainer marks a
+     * flagged blocking question answered — the counterpart to
+     * {@code isQuestion} on {@link #createIssueComment}. Idempotent: marking
+     * an already-resolved question resolved again is a no-op, not an error,
+     * same reasoning as {@code ClaimService.reviewClaim}'s
+     * {@code confirm_completed} re-confirmation case.
+     *
+     * @param commentId the comment id from the path
+     * @param caller    the authenticated caller, injected via {@code @AuthenticatedUser}
+     * @return the resolved comment, in API shape
+     * @throws ApiException with code {@code COMMENT_NOT_FOUND} (404) if the comment doesn't exist
+     *                       or is soft-deleted, {@code COMMENT_NOT_A_QUESTION} (409) if it was never
+     *                       flagged as a question, or {@code FORBIDDEN} (403) if the caller isn't a
+     *                       maintainer of the comment's parent project
+     */
+    @Transactional
+    public CommentDto resolveQuestion(Long commentId, User caller) {
+        Comment comment = findActiveCommentOrThrow(commentId);
+
+        if (!Boolean.TRUE.equals(comment.getIsQuestion())) {
+            throw new ApiException(
+                    "COMMENT_NOT_A_QUESTION", "This comment was never flagged as a blocking question.",
+                    HttpStatus.CONFLICT);
+        }
+
+        if (!isMaintainerOfParentProject(comment, caller.getId())) {
+            throw new ApiException(
+                    "FORBIDDEN", "Only a maintainer of this project may resolve a question.", HttpStatus.FORBIDDEN);
+        }
+
+        if (comment.getResolvedAt() == null) {
+            comment.setResolvedAt(OffsetDateTime.now());
+            comment = commentRepository.save(comment);
+        }
+        return toDto(comment);
+    }
+
+    /**
      * Shared lookup for {@link #editComment}/{@link #deleteComment}: a soft-deleted comment is treated
      * as not found (404), same as one that was never created — not a 403/409 on an already-gone row.
      */
@@ -280,7 +322,10 @@ public class CommentService {
                 entity.getBody(),
                 Boolean.TRUE.equals(entity.getEdited()),
                 entity.getCreatedAt(),
-                entity.getUpdatedAt()
+                entity.getUpdatedAt(),
+                Boolean.TRUE.equals(entity.getIsQuestion()),
+                entity.getResolvedAt() != null,
+                entity.getIssue() != null ? entity.getIssue().getId() : null
         );
     }
 

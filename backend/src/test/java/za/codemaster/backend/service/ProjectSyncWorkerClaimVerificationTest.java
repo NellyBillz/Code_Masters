@@ -47,6 +47,7 @@ class ProjectSyncWorkerClaimVerificationTest {
     @Mock private SyncJobRepository jobs;
     @Mock private ClaimRepository claims;
     @Mock private ClaimCollaborationRequestRepository collaborationRequests;
+    @Mock private ClaimService claimService;
 
     private ProjectSyncWorker worker;
     private UUID jobId;
@@ -54,7 +55,7 @@ class ProjectSyncWorkerClaimVerificationTest {
 
     @BeforeEach
     void setUp() {
-        worker = new ProjectSyncWorker(github, projects, issues, jobs, claims, collaborationRequests);
+        worker = new ProjectSyncWorker(github, projects, issues, jobs, claims, collaborationRequests, claimService);
         jobId = UUID.randomUUID();
         job = new SyncJob(1L);
         when(jobs.findById(jobId)).thenReturn(Optional.of(job));
@@ -96,6 +97,7 @@ class ProjectSyncWorkerClaimVerificationTest {
         assertEquals(1, job.getContributionsVerifiedCount());
         verify(issues).markClosed(42L);
         verify(claims).save(claim);
+        verify(claimService).notifyClaimCompleted(claim, claim.getIssue());
     }
 
     @Test
@@ -133,6 +135,7 @@ class ProjectSyncWorkerClaimVerificationTest {
         assertEquals(ClaimStatus.COMPLETED, claim.getStatus());
         assertEquals(CompletionSource.GITHUB_VERIFIED, claim.getCompletionSource());
         verify(claims).save(claim);
+        verify(claimService).notifyClaimCompleted(claim, claim.getIssue());
     }
 
     @Test
@@ -159,6 +162,7 @@ class ProjectSyncWorkerClaimVerificationTest {
         assertNull(claim.getCompletedAt());
         assertEquals(0, job.getContributionsVerifiedCount());
         verify(claims, never()).save(any());
+        verify(claimService, never()).notifyClaimCompleted(any(), any());
     }
 
     @Test
@@ -171,5 +175,6 @@ class ProjectSyncWorkerClaimVerificationTest {
         verify(github, never()).fetchClosingPullRequest(any(), any(), anyInt());
         verify(claims, never()).findByIssueIdAndStatusIn(any(), any());
         verify(claims, never()).save(any());
+        verify(claimService, never()).notifyClaimCompleted(any(), any());
     }
 }

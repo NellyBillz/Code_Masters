@@ -9,6 +9,7 @@ import za.codemaster.backend.domain.model.ClaimStatus;
 import za.codemaster.backend.domain.model.CollaborationRequestStatus;
 import za.codemaster.backend.domain.model.CompletionSource;
 import za.codemaster.backend.domain.model.Issue;
+import za.codemaster.backend.domain.model.NotificationType;
 import za.codemaster.backend.domain.model.PullRequestState;
 import za.codemaster.backend.domain.model.User;
 import za.codemaster.backend.dto.claim.ClaimCompletionSourceDto;
@@ -40,16 +41,19 @@ public class ClaimService {
     private final ProjectMaintainerRepository projectMaintainerRepository;
     private final RateLimitService rateLimitService;
     private final ClaimCollaborationRequestRepository collaborationRequestRepository;
+    private final NotificationService notificationService;
 
     public ClaimService(ClaimRepository claimRepository, IssueRepository issueRepository,
                          ProjectMaintainerRepository projectMaintainerRepository,
                          RateLimitService rateLimitService,
-                         ClaimCollaborationRequestRepository collaborationRequestRepository) {
+                         ClaimCollaborationRequestRepository collaborationRequestRepository,
+                         NotificationService notificationService) {
         this.claimRepository = claimRepository;
         this.issueRepository = issueRepository;
         this.projectMaintainerRepository = projectMaintainerRepository;
         this.rateLimitService = rateLimitService;
         this.collaborationRequestRepository = collaborationRequestRepository;
+        this.notificationService = notificationService;
     }
 
     /**
@@ -234,7 +238,11 @@ public class ClaimService {
             }
             claim.setStatus(ClaimStatus.CHANGES_REQUESTED);
             claim.setMaintainerFeedback(request.feedback());
-            return toDto(claimRepository.save(claim));
+            ClaimDto updated = toDto(claimRepository.save(claim));
+            notificationService.notify(claim.getUser(), NotificationType.CLAIM_REVIEWED,
+                    "A maintainer requested changes on your claim for \"" + issue.getTitle() + "\"",
+                    "/issues/" + issueId);
+            return updated;
         }
 
         // decision == CONFIRM_COMPLETED
@@ -244,7 +252,25 @@ public class ClaimService {
         claim.setStatus(ClaimStatus.COMPLETED);
         claim.setCompletionSource(CompletionSource.MAINTAINER_CONFIRMED);
         claim.setCompletedAt(OffsetDateTime.now());
-        return toDto(claimRepository.save(claim));
+        ClaimDto updated = toDto(claimRepository.save(claim));
+        notifyClaimCompleted(claim, issue);
+        return updated;
+    }
+
+    /**
+     * Notifies everyone actually credited for a claim that just reached
+     * {@code completed} — the owner, and every accepted collaborator (see
+     * {@code ClaimCollaborationRequestRepository}, which is exactly who
+     * {@code countCreditedContributions} counts it for). Called from both
+     * a maintainer's manual confirmation here and GitHub-verified
+     * completion ({@code ProjectSyncWorker}).
+     */
+    void notifyClaimCompleted(Claim claim, Issue issue) {
+        String message = "Your contribution to \"" + issue.getTitle() + "\" was verified as completed!";
+        String link = "/issues/" + issue.getId();
+        notificationService.notify(claim.getUser(), NotificationType.CLAIM_REVIEWED, message, link);
+        collaborationRequestRepository.findByClaimIdAndStatus(claim.getId(), CollaborationRequestStatus.ACCEPTED)
+                .forEach(request -> notificationService.notify(request.getRequester(), NotificationType.CLAIM_REVIEWED, message, link));
     }
 
     /**

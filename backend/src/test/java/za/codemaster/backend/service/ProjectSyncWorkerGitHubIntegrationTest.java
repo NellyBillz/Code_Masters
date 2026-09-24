@@ -40,6 +40,7 @@ class ProjectSyncWorkerGitHubIntegrationTest {
         SyncJobRepository jobs = mock(SyncJobRepository.class);
         ClaimRepository claims = mock(ClaimRepository.class);
         ClaimCollaborationRequestRepository collaborationRequests = mock(ClaimCollaborationRequestRepository.class);
+        ClaimService claimService = mock(ClaimService.class);
 
         UUID jobId = UUID.randomUUID();
         SyncJob job = new SyncJob(1L);
@@ -62,7 +63,7 @@ class ProjectSyncWorkerGitHubIntegrationTest {
                 42L, List.of(ClaimStatus.ACTIVE, ClaimStatus.CHANGES_REQUESTED)))
                 .thenReturn(List.of(claim));
 
-        new ProjectSyncWorker(github, projects, issues, jobs, claims, collaborationRequests).run(jobId);
+        new ProjectSyncWorker(github, projects, issues, jobs, claims, collaborationRequests, claimService).run(jobId);
 
         assertEquals("completed", job.getStatus());
         assertEquals(1, job.getContributionsVerifiedCount());

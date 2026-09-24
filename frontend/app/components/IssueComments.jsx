@@ -2,19 +2,35 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { getIssueComments, postComment } from "../../lib/api";
+import { HelpCircle, CheckCircle2 } from "lucide-react";
+import { getIssueComments, postComment, resolveQuestion, getProject } from "../../lib/api";
 import { useAuth } from "../context/AuthContext";
 import ReportCommentButton from "./ReportCommentButton";
 import EditCommentButton from "./EditCommentButton";
 import DeleteCommentButton from "./DeleteCommentButton";
 
-export default function IssueComments({ issueId }) {
+export default function IssueComments({ issueId, projectId }) {
   const { user, loading: authLoading } = useAuth();
   const [comments, setComments] = useState([]);
   const [body, setBody] = useState("");
+  const [isQuestion, setIsQuestion] = useState(false);
   const [loading, setLoading] = useState(true);
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState("");
+  const [project, setProject] = useState(null);
+
+  useEffect(() => {
+    if (!projectId) return;
+    getProject(projectId)
+      .then(setProject)
+      .catch(() => setProject(null));
+  }, [projectId]);
+
+  const isMaintainer = Boolean(
+    user && project?.maintainers?.some(
+      (maintainer) => maintainer.user?.id === user.id || maintainer.user?.username === user.username
+    )
+  );
 
   async function loadComments() {
     try {
@@ -42,13 +58,23 @@ export default function IssueComments({ issueId }) {
     try {
       setPosting(true);
       setError("");
-      await postComment(issueId, trimmedBody);
+      await postComment(issueId, trimmedBody, isQuestion);
       setBody("");
+      setIsQuestion(false);
       await loadComments();
     } catch (err) {
       setError(err.message || "Failed to post comment.");
     } finally {
       setPosting(false);
+    }
+  }
+
+  async function handleResolve(commentId) {
+    try {
+      const updated = await resolveQuestion(commentId);
+      setComments((prev) => prev.map((c) => (c.id === commentId ? updated : c)));
+    } catch (err) {
+      setError(err.message || "Failed to mark this question answered.");
     }
   }
 
@@ -79,6 +105,16 @@ export default function IssueComments({ issueId }) {
             }}
           />
 
+          <label style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "12px", color: "var(--cm-text-secondary)", marginBottom: "12px", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={isQuestion}
+              onChange={(event) => setIsQuestion(event.target.checked)}
+              style={{ width: "14px", height: "14px", accentColor: "var(--cm-orange)" }}
+            />
+            This is a blocking question — I need this answered before I can start
+          </label>
+
           <button
             type="submit"
             disabled={posting || !body.trim()}
@@ -94,7 +130,7 @@ export default function IssueComments({ issueId }) {
               color: "#FFFFFF",
             }}
           >
-            {posting ? "Posting…" : "Post comment"}
+            {posting ? "Posting…" : isQuestion ? "Post question" : "Post comment"}
           </button>
         </form>
       ) : (
@@ -118,6 +154,34 @@ export default function IssueComments({ issueId }) {
 
             return (
               <article key={comment.id} style={{ background: "var(--cm-surface-alt)", borderRadius: "14px", padding: "12px 16px" }}>
+                {comment.isQuestion && (
+                  <span
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "4px",
+                      fontSize: "10.5px",
+                      fontWeight: 700,
+                      padding: "2px 8px",
+                      borderRadius: "999px",
+                      marginBottom: "6px",
+                      background: comment.resolved ? "var(--cm-lime-soft)" : "var(--cm-orange-soft)",
+                      color: comment.resolved ? "var(--cm-lime-text)" : "var(--cm-orange-text)",
+                    }}
+                  >
+                    {comment.resolved ? (
+                      <>
+                        <CheckCircle2 size={11} strokeWidth={2} aria-hidden="true" />
+                        Question answered
+                      </>
+                    ) : (
+                      <>
+                        <HelpCircle size={11} strokeWidth={2} aria-hidden="true" />
+                        Blocking question
+                      </>
+                    )}
+                  </span>
+                )}
                 {isOwner ? (
                   <EditCommentButton
                     comment={comment}
@@ -144,6 +208,16 @@ export default function IssueComments({ issueId }) {
                     )}
                     {comment.createdAt ? ` · ${new Date(comment.createdAt).toLocaleString()}` : ""}
                   </p>
+                  {isMaintainer && comment.isQuestion && !comment.resolved && (
+                    <button
+                      type="button"
+                      onClick={() => handleResolve(comment.id)}
+                      style={{ display: "inline-flex", alignItems: "center", gap: "4px", background: "none", border: "none", padding: 0, fontSize: "11.5px", fontWeight: 700, color: "var(--cm-lime-text)", cursor: "pointer" }}
+                    >
+                      <CheckCircle2 size={11} strokeWidth={2} aria-hidden="true" />
+                      Mark answered
+                    </button>
+                  )}
                   {user && !isOwner && <ReportCommentButton commentId={comment.id} />}
                   {isOwner && (
                     <DeleteCommentButton
