@@ -177,6 +177,39 @@ class UserServiceTest {
         assertEquals(0, service.getPublicProfile(user.getUsername()).contributionsCount());
     }
 
+    @Test
+    void projectsCountCountsEachDistinctProjectOnceEvenWithMultipleCompletedIssuesOnIt() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("projectscount_" + suffix, "projectscount_" + suffix + "@example.com");
+        ProjectQueryServiceFixtures fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
+        // issueId(0) and issueId(1) both belong to the same fixture project (OpenLearn SA).
+        Issue sameProjectIssueA = issueRepository.findById(fixtures.issueId(0)).orElseThrow();
+        Issue sameProjectIssueB = issueRepository.findById(fixtures.issueId(1)).orElseThrow();
+
+        completedClaim(sameProjectIssueA, user, java.time.OffsetDateTime.now());
+        assertEquals(1, service.getPublicProfile(user.getUsername()).projectsCount());
+
+        completedClaim(sameProjectIssueB, user, java.time.OffsetDateTime.now());
+        assertEquals(1, service.getPublicProfile(user.getUsername()).projectsCount(),
+                "a second completed contribution on the SAME project must not double-count it");
+    }
+
+    @Test
+    void projectsCountIncrementsOnlyWhenACompletedContributionLandsOnANewProject() {
+        String suffix = String.valueOf(System.nanoTime());
+        User user = createUser("multiproj_" + suffix, "multiproj_" + suffix + "@example.com");
+        Issue issueOnProjectA = seedIssue();
+        Issue issueOnProjectB = seedIssue(); // a fresh seed() call, so this is a distinct project row
+
+        assertEquals(0, service.getPublicProfile(user.getUsername()).projectsCount());
+
+        completedClaim(issueOnProjectA, user, java.time.OffsetDateTime.now());
+        assertEquals(1, service.getPublicProfile(user.getUsername()).projectsCount());
+
+        completedClaim(issueOnProjectB, user, java.time.OffsetDateTime.now());
+        assertEquals(2, service.getPublicProfile(user.getUsername()).projectsCount());
+    }
+
     private Claim completedClaim(Issue issue, User user, java.time.OffsetDateTime completedAt) {
         Claim claim = new Claim();
         claim.setIssue(issue);

@@ -3,6 +3,47 @@ import { getPublicProfile } from "../../../lib/api";
 import GitHubStats from "../../components/GitHubStats";
 import StatTile from "../../components/StatTile";
 import RecentContributions from "../../components/RecentContributions";
+import ShareProfileButton from "../../components/ShareProfileButton";
+
+/**
+ * Dynamic Open Graph metadata (Contributor Passport wow-feature, 2026-09-24)
+ * — the concrete "shareable" capability: pasting a /users/{username} link
+ * into LinkedIn/Slack/Twitter now unfurls a real preview card (name,
+ * verified contribution count, avatar) instead of the generic site default.
+ * `getPublicProfile` calls the same underlying `fetch` the page body below
+ * calls; Next.js memoizes identical fetches within one request, so this
+ * doesn't double the network call.
+ */
+export async function generateMetadata({ params }) {
+  const { username } = await params;
+
+  try {
+    const user = await getPublicProfile(username);
+    const name = user.displayName || user.username;
+    const title = `${name} (@${user.username}) — Code Masters`;
+    const contributions = user.contributionsCount ?? 0;
+    const description = `${contributions} GitHub-verified contribution${contributions === 1 ? "" : "s"} across South African open-source projects.`;
+
+    return {
+      title,
+      description,
+      openGraph: {
+        title,
+        description,
+        type: "profile",
+        images: user.avatarUrl ? [{ url: user.avatarUrl }] : undefined,
+      },
+      twitter: {
+        card: "summary",
+        title,
+        description,
+        images: user.avatarUrl ? [user.avatarUrl] : undefined,
+      },
+    };
+  } catch {
+    return { title: `@${username} — Code Masters` };
+  }
+}
 
 export default async function PublicProfilePage({ params }) {
   const { username } = await params;
@@ -34,6 +75,9 @@ export default async function PublicProfilePage({ params }) {
     <div style={{ padding: "8px 4px 40px", maxWidth: "760px", margin: "0 auto" }}>
       {/* Header */}
       <header className="cm-glass" style={{ borderRadius: "28px", padding: "28px", marginBottom: "20px" }}>
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: "8px" }}>
+          <ShareProfileButton />
+        </div>
         <div style={{ display: "flex", alignItems: "flex-start", gap: "18px", flexWrap: "wrap" }}>
           {user.avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- external, size-variable avatar URL

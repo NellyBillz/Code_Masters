@@ -134,6 +134,22 @@ public interface ClaimRepository extends JpaRepository<Claim, Long> {
     long countCreditedContributions(@Param("userId") Long userId);
 
     /**
+     * How many distinct projects a user has a real, credited contribution on
+     * — same eligibility rule as {@link #countCreditedContributions}, just
+     * counting distinct {@code issue.project} instead of distinct claims.
+     * Backs {@code PublicUserProfile.projectsCount} (Contributor Passport
+     * wow-feature, 2026-09-24), previously a documented dead field nothing
+     * computed.
+     */
+    @Query("SELECT COUNT(DISTINCT c.issue.project.id) FROM Claim c WHERE c.status = za.codemaster.backend.domain.model.ClaimStatus.COMPLETED "
+            + "AND (c.user.id = :userId OR EXISTS ("
+            + "  SELECT 1 FROM ClaimCollaborationRequest ccr "
+            + "  WHERE ccr.claim = c AND ccr.requester.id = :userId "
+            + "  AND ccr.status = za.codemaster.backend.domain.model.CollaborationRequestStatus.ACCEPTED"
+            + "))")
+    long countDistinctCreditedProjects(@Param("userId") Long userId);
+
+    /**
      * A user's real, credited contribution history: claims they own with
      * status {@code completed}, plus claims they were an accepted
      * collaborator on with status {@code completed}, most recent

@@ -206,9 +206,16 @@ public class UserService {
     }
 
     /**
-     * Maps a user to the API's {@link PublicUserProfile} shape.
-     * {@code projectsCount} is not yet computed anywhere in the codebase (no
-     * ticket populates it); left {@code null} rather than a made-up value.
+     * Maps a user to the API's {@link PublicUserProfile} shape — the one
+     * construction site that backs the actual public profile endpoint
+     * ({@code GET /users/{username}}, the Contributor Passport page). Every
+     * other {@code toPublicProfile}-style mapper in this codebase (embedding
+     * author info in a comment, claim, report, or collaboration response)
+     * still leaves {@code projectsCount} {@code null} — this field only
+     * matters on the profile page itself, and populating it everywhere an
+     * author gets embedded would be needless extra queries for no visible
+     * benefit.
+     * <p>
      * {@code contributionsCount} (API-03.5) counts only this user's
      * {@code completed} claims — verified contributions, not raw claim activity.
      */
@@ -221,7 +228,7 @@ public class UserService {
                 user.getBio(),
                 user.getLocation(),
                 user.getSkills() == null ? List.of() : List.of(user.getSkills()),
-                null,
+                (int) claimRepository.countDistinctCreditedProjects(user.getId()),
                 (int) claimRepository.countCreditedContributions(user.getId()),
                 user.getReputation()
         );
