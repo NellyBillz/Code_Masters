@@ -78,7 +78,7 @@ class ReportServiceTest {
     void setUp() {
         // A generous limit — this class isn't testing API-03.10's rate limiting.
         service = new ReportService(reportRepository, commentRepository, projectRepository, claimRepository,
-                new SiteAdminGuard(), new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000));
+                new SiteAdminGuard(), new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000));
         fixtures = ProjectQueryServiceFixtures.seed(projectRepository, issueRepository);
     }
 

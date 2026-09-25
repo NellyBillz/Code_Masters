@@ -72,7 +72,9 @@ class ProjectServiceTest {
     @BeforeEach
     void setUp() {
         projectQueryService = new ProjectQueryService(projectRepository, issueRepository, claimRepository, projectMaintainerRepository);
-        service = new ProjectService(projectRepository, projectMaintainerRepository, projectQueryService);
+        RateLimitService unlimitedRateLimitService =
+                new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000);
+        service = new ProjectService(projectRepository, projectMaintainerRepository, projectQueryService, unlimitedRateLimitService);
 
         submitter = userRepository.save(User.builder()
                 .githubId(System.nanoTime())

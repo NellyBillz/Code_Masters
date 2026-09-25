@@ -18,6 +18,7 @@ import java.util.UUID;
 import za.codemaster.backend.client.github.dto.GitHubOAuthUser;
 import za.codemaster.backend.service.AuthPersistenceService;
 import za.codemaster.backend.service.GitHubOAuthService;
+import za.codemaster.backend.service.RateLimitService;
 
 import java.net.URI;
 import java.security.SecureRandom;
@@ -38,6 +39,7 @@ public class AuthController {
     private final Duration sessionTtl;
     private final boolean secureCookies;
     private final SessionRepository sessionRepository;
+    private final RateLimitService rateLimitService;
 
     public AuthController(
             GitHubOAuthService gitHubOAuthService,
@@ -45,17 +47,20 @@ public class AuthController {
             @Value("${app.frontend-url:http://localhost:3000}") String frontendUrl,
             @Value("${app.session-ttl:PT168H}") Duration sessionTtl,
             @Value("${app.cookies.secure:false}") boolean secureCookies,
-            SessionRepository sessionRepository) {
+            SessionRepository sessionRepository,
+            RateLimitService rateLimitService) {
         this.gitHubOAuthService = gitHubOAuthService;
         this.authPersistenceService = authPersistenceService;
         this.frontendUrl = frontendUrl;
         this.sessionTtl = sessionTtl;
         this.secureCookies = secureCookies;
         this.sessionRepository = sessionRepository;
+        this.rateLimitService = rateLimitService;
     }
 
     @GetMapping("/auth/github")
     public ResponseEntity<Void> startGitHubLogin(HttpServletRequest request) {
+        rateLimitService.checkOAuthLimit(request.getRemoteAddr());
         String state = randomToken();
         request.getSession(true).setAttribute(OAUTH_STATE_SESSION_KEY, state);
         return ResponseEntity.status(HttpStatus.FOUND)
@@ -68,6 +73,7 @@ public class AuthController {
             @RequestParam String code,
             @RequestParam String state,
             HttpServletRequest request) {
+        rateLimitService.checkOAuthLimit(request.getRemoteAddr());
         HttpSession oauthSession = request.getSession(false);
         String expectedState = oauthSession == null ? null : (String) oauthSession.getAttribute(OAUTH_STATE_SESSION_KEY);
         if (oauthSession != null) {

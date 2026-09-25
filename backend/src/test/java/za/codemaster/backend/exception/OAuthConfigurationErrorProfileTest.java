@@ -8,6 +8,7 @@ import za.codemaster.backend.controller.AuthController;
 import za.codemaster.backend.repository.SessionRepository;
 import za.codemaster.backend.service.AuthPersistenceService;
 import za.codemaster.backend.service.GitHubOAuthService;
+import za.codemaster.backend.service.RateLimitService;
 
 import java.time.Duration;
 
@@ -71,6 +72,7 @@ class OAuthConfigurationErrorProfileTest {
                 "http://localhost:3000",
                 Duration.ofDays(7),
                 false,
-                mock(SessionRepository.class));
+                mock(SessionRepository.class),
+                new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000));
     }
 }

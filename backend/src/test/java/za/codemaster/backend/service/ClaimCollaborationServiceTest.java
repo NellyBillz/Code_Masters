@@ -89,7 +89,7 @@ class ClaimCollaborationServiceTest {
     @BeforeEach
     void setUp() {
         // A generous limit — this class isn't testing API-03.10's rate limiting.
-        RateLimitService unlimitedRateLimitService = new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000);
+        RateLimitService unlimitedRateLimitService = new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000);
         service = new ClaimCollaborationService(
                 collaborationRequestRepository, claimRepository, issueRepository, unlimitedRateLimitService,
                 notificationService);

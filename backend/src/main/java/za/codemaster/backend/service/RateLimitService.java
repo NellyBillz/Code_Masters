@@ -14,12 +14,15 @@ import java.util.concurrent.ConcurrentHashMap;
  * Round 2 (an {@code Error.code = RATE_LIMITED} response was documented but
  * nothing ever enforced it).
  * <p>
- * A plain in-memory token bucket per {@code (userId, action)} pair — no new
+ * A plain in-memory token bucket per {@code (key, action)} pair — no new
  * infrastructure, per the ticket's own instruction that this is sufficient at
  * this scale. Each bucket holds up to {@code limit} tokens, continuously
  * refilling back to full over one hour; each write attempt spends one token.
  * Limits are configuration values (see {@code application.properties}), not
- * hardcoded, so the team can tune them post-launch without a code change.
+ * hardcoded, so the team can tune them post-launch without a code change. The
+ * key is normally the caller's user id; {@link #checkOAuthLimit(String)} is
+ * the one exception, keyed by client IP instead, since that flow runs before
+ * there's an authenticated user to key a bucket by.
  * <p>
  * Deliberately keyed by action <em>type</em> (comment/claim/report), not by
  * endpoint: a comment on a project and a comment on an issue are the same
@@ -35,21 +38,30 @@ public class RateLimitService {
     private final int claimsPerHour;
     private final int reportsPerHour;
     private final int collaborationRequestsPerHour;
+    private final int projectSubmissionsPerHour;
+    private final int oauthAttemptsPerHour;
 
     private final ConcurrentHashMap<Long, TokenBucket> commentBuckets = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, TokenBucket> claimBuckets = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, TokenBucket> reportBuckets = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, TokenBucket> collaborationRequestBuckets = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<Long, TokenBucket> projectSubmissionBuckets = new ConcurrentHashMap<>();
+    /** Keyed by client IP, not user id — the OAuth flow has no authenticated caller yet (design doc §16 follow-up, 2026-09-25). */
+    private final ConcurrentHashMap<String, TokenBucket> oauthAttemptBuckets = new ConcurrentHashMap<>();
 
     public RateLimitService(
             @Value("${app.rate-limit.comments-per-hour:20}") int commentsPerHour,
             @Value("${app.rate-limit.claims-per-hour:10}") int claimsPerHour,
             @Value("${app.rate-limit.reports-per-hour:5}") int reportsPerHour,
-            @Value("${app.rate-limit.collaboration-requests-per-hour:10}") int collaborationRequestsPerHour) {
+            @Value("${app.rate-limit.collaboration-requests-per-hour:10}") int collaborationRequestsPerHour,
+            @Value("${app.rate-limit.project-submissions-per-hour:5}") int projectSubmissionsPerHour,
+            @Value("${app.rate-limit.oauth-attempts-per-hour:20}") int oauthAttemptsPerHour) {
         this.commentsPerHour = commentsPerHour;
         this.claimsPerHour = claimsPerHour;
         this.reportsPerHour = reportsPerHour;
         this.collaborationRequestsPerHour = collaborationRequestsPerHour;
+        this.projectSubmissionsPerHour = projectSubmissionsPerHour;
+        this.oauthAttemptsPerHour = oauthAttemptsPerHour;
     }
 
     /**
@@ -84,8 +96,30 @@ public class RateLimitService {
         enforce(collaborationRequestBuckets, userId, collaborationRequestsPerHour, "collaboration request");
     }
 
-    private void enforce(ConcurrentHashMap<Long, TokenBucket> buckets, Long userId, int limit, String actionName) {
-        TokenBucket bucket = buckets.computeIfAbsent(userId, id -> new TokenBucket(limit));
+    /**
+     * @throws ApiException with code {@code RATE_LIMITED} (429) if the caller has
+     *                       submitted too many projects in the last hour
+     */
+    public void checkProjectSubmissionLimit(Long userId) {
+        enforce(projectSubmissionBuckets, userId, projectSubmissionsPerHour, "project submission");
+    }
+
+    /**
+     * Covers both {@code /auth/github} (starts a server-side session per hit)
+     * and {@code /auth/github/callback} — the one pair of public write-adjacent
+     * endpoints with no authenticated caller to key a bucket by, so this is
+     * keyed by client IP instead (security audit finding, 2026-09-24: neither
+     * endpoint had any rate limit at all).
+     *
+     * @throws ApiException with code {@code RATE_LIMITED} (429) if this IP has
+     *                       attempted too many logins in the last hour
+     */
+    public void checkOAuthLimit(String clientIp) {
+        enforce(oauthAttemptBuckets, clientIp, oauthAttemptsPerHour, "login");
+    }
+
+    private <K> void enforce(ConcurrentHashMap<K, TokenBucket> buckets, K key, int limit, String actionName) {
+        TokenBucket bucket = buckets.computeIfAbsent(key, id -> new TokenBucket(limit));
         if (!bucket.tryConsume()) {
             throw new ApiException(
                     "RATE_LIMITED",

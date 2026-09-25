@@ -87,7 +87,7 @@ class MaintainerActivityServiceTest {
     void setUp() {
         projectQueryService = new ProjectQueryService(projectRepository, issueRepository, claimRepository, projectMaintainerRepository);
         // A generous limit — this class isn't testing API-03.10's rate limiting.
-        RateLimitService unlimitedRateLimitService = new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000);
+        RateLimitService unlimitedRateLimitService = new RateLimitService(1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000, 1_000_000);
         claimService = new ClaimService(claimRepository, issueRepository, projectMaintainerRepository, unlimitedRateLimitService,
                 claimCollaborationRequestRepository, notificationService);
         commentService = new CommentService(commentRepository, projectRepository, issueRepository, projectMaintainerRepository,

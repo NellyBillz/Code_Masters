@@ -39,13 +39,16 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final ProjectMaintainerRepository projectMaintainerRepository;
     private final ProjectQueryService projectQueryService;
+    private final RateLimitService rateLimitService;
 
     public ProjectService(ProjectRepository projectRepository,
                            ProjectMaintainerRepository projectMaintainerRepository,
-                           ProjectQueryService projectQueryService) {
+                           ProjectQueryService projectQueryService,
+                           RateLimitService rateLimitService) {
         this.projectRepository = projectRepository;
         this.projectMaintainerRepository = projectMaintainerRepository;
         this.projectQueryService = projectQueryService;
+        this.rateLimitService = rateLimitService;
     }
 
     /**
@@ -92,6 +95,8 @@ public class ProjectService {
      */
     @Transactional
     public ProjectDto createProject(CreateProjectRequest request, User submitter) {
+        rateLimitService.checkProjectSubmissionLimit(submitter.getId());
+
         Matcher matcher = GITHUB_URL_PATTERN.matcher(request.githubUrl());
         if (!matcher.matches()) {
             throw new ApiException(

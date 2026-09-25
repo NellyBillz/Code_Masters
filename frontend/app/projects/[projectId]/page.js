@@ -27,6 +27,7 @@ import SyncStatusBanner from "../../components/SyncStatusBanner";
 import EditProjectPanel from "../../components/EditProjectPanel";
 import ReportProjectPanel from "../../components/ReportProjectPanel";
 import ProjectComments from "../../components/ProjectComments";
+import EmbedBadgePanel from "../../components/EmbedBadgePanel";
 
 const TABS = ["Overview", "Issues", "Pull requests", "Contributors", "Discussions"];
 
@@ -762,6 +763,8 @@ function ContributorsTab({ project, isMaintainer, onMaintainerAdded, onMaintaine
         onMaintainerAdded={onMaintainerAdded}
         onMaintainerRemoved={onMaintainerRemoved}
       />
+
+      <EmbedBadgePanel project={project} isMaintainer={isMaintainer} />
     </div>
   );
 }
