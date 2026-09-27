@@ -1,5 +1,11 @@
-# Environment variables
+# Environment variables and secrets (never commit these)
 .env
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
 .env.local
 .env.*.local
 
@@ -7,8 +13,9 @@
 frontend/.next/
 frontend/out/
 
-# Dependencies
+# Dependencies and build output
 frontend/node_modules/
+backend/target/
 
 # Logs
 *.log
